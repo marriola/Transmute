@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "Transmute": {
+      "commandName": "Project",
+      "commandLineArgs": "--lexicon sample\\lexicon.txt --rules sample\\test.sc"
+    }
+  }
+}

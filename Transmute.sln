@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.27130.2024
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Transmute", "Transmute\Transmute.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TransmuteLib", "TransmuteLib\TransmuteLib.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E909825E-D739-4690-A5A1-E136FB506007}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E909825E-D739-4690-A5A1-E136FB506007}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {52C3C505-38A0-4EFB-A27C-5D05077F1CB1}
+	EndGlobalSection
+EndGlobal
