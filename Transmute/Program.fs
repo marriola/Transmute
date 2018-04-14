@@ -14,6 +14,7 @@ let validateOptions (options: Arguments.Options) =
 
 [<EntryPoint>]
 let main argv =
+    Console.OutputEncoding <- Text.Encoding.UTF8
     let options = Arguments.parse argv
     if not (validateOptions options) then
         Environment.Exit(0)
@@ -26,7 +27,14 @@ let main argv =
         | OK tokens ->
             printfn "%s"
                 (List.fold
-                    (fun acc v -> acc + sprintf "%s\n" (v.ToString()))
+                    (fun acc v ->
+                        acc + (sprintf
+                            "type: %s\n\
+                                value: \"%s\"\n\
+                                position: (%d, %d)\n\n" 
+                            (v.tokenType.ToString())
+                            v.value
+                            <|| v.position))
                     ""
                     tokens)
     Console.ReadKey()

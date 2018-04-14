@@ -71,28 +71,7 @@ type LexerResult =
     | FileError of (string)
 
 module Lexer =
-
-    let stateTokens =
-        (dict
-            [
-                (Q_LBrack, LBrack)
-                (Q_RBrack, RBrack)
-                (Q_LBrace, LBrace)
-                (Q_RBrace, RBrace)
-                (Q_LParen, LParen)
-                (Q_RParen, RParen)
-                (Q_Divider, Divider)
-                (Q_Placeholder, Placeholder)
-                (Q_Boundary, Boundary)
-                (Q_Plus, Plus)
-                (Q_Minus, Minus)
-                (Q_Pipe, Pipe)
-                (Q_Not, Not)
-                (Q_Gives, Gives)
-                (Q_IdentifierFinal, Id)
-                (Q_UtteranceFinal, Utterance)
-                (Q_CommentFinal, Comment)
-            ])
+    open System.Text
 
     let identifierTransitions =
         List.concat (
@@ -151,6 +130,28 @@ module Lexer =
                 transitionFrom Q_Comment [ on '\n' Q_CommentFinal ]
             ]
 
+    let stateTokens =
+        (dict
+            [
+                (Q_LBrack, LBrack)
+                (Q_RBrack, RBrack)
+                (Q_LBrace, LBrace)
+                (Q_RBrace, RBrace)
+                (Q_LParen, LParen)
+                (Q_RParen, RParen)
+                (Q_Divider, Divider)
+                (Q_Placeholder, Placeholder)
+                (Q_Boundary, Boundary)
+                (Q_Plus, Plus)
+                (Q_Minus, Minus)
+                (Q_Pipe, Pipe)
+                (Q_Not, Not)
+                (Q_Gives, Gives)
+                (Q_IdentifierFinal, Id)
+                (Q_UtteranceFinal, Utterance)
+                (Q_CommentFinal, Comment)
+            ])
+
     let incrRow pos =
         let row, col = pos
         (row + 1, 1)
@@ -161,10 +162,10 @@ module Lexer =
 
     let rec lexInternal
         (stream: StreamReader)
+        (value: StringBuilder)
         (currentState: State)
         (startPos: int * int)
         (pos: int * int)
-        (lastValue: string)
         (out: Token list) =
 
         let rec step s c =
@@ -183,34 +184,40 @@ module Lexer =
             let isFinal = stateTokens.ContainsKey nextState
             let isEpsilon = matchSymbol = Epsilon
             let nextPos =
-                if isEpsilon then pos
-                else if nextChar = '\n' then incrRow pos
-                else incrCol pos
-            let nextValue =
-                if isEpsilon then lastValue
-                else lastValue + (string (char (stream.Read())))
+                if isEpsilon then
+                    pos
+                else if nextChar = '\n' then
+                    incrRow pos
+                else
+                    incrCol pos
+
+            ignore (
+                if isEpsilon then
+                    value
+                else
+                    value.Append(stream.Read() |> char |> string))
 
             if nextState = ERROR then
                 let row, col = startPos in
-                    SyntaxError (sprintf "Unrecognized token '%s'" (nextValue.Trim()), row, col)
+                    SyntaxError (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col)
             else
                 let nextOut =
                     if isFinal then
-                        { tokenType = stateTokens.[nextState]; value = nextValue.Trim(); position = startPos } :: out
+                        { tokenType = stateTokens.[nextState]; value = value.ToString().Trim(); position = startPos } :: out
                     else
                         out
 
                 lexInternal
                     stream
+                    (if isFinal then value.Clear() else value)
                     nextState
                     (if isFinal || System.Char.IsWhiteSpace(nextChar) then nextPos else startPos)
                     nextPos
-                    (if isFinal then "" else nextValue)
                     nextOut
 
     let lex (filename: string) =
         try
             use stream = new StreamReader(filename, true)
-            lexInternal stream START (1, 1) (1, 1) "" []
+            lexInternal stream (new StringBuilder()) START (1, 1) (1, 1) []
         with
             | ex -> FileError ex.Message

@@ -1,6 +1,6 @@
 ﻿ah/oh/$C_#
-[-$round]/[+$round]/_$C[+$round]
+[-$round]/[+$round]/_$C($C)[+$round]
 
 $round {
-    iao => wowiezowie
+    iao => wɔwɪezõw̃ie
 }
