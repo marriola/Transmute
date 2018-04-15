@@ -1,5 +1,6 @@
-﻿[-$round]/[+$round]/_$C($C)[$V+$round]
-ah/oh/$C_#
+﻿e/ø/_(r|w)
+[-$round]/[+$round]/_$C($C)[$V+$round]
+s/h/$V_#
 
 $C { k p t }
 

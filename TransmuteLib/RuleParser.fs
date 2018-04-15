@@ -176,19 +176,43 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let rec matchRuleSegment tokens =
-            let matchOptional tokens =
-                let rec matchOptionalInternal tokens out =
-                    match tokens with
-                    | [] ->
-                        tokens, OptionalNode (List.rev out)
-                    | x::xs ->
-                        match x.tokenType with
-                        | RParen ->
-                            xs, OptionalNode (List.rev out)
-                        | _ ->
-                            let tokens, ruleSegment = matchRuleSegment tokens in
-                            matchOptionalInternal tokens (List.concat [ (List.rev ruleSegment); out ])
-                matchOptionalInternal tokens []
+            //let matchOptional tokens =
+            //    let rec matchOptionalInternal tokens out =
+            //        match tokens with
+            //        | [] ->
+            //            tokens, OptionalNode (List.rev out)
+            //        | x::xs ->
+            //            match x.tokenType with
+            //            | RParen ->
+            //                xs, OptionalNode (List.rev out)
+            //            | _ ->
+            //                let tokens, ruleSegment = matchRuleSegment tokens in
+            //                matchOptionalInternal tokens (List.concat [ (List.rev ruleSegment); out ])
+            //    matchOptionalInternal tokens []
+
+            let rec matchDisjunct (tokens: Token list) out =
+                match tokens.Head.tokenType with
+                | Whitespace ->
+                    matchDisjunct tokens.Tail out
+                | RParen ->
+                    tokens.Tail, DisjunctNode (List.rev out)
+                | _ ->
+                    let tokens, ruleSegment = matchRuleSegment tokens in
+                    matchDisjunct tokens (List.concat [ (List.rev ruleSegment); out ])
+
+            let matchOptional_Disjunct tokens =
+                let rec matchOptional_DisjunctInteral (tokens: Token list) out =
+                    match tokens.Head.tokenType with
+                    | Whitespace ->
+                        matchOptional_DisjunctInteral tokens.Tail out
+                    | RParen ->
+                        tokens.Tail, OptionalNode (List.rev out)
+                    | Pipe ->
+                        matchDisjunct tokens.Tail out
+                    | _ ->
+                        let tokens, ruleSegment = matchRuleSegment tokens in
+                        matchOptional_DisjunctInteral tokens (List.concat [ (List.rev ruleSegment); out ])
+                matchOptional_DisjunctInteral tokens []
 
             let rec matchRuleSegmentInternal tokens out =
                 match tokens with
@@ -208,7 +232,7 @@ module RuleParser =
                         let tokens, setIdentifier = matchSetIdentifier xs
                         matchRuleSegmentInternal tokens (setIdentifier :: out)
                     | LParen ->
-                        let tokens, optional = matchOptional xs
+                        let tokens, optional = matchOptional_Disjunct xs
                         matchRuleSegmentInternal tokens (optional :: out)
                     | _ ->
                         tokens, List.rev out
