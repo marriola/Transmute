@@ -6,6 +6,7 @@ open StateMachine
 type TokenType =
     | Error
     | Whitespace
+    | Separator
     | LBrack
     | RBrack
     | LBrace
@@ -35,6 +36,7 @@ type State =
     | ERROR
     | Q_Whitespace
     | Q_WhitespaceFinal
+    | Q_Separator
     | Q_LBrack
     | Q_RBrack
     | Q_LBrace
@@ -64,13 +66,13 @@ type LexerResult =
 
 module Lexer =
     open System.Text
+    open System
 
     let identifierTransitions =
         List.concat
             [ List.map (transitionTo Q_Identifier) (Charset.make '0' '9')
               List.map (transitionTo Q_Identifier) (Charset.make 'A' 'Z')
               List.map (transitionTo Q_Identifier) (Charset.make 'a' 'z')
-              [ on '-' Q_Identifier ]
             ]
 
     let utteranceTransitions =
@@ -83,6 +85,9 @@ module Lexer =
     let whitespaceTransitions =
         List.map (transitionTo Q_Whitespace) (List.ofSeq " \t\r\n")
     
+    /// <summary>
+    /// Defines the transition table for the lexer.
+    /// </summary>
     let table =
         createTransitionTable
             [ transitionFrom START whitespaceTransitions
@@ -91,7 +96,8 @@ module Lexer =
               transitionFrom Q_WhitespaceFinal [ epsilonTo START ]
 
               transitionFrom START
-                [ on '[' Q_LBrack
+                [ on '.' Q_Separator
+                  on '[' Q_LBrack
                   on ']' Q_RBrack
                   on '{' Q_LBrace
                   on '}' Q_RBrace
@@ -121,9 +127,13 @@ module Lexer =
               transitionFrom Q_Comment [ on '\n' Q_CommentFinal ]
             ]
 
+    /// <summary>
+    /// Defines the final states and the token produced by each.
+    /// </summary>
     let stateTokens =
         (dict
             [ (Q_WhitespaceFinal, Whitespace)
+              (Q_Separator, Separator)
               (Q_LBrack, LBrack)
               (Q_RBrack, RBrack)
               (Q_LBrace, LBrace)
@@ -163,9 +173,13 @@ module Lexer =
             let matchSymbol, next = StateMachine.step table s c ERROR
             // If we can't step from the current state, try stepping from START
             if next = ERROR && stateTokens.ContainsKey currentState then
-                step START c
+                match step START c with
+                | _, ERROR ->
+                    raise (ApplicationException (sprintf "Unrecognized token '%s' at row %d, column %d" (value.ToString().Trim()) <|| startPos))
+                | x ->
+                    x
             else
-                (matchSymbol, next)
+                matchSymbol, next
 
         if stream.EndOfStream then
             OK (List.rev out)
