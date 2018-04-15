@@ -15,9 +15,9 @@ type Match =
 
 type TransitionTable<'TState> = Dictionary<'TState * Match, 'TState>
 
-type SymbolClass<'TState, 'TSymbol> = {
-    state: 'TState;
-    members: ('TState * 'TSymbol) list;
+type SymbolClass<'TState, 'TSymbol> =
+    { state: 'TState;
+      members: ('TState * 'TSymbol) list;
     }
 
 type CharacterClass<'TState> = SymbolClass<'TState, Match>
@@ -61,9 +61,8 @@ let step<'a> (transitionTable: TransitionTable<'a>) (currentState: 'a) (inputSym
         (Char inputSymbol, failState)
 
 let transitionFrom state members =
-    {
-        state = state;
-        members = members
+    { state = state;
+      members = members
     }
 
 let on (c: char) state = (state, Char c)

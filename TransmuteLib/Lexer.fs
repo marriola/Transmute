@@ -24,10 +24,10 @@ type TokenType =
     | Utterance
     | Comment
 
-type Token = {
-    tokenType: TokenType;
-    position: int * int;
-    value: string
+type Token =
+    { tokenType: TokenType;
+      position: int * int;
+      value: string
     }
 
 type State =
@@ -55,16 +55,6 @@ type State =
     | Q_Comment
     | Q_CommentFinal
 
-type LexerState = {
-    stream: StreamReader;
-    currentState: State;
-    startPosition: int * int;
-    row: int;
-    col: int;
-    lastValue: string;
-    out: Token list;
-    }
-
 type LexerResult =
     | OK of (Token list)
     | SyntaxError of (string * int * int)
@@ -74,83 +64,75 @@ module Lexer =
     open System.Text
 
     let identifierTransitions =
-        List.concat (
-            [
-                List.map (transitionTo Q_Identifier) (Charset.make '0' '9')
-                List.map (transitionTo Q_Identifier) (Charset.make 'A' 'Z')
-                List.map (transitionTo Q_Identifier) (Charset.make 'a' 'z')
-                [ on '-' Q_Identifier ]
+        List.concat
+            [ List.map (transitionTo Q_Identifier) (Charset.make '0' '9')
+              List.map (transitionTo Q_Identifier) (Charset.make 'A' 'Z')
+              List.map (transitionTo Q_Identifier) (Charset.make 'a' 'z')
+              [ on '-' Q_Identifier ]
             ]
-        )
 
     let utteranceTransitions =
-        List.concat (
-            [
-                List.map (transitionTo Q_Utterance) (Charset.make 'a' 'z')
-                List.map (transitionTo Q_Utterance) (Charset.make '\u0250' '\u0341')
-                List.map (transitionTo Q_Utterance) (List.ofSeq "æðøçθβɸ")
+        List.concat
+            [ List.map (transitionTo Q_Utterance) (Charset.make 'a' 'z')
+              List.map (transitionTo Q_Utterance) (Charset.make '\u0250' '\u0341')
+              List.map (transitionTo Q_Utterance) (List.ofSeq "æðøçθβɸ")
             ]
-        )
     
     let table =
         createTransitionTable
-            [
-                transitionFrom START (List.map (transitionTo START) (List.ofSeq " \t\r\n"))
+            [ transitionFrom START (List.map (transitionTo START) (List.ofSeq " \t\r\n"))
 
-                transitionFrom START
-                    [
-                        on '[' Q_LBrack
-                        on ']' Q_RBrack
-                        on '{' Q_LBrace
-                        on '}' Q_RBrace
-                        on '(' Q_LParen
-                        on ')' Q_RParen
-                        on '/' Q_Divider
-                        on '_' Q_Placeholder
-                        on '#' Q_Boundary
-                        on '+' Q_Plus
-                        on '-' Q_Minus
-                        on '|' Q_Pipe
-                        on '!' Q_Not
-                    ]
+              transitionFrom START
+                [ on '[' Q_LBrack
+                  on ']' Q_RBrack
+                  on '{' Q_LBrace
+                  on '}' Q_RBrace
+                  on '(' Q_LParen
+                  on ')' Q_RParen
+                  on '/' Q_Divider
+                  on '_' Q_Placeholder
+                  on '#' Q_Boundary
+                  on '+' Q_Plus
+                  on '-' Q_Minus
+                  on '|' Q_Pipe
+                  on '!' Q_Not
+              ]
 
-                transitionFrom START [ on '=' Q0 ]
-                transitionFrom Q0 [ on '>' Q_Gives ]
+              transitionFrom START [ on '=' Q0 ]
+              transitionFrom Q0 [ on '>' Q_Gives ]
 
-                transitionFrom START [ on '$' Q_Identifier ]
-                transitionFrom Q_Identifier identifierTransitions
-                transitionFrom Q_Identifier [ epsilonTo Q_IdentifierFinal ]
+              transitionFrom START [ on '$' Q_Identifier ]
+              transitionFrom Q_Identifier identifierTransitions
+              transitionFrom Q_Identifier [ epsilonTo Q_IdentifierFinal ]
 
-                transitionFrom START utteranceTransitions
-                transitionFrom Q_Utterance utteranceTransitions
-                transitionFrom Q_Utterance [ epsilonTo Q_UtteranceFinal ]
-
-                transitionFrom START [ on ';' Q_Comment ]
-                transitionFrom Q_Comment [ anyTo Q_Comment ]
-                transitionFrom Q_Comment [ on '\n' Q_CommentFinal ]
+              transitionFrom START utteranceTransitions
+              transitionFrom Q_Utterance utteranceTransitions
+              transitionFrom Q_Utterance [ epsilonTo Q_UtteranceFinal ]
+              transitionFrom START [ on ';' Q_Comment ]
+              transitionFrom Q_Comment [ anyTo Q_Comment ]
+              transitionFrom Q_Comment [ on '\n' Q_CommentFinal ]
             ]
 
     let stateTokens =
         (dict
-            [
-                (Q_LBrack, LBrack)
-                (Q_RBrack, RBrack)
-                (Q_LBrace, LBrace)
-                (Q_RBrace, RBrace)
-                (Q_LParen, LParen)
-                (Q_RParen, RParen)
-                (Q_Divider, Divider)
-                (Q_Placeholder, Placeholder)
-                (Q_Boundary, Boundary)
-                (Q_Plus, Plus)
-                (Q_Minus, Minus)
-                (Q_Pipe, Pipe)
-                (Q_Not, Not)
-                (Q_Gives, Gives)
-                (Q_IdentifierFinal, Id)
-                (Q_UtteranceFinal, Utterance)
-                (Q_CommentFinal, Comment)
-            ])
+            [ (Q_LBrack, LBrack)
+              (Q_RBrack, RBrack)
+              (Q_LBrace, LBrace)
+              (Q_RBrace, RBrace)
+              (Q_LParen, LParen)
+              (Q_RParen, RParen)
+              (Q_Divider, Divider)
+              (Q_Placeholder, Placeholder)
+              (Q_Boundary, Boundary)
+              (Q_Plus, Plus)
+              (Q_Minus, Minus)
+              (Q_Pipe, Pipe)
+              (Q_Not, Not)
+              (Q_Gives, Gives)
+              (Q_IdentifierFinal, Id)
+              (Q_UtteranceFinal, Utterance)
+              (Q_CommentFinal, Comment)
+          ])
 
     let incrRow pos =
         let row, col = pos
@@ -206,14 +188,16 @@ module Lexer =
                         { tokenType = stateTokens.[nextState]; value = value.ToString().Trim(); position = startPos } :: out
                     else
                         out
+                let nextStartPos =
+                    if isFinal || System.Char.IsWhiteSpace(nextChar) then
+                        nextPos
+                    else
+                        startPos
 
-                lexInternal
-                    stream
-                    (if isFinal then value.Clear() else value)
-                    nextState
-                    (if isFinal || System.Char.IsWhiteSpace(nextChar) then nextPos else startPos)
-                    nextPos
-                    nextOut
+                if isFinal then
+                    ignore (value.Clear())
+
+                lexInternal stream value nextState nextStartPos nextPos nextOut
 
     let lex (filename: string) =
         try

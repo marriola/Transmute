@@ -1,13 +1,13 @@
 ﻿module Arguments
 
-type Options = {
-    lexiconFile: string;
-    rulesFile: string
+type Options =
+    { lexiconFile: string;
+      rulesFile: string
     }
 
-let defaultOptions = {
-    lexiconFile = null;
-    rulesFile = null
+let defaultOptions =
+    { lexiconFile = null;
+      rulesFile = null
     }
 
 let rec parseInternal (args: string list) (options: Options) =
