@@ -33,6 +33,8 @@ type Token =
 type State =
     | START
     | ERROR
+    | Q_Whitespace
+    | Q_WhitespaceFinal
     | Q_LBrack
     | Q_RBrack
     | Q_LBrace
@@ -77,10 +79,16 @@ module Lexer =
               List.map (transitionTo Q_Utterance) (Charset.make '\u0250' '\u0341')
               List.map (transitionTo Q_Utterance) (List.ofSeq "æðøçθβɸ")
             ]
+
+    let whitespaceTransitions =
+        List.map (transitionTo Q_Whitespace) (List.ofSeq " \t\r\n")
     
     let table =
         createTransitionTable
-            [ transitionFrom START (List.map (transitionTo START) (List.ofSeq " \t\r\n"))
+            [ transitionFrom START whitespaceTransitions
+              transitionFrom Q_Whitespace whitespaceTransitions
+              transitionFrom Q_Whitespace [ epsilonTo Q_WhitespaceFinal ]
+              transitionFrom Q_WhitespaceFinal [ epsilonTo START ]
 
               transitionFrom START
                 [ on '[' Q_LBrack
@@ -115,7 +123,8 @@ module Lexer =
 
     let stateTokens =
         (dict
-            [ (Q_LBrack, LBrack)
+            [ (Q_WhitespaceFinal, Whitespace)
+              (Q_LBrack, LBrack)
               (Q_RBrack, RBrack)
               (Q_LBrace, LBrace)
               (Q_RBrace, RBrace)
@@ -185,11 +194,18 @@ module Lexer =
             else
                 let nextOut =
                     if isFinal then
-                        { tokenType = stateTokens.[nextState]; value = value.ToString().Trim(); position = startPos } :: out
+                        { tokenType = stateTokens.[nextState];
+                          value =
+                            if currentState = Q_Whitespace then
+                                value.ToString()
+                            else
+                                value.ToString().Trim();
+                          position = startPos
+                        } :: out
                     else
                         out
                 let nextStartPos =
-                    if isFinal || System.Char.IsWhiteSpace(nextChar) then
+                    if isFinal || (currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
                         nextPos
                     else
                         startPos

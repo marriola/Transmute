@@ -1,6 +1,9 @@
-﻿ah/oh/$C_#
-[-$round]/[+$round]/_$C($C)[+$round]
+﻿[-$round]/[+$round]/_$C($C)[$V+$round]
+ah/oh/$C_#
 
-$round {
-    iao => wɔwɪezõw̃ie
+$C { k p t }
+
+[$round] {
+    i => y
+    k => kʷ
 }

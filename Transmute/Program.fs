@@ -25,17 +25,14 @@ let main argv =
         | SyntaxError (msg, row, col) ->
             printfn "Syntax error at row %d column %d: %s" row col msg
         | OK tokens ->
+            let rules = RuleParser.parse tokens
             printfn "%s"
                 (List.fold
-                    (fun acc v ->
+                    (fun acc r ->
                         acc + (sprintf
-                            "type: %s\n\
-                                value: \"%s\"\n\
-                                position: (%d, %d)\n\n" 
-                            (v.tokenType.ToString())
-                            v.value
-                            <|| v.position))
+                            "%s\n" 
+                            (r.ToString())))
                     ""
-                    tokens)
+                    rules)
     Console.ReadKey()
     0 // return an integer exit code
