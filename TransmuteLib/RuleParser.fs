@@ -1,6 +1,5 @@
 ﻿namespace TransmuteLib
 
-open StateMachine
 open Exceptions
 open System
 
@@ -14,20 +13,70 @@ type ExpectedSetException(expected:TokenType list, got:Token) =
             (got.ToString()) <|| got.position))
 
 type Node =
+    /// <summary>
+    /// Represents an identifier.
+    /// </summary>
     | IdentifierNode of string
+
+    /// <summary>
+    /// Defines the intersection of a list of sets and features.
+    /// </summary>
     | SetIdentifierNode of Node list
+
+    /// <summary>
+    /// Represents the presence of a set in a set identifier.
+    /// </summary>
     | SetIdentifierTermNode of name:string
+
+    /// <summary>
+    /// Represents the presenc or absence of a feature in a set identifier.
+    /// </summary>
     | FeatureIdentifierTermNode of isPresent:bool * name:string
-    | CompoundSetNode of Node list
+
+    /// <summary>
+    /// Represents an utterance.
+    /// </summary>
     | UtteranceNode of string
+
+    /// <summary>
+    /// Represents the placeholder for the target segment in the environment segment.
+    /// </summary>
     | PlaceholderNode
+
+    /// <summary>
+    /// Represents a word boundary in the environment segment.
+    /// </summary>
     | BoundaryNode
+
+    /// <summary>
+    /// Represents a phonological rule.
+    /// </summary>
     | RuleNode of target:Node list * result:Node list * environment:Node list
+
+    /// <summary>
+    /// Defines a set of utterances.
+    /// </summary>
     | SetDefinitionNode of name:string * members:Node list
-    | FeatureDefinitionNode of name:string * members:Node list
-    | OptionalNode of Node list
-    | DisjunctNode of Node list
+
+    /// <summary>
+    /// Defines a transformation from one phoneme to another.
+    /// </summary>
     | TransformationNode of target:Node * result:Node
+
+    /// <summary>
+    /// Defines a set of phonemes possessing this feature and transformations on it.
+    /// </summary>
+    | FeatureDefinitionNode of name:string * members:Node list
+
+    /// <summary>
+    /// Defines a list of nodes that may be optionally matched.
+    /// </summary>
+    | OptionalNode of Node list
+
+    /// <summary>
+    /// Defines a set of lists of nodes, only one of which may be matched.
+    /// </summary>
+    | DisjunctNode of Node list
 
 type RuleParserResult =
     | OK of Node list
@@ -38,6 +87,10 @@ type NextResult =
     | SyntaxError of string * (int * int)
 
 module RuleParser =
+    /// <summary>
+    /// Parses the next node in the list of tokens.
+    /// </summary>
+    /// <param name="tokens">The list of tokens.</param>
     let rec next tokens =
         let mutable _position = (1, 1)
 
@@ -57,6 +110,8 @@ module RuleParser =
         /// <summary>
         /// Matches a token to one of a set of token types.
         /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="targetTypes">The list of valid token types.</param>
         let rec matchSet (tokens: Token list) (targetTypes: TokenType list) =
             let tokenType = tokens.Head.tokenType
             if tokenType = Whitespace then
@@ -66,15 +121,27 @@ module RuleParser =
             else
                 raise (ExpectedSetException (targetTypes, tokens.Head))
 
+        /// <summary>
+        /// Matches a <see cref="FeatureIdentifierTermNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchFeatureIdentifierTerm tokens =
             let tokens, presence = matchSet tokens [ Plus; Minus ]
             let tokens, identifier = matchToken tokens Id
             tokens, FeatureIdentifierTermNode (presence.tokenType = Plus, identifier.value)
 
+        /// <summary>
+        /// Matches a <see cref="SetIdentifierTermNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchSetIdentifierTerm tokens =
             let tokens, identifier = matchToken tokens Id
             tokens, SetIdentifierTermNode identifier.value
 
+        /// <summary>
+        /// Matches either a <see cref="SetIdentifierTermNode" /> or a <see cref="FeatureIdentifierTermNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchSetOrFeatureIdentifierTerm (tokens: Token list) =
             match tokens.Head.tokenType with
             | Id ->
@@ -84,6 +151,10 @@ module RuleParser =
             | _ ->
                 raise (ExpectedSetException ([ Id; Plus; Minus ], tokens.Head))
 
+        /// <summary>
+        /// Matches a <see cref="SetIdentifierNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchSetIdentifier tokens =
             let rec matchSetIdentifierInternal tokens out =
                 match tokens with
@@ -98,6 +169,12 @@ module RuleParser =
                         matchSetIdentifierInternal tokens (term :: out)
             matchSetIdentifierInternal tokens []
 
+        /// <summary>
+        /// Matches a rule segment, i.e. a list of <see cref="IdentifierNode" />, <see cref="UtteranceNode" />,
+        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="SetIdentifierNode" />,
+        /// <see cref="OptionalNode" /> or <see cref="DisjunctNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let rec matchRuleSegment tokens =
             let matchOptional tokens =
                 let rec matchOptionalInternal tokens out =
@@ -137,6 +214,11 @@ module RuleParser =
                         tokens, List.rev out
             matchRuleSegmentInternal tokens []
 
+        /// <summary>
+        /// Matches either an <see cref="UtteranceNode" /> or a <see cref="TransformationNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="utterance">The utterance already matched.</param>
         let rec matchUtterance_Transformation (tokens: Token list) utterance =
             match tokens.Head.tokenType with
             | Whitespace ->
@@ -147,6 +229,11 @@ module RuleParser =
             | _ ->
                 tokens, utterance
 
+        /// <summary>
+        /// Matches a list of set/feature members. These may be of type <see cref="UtteranceNode" /> or
+        /// <see cref="TransformationNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchMemberList tokens =
             let rec matchMemberListInternal tokens out =
                 match tokens with
@@ -167,6 +254,10 @@ module RuleParser =
                         raise (UnexpectedTokenException (Utterance, x))
             matchMemberListInternal tokens []
 
+        /// <summary>
+        /// Matches a rule.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchRule tokens =
             let tokens, target = matchRuleSegment tokens
             let tokens, _ = matchToken tokens Divider
@@ -175,6 +266,11 @@ module RuleParser =
             let tokens, environment = matchRuleSegment tokens
             tokens, RuleNode (target, replacement, environment)
 
+        /// <summary>
+        /// Matches a rule when an identifier has already been matched.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="identifier">The identifier already matched.</param>
         let matchRuleStartingWithIdentifier tokens (identifier: Token) =
             let tokens, ruleNode = matchRule tokens
             match ruleNode with
@@ -182,6 +278,10 @@ module RuleParser =
                 tokens, RuleNode (IdentifierNode identifier.value :: target, replacement, environment)
             | _ -> raise (SyntaxException ("unexpected error", _position))
 
+        /// <summary>
+        /// Matches either a set or a rule.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchSet_Rule tokens identifier =
             let tokens, nextToken = matchSet tokens [ LBrace; Utterance ]
             match nextToken.tokenType with
@@ -194,6 +294,10 @@ module RuleParser =
                 tokens, ruleNode
             | _ -> raise (SyntaxException ("unexpected error", nextToken.position))
 
+        /// <summary>
+        /// Matches a rule when a set identifier has already been matched.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchRuleStartingWithSetIdentifier tokens =
             let tokens, setIdentifier = matchSetIdentifier tokens
             let tokens, ruleNode = matchRule tokens
@@ -203,6 +307,10 @@ module RuleParser =
             | _ ->
                 raise (SyntaxException ("unexpected error", _position))
                     
+        /// <summary>
+        /// Matches a feature definition.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchFeature tokens =
             let tokens, identifier = matchToken tokens Id
             let tokens, _ = matchToken tokens RBrack
@@ -210,6 +318,11 @@ module RuleParser =
             let tokens, memberList = matchMemberList tokens
             tokens, FeatureDefinitionNode (identifier.value, memberList)
 
+        /// <summary>
+        /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="SetIdentifierNode" />
+        /// or a <see cref="RuleNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
         let matchFeature_SetIdentifier_Rule (tokens: Token list) =
             match tokens.Head.tokenType with
             | Plus | Minus ->
@@ -219,6 +332,11 @@ module RuleParser =
             | _ ->
                 raise (ExpectedSetException ([ Plus; Minus; Id ], tokens.Head))
 
+        /// <summary>
+        /// Determines which rule to match to the available tokens.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <exception cref="SyntaxException">No rule matches the available tokens.</exception>
         let rec nextInternal tokens =
             try
                 match tokens with
@@ -239,6 +357,7 @@ module RuleParser =
             with
                 | :? SyntaxException as ex -> SyntaxError (ex.Message, (0, 0))
    
+        // Store result and updat position before returning
         let result = (nextInternal tokens)
 
         match result with
@@ -248,6 +367,10 @@ module RuleParser =
             result
         | _ -> result
 
+    /// <summary>
+    /// Parses a list of tokens to a list of nodes.
+    /// </summary>
+    /// <param name="tokens">The list of tokens to parse.</param>
     let parse tokens =
         let rec parseInternal tokens (out: Node list) =
             match tokens with
