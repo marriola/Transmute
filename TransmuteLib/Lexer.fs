@@ -93,7 +93,6 @@ module Lexer =
             [ transitionFrom START whitespaceTransitions
               transitionFrom Q_Whitespace whitespaceTransitions
               transitionFrom Q_Whitespace [ epsilonTo Q_WhitespaceFinal ]
-              transitionFrom Q_WhitespaceFinal [ epsilonTo START ]
 
               transitionFrom START
                 [ on '.' Q_Separator
@@ -184,6 +183,8 @@ module Lexer =
         if stream.EndOfStream then
             OK (List.rev out)
         else
+            // Peek the next input symbol and transition on it. If the transition is not an
+            // epsilon transition, advance the lexer position and consume the input symbol.
             let nextChar = char (stream.Peek())
             let matchSymbol, nextState = step currentState nextChar
             let isFinal = stateTokens.ContainsKey nextState
@@ -200,12 +201,13 @@ module Lexer =
                 if isEpsilon then
                     value
                 else
-                    value.Append(stream.Read() |> char |> string))
+                    value.Append(stream.Read() |> char))
 
             if nextState = ERROR then
                 let row, col = startPos in
                     SyntaxError (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col)
             else
+                // Add token to output if on a final state
                 let nextOut =
                     if isFinal then
                         { tokenType = stateTokens.[nextState];
@@ -219,6 +221,7 @@ module Lexer =
                     else
                         out
                 let nextStartPos =
+                    // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
                     if isFinal || (currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
                         nextPos
                     else

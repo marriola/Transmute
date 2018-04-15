@@ -13,6 +13,9 @@ type ExpectedSetException(expected:TokenType list, got:Token) =
             (got.tokenType.ToString()) <|| got.position))
 
 type Node =
+    /// <summary>
+    /// Represents a comment.
+    /// </summary>
     | CommentNode of string
 
     /// <summary>
@@ -330,6 +333,11 @@ module RuleParser =
             | _ ->
                 raise (SyntaxException ("unexpected error", _position))
 
+        /// <summary>
+        /// Prepends a node list to the target segment of a RuleNode.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/>
+        /// is not a <see cref="RuleNode" />.</exception>
         let prependToRule rule (nodes: Node list) =
             match rule with
             | RuleNode (target, replacement, environment) ->
@@ -337,6 +345,11 @@ module RuleParser =
             | _ ->
                 raise (ArgumentException ("Must be a RuleNode", "rule"))
 
+        /// <summary>
+        /// Prepends a node list to the initial SetIdentifierNode of the target segment of a RuleNode.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
+        /// or when the first element of the target segment is not a <see cref="SetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule (nodes: Node list) =
             match rule with
             | RuleNode (target, _relacement, _environment) ->
@@ -344,7 +357,7 @@ module RuleParser =
                 | SetIdentifierNode identifiers ->
                     RuleNode ((List.concat [ nodes; identifiers ]), _relacement, _environment)
                 | _ ->
-                    raise (ArgumentException ("Must be a RuleNode", "rule"))
+                    raise (ArgumentException ("First element of the target segment must be a SetIdentifierNode", "rule"))
             | _ ->
                 raise (ArgumentException ("Must be a RuleNode", "rule"))
                     
@@ -362,6 +375,9 @@ module RuleParser =
         /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="SetIdentifierNode" />
         /// or a <see cref="RuleNode" />.
         /// </summary>
+        /// <remarks>
+        /// LBrack '[' is parsed just before entering this function.
+        /// </remarks>
         /// <param name="tokens">The list of tokens.</param>
         let rec matchFeature_SetIdentifier_Rule (tokens: Token list) (identifier:Token option) =
             match tokens.Head.tokenType with
@@ -403,7 +419,7 @@ module RuleParser =
             try
                 match tokens with
                 | [] ->
-                    SyntaxError ("End of file", (0, 0))
+                    SyntaxError ("End of file", _position)
                 | x::xs ->
                     match x.tokenType with
                     | Whitespace ->
@@ -419,9 +435,9 @@ module RuleParser =
                     | _ ->
                         SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
-                | :? SyntaxException as ex -> SyntaxError (ex.Message, (0, 0))
+                | :? SyntaxException as ex -> SyntaxError (ex.Message, _position)
    
-        // Store result and updat position before returning
+        // Store result and update position before returning
         let result = (nextInternal tokens)
 
         match result with
