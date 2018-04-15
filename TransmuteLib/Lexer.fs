@@ -222,7 +222,7 @@ module Lexer =
                         out
                 let nextStartPos =
                     // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isFinal || (currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
+                    if isFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
                         nextPos
                     else
                         startPos

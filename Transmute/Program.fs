@@ -34,5 +34,10 @@ let main argv =
                             (r.ToString())))
                     ""
                     rules)
+            match SyntaxAnalyzer.validate rules with
+            | ValidateResult.OK ->
+                printfn "Passed validation!"
+            | ValidateResult.SyntaxError (message, (row, col)) ->
+                printfn "Syntax error at row %d column %d: %s" row col message
     Console.ReadKey()
     0 // return an integer exit code

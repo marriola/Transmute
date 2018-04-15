@@ -83,6 +83,11 @@ type Node =
     /// </summary>
     | DisjunctNode of Node list
 
+    /// <summary>
+    /// Represents a node tagged with metadata.
+    /// </summary>
+    | TaggedNode of pos:(int * int) * Node
+
 type RuleParserResult =
     | OK of Node list
     | SyntaxError of string * (int * int)
@@ -91,7 +96,28 @@ type NextResult =
     | OK of Token list * Node
     | SyntaxError of string * (int * int)
 
+type ValidateResult =
+    | OK
+    | SyntaxError of string * (int * int)
+
 module RuleParser =
+    let inline tag node position =
+        TaggedNode (position, node)
+
+    let inline untag taggedNode =
+        match taggedNode with
+        | TaggedNode (_, node) ->
+            node
+        | x ->
+            x
+
+    let inline untagWithMetadata taggedNode =
+        match taggedNode with
+        | TaggedNode (position, node) ->
+            position, node
+        | x ->
+            (0, 0), x
+
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
@@ -133,7 +159,7 @@ module RuleParser =
         let matchFeatureIdentifierTerm tokens =
             let tokens, presence = matchSet tokens [ Plus; Minus ]
             let tokens, identifier = matchToken tokens Id
-            tokens, FeatureIdentifierTermNode (presence.tokenType = Plus, identifier.value)
+            tokens, tag (FeatureIdentifierTermNode (presence.tokenType = Plus, identifier.value)) presence.position
 
         /// <summary>
         /// Matches a <see cref="SetIdentifierTermNode" />.
@@ -141,7 +167,7 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let matchSetIdentifierTerm tokens =
             let tokens, identifier = matchToken tokens Id
-            tokens, SetIdentifierTermNode identifier.value
+            tokens, tag (SetIdentifierTermNode identifier.value) identifier.position
 
         /// <summary>
         /// Matches either a <see cref="SetIdentifierTermNode" /> or a <see cref="FeatureIdentifierTermNode" />.
@@ -160,7 +186,7 @@ module RuleParser =
         /// Matches a <see cref="SetIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let matchSetIdentifier tokens =
+        let matchSetIdentifier (tokens: Token list) headPosition =
             let rec matchSetIdentifierInternal tokens out =
                 match tokens with
                 | [] ->
@@ -168,7 +194,7 @@ module RuleParser =
                 | x::xs ->
                     match x.tokenType with
                     | RBrack ->
-                        xs, SetIdentifierNode (List.rev out)
+                        xs, tag (SetIdentifierNode (List.rev out)) headPosition
                     | _ ->
                         let tokens, term = matchSetOrFeatureIdentifierTerm tokens
                         matchSetIdentifierInternal tokens (term :: out)
@@ -186,29 +212,30 @@ module RuleParser =
             /// </summary>
             /// <param name="tokens">The list of tokens.</param>
             /// <param name="out">The contents of the node.</param>
-            let rec matchDisjunct (tokens: Token list) out =
+            let rec matchDisjunct (tokens: Token list) (startToken: Token) out =
                 match tokens.Head.tokenType with
                 | Whitespace ->
-                    matchDisjunct tokens.Tail out
+                    matchDisjunct tokens.Tail startToken out
                 | RParen ->
-                    tokens.Tail, DisjunctNode (List.rev out)
+                    tokens.Tail, tag (DisjunctNode (List.rev out)) startToken.position
                 | _ ->
                     let tokens, ruleSegment = matchRuleSegment tokens in
-                    matchDisjunct tokens (List.concat [ (List.rev ruleSegment); out ])
+                    matchDisjunct tokens startToken (List.concat [ (List.rev ruleSegment); out ])
 
             /// <summary>
             /// Matches either an <see cref="OptionalNode" /> or a <see cref="DisjunctNode" />.
             /// </summary>
             /// <param name="tokens">The list of tokens.</param>
             let matchOptional_Disjunct tokens =
+                let tokens, lparen = matchToken tokens LParen
                 let rec matchOptional_DisjunctInteral (tokens: Token list) out =
                     match tokens.Head.tokenType with
                     | Whitespace ->
                         matchOptional_DisjunctInteral tokens.Tail out
                     | RParen ->
-                        tokens.Tail, OptionalNode (List.rev out)
+                        tokens.Tail, tag (OptionalNode (List.rev out)) lparen.position
                     | Pipe ->
-                        matchDisjunct tokens.Tail out
+                        matchDisjunct tokens.Tail lparen out
                     | _ ->
                         let tokens, ruleSegment = matchRuleSegment tokens in
                         matchOptional_DisjunctInteral tokens (List.concat [ (List.rev ruleSegment); out ])
@@ -223,18 +250,18 @@ module RuleParser =
                     | Separator ->
                         matchRuleSegmentInternal xs out
                     | Id ->
-                        matchRuleSegmentInternal xs (IdentifierNode x.value :: out)
+                        matchRuleSegmentInternal xs (tag (IdentifierNode x.value) x.position :: out)
                     | Utterance ->
-                        matchRuleSegmentInternal xs (UtteranceNode x.value :: out)
+                        matchRuleSegmentInternal xs (tag (UtteranceNode x.value) x.position :: out)
                     | Placeholder ->
-                        matchRuleSegmentInternal xs (PlaceholderNode :: out)
+                        matchRuleSegmentInternal xs (tag PlaceholderNode x.position :: out)
                     | Boundary ->
-                        matchRuleSegmentInternal xs (BoundaryNode :: out)
+                        matchRuleSegmentInternal xs (tag BoundaryNode x.position :: out)
                     | LBrack ->
-                        let tokens, setIdentifier = matchSetIdentifier xs
+                        let tokens, setIdentifier = matchSetIdentifier xs x.position
                         matchRuleSegmentInternal tokens (setIdentifier :: out)
                     | LParen ->
-                        let tokens, optional = matchOptional_Disjunct xs
+                        let tokens, optional = matchOptional_Disjunct tokens
                         matchRuleSegmentInternal tokens (optional :: out)
                     | _ ->
                         tokens, List.rev out
@@ -251,9 +278,11 @@ module RuleParser =
                 matchUtterance_Transformation tokens.Tail utterance
             | Gives ->
                 let tokens, result = matchToken tokens.Tail Utterance
-                tokens, TransformationNode (utterance, UtteranceNode result.value)
+                tokens, tag (TransformationNode (
+                    tag (UtteranceNode utterance.value) utterance.position,
+                    tag (UtteranceNode result.value) result.position)) utterance.position
             | _ ->
-                tokens, utterance
+                tokens, tag (UtteranceNode utterance.value) utterance.position
 
         /// <summary>
         /// Matches a list of set/feature members. These may be of type <see cref="UtteranceNode" /> or
@@ -270,8 +299,7 @@ module RuleParser =
                     | Whitespace ->
                         matchMemberListInternal xs out
                     | Utterance ->
-                        let utterance = UtteranceNode x.value
-                        let tokens, utteranceOrTransformation = matchUtterance_Transformation xs utterance
+                        let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
                         matchMemberListInternal tokens (utteranceOrTransformation :: out)
                     | RBrace ->
                         xs, List.rev out
@@ -284,13 +312,13 @@ module RuleParser =
         /// Matches a rule.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let matchRule tokens =
+        let matchRule tokens headPosition =
             let tokens, target = matchRuleSegment tokens
             let tokens, _ = matchToken tokens Divider
             let tokens, replacement = matchRuleSegment tokens
             let tokens, _ = matchToken tokens Divider
             let tokens, environment = matchRuleSegment tokens
-            tokens, RuleNode (target, replacement, environment)
+            tokens, tag (RuleNode (target, replacement, environment)) headPosition
 
         /// <summary>
         /// Matches a rule when an identifier has already been matched.
@@ -298,10 +326,15 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         /// <param name="identifier">The identifier already matched.</param>
         let matchRuleStartingWithIdentifier tokens (identifier: Token) =
-            let tokens, ruleNode = matchRule tokens
-            match ruleNode with
+            let tokens, ruleNode = matchRule tokens identifier.position
+            match untag ruleNode with
             | RuleNode (target, replacement, environment) ->
-                tokens, RuleNode (IdentifierNode identifier.value :: target, replacement, environment)
+                tokens, tag
+                    (RuleNode (
+                        tag (IdentifierNode identifier.value) identifier.position :: target,
+                        replacement,
+                        environment))
+                    identifier.position
             | _ -> raise (SyntaxException ("unexpected error", _position))
 
         /// <summary>
@@ -314,7 +347,7 @@ module RuleParser =
             | LBrace ->
                 // TODO: include members of other sets
                 let tokens, members = matchMemberList tokens
-                tokens, SetDefinitionNode (identifier.value, members)
+                tokens, tag (SetDefinitionNode (identifier.value, members)) identifier.position
             | Utterance ->
                 let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
                 tokens, ruleNode
@@ -324,12 +357,12 @@ module RuleParser =
         /// Matches a rule when a set identifier has already been matched.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let matchRuleStartingWithSetIdentifier tokens =
-            let tokens, setIdentifier = matchSetIdentifier tokens
-            let tokens, ruleNode = matchRule tokens
-            match ruleNode with
+        let matchRuleStartingWithSetIdentifier tokens headPosition =
+            let tokens, setIdentifier = matchSetIdentifier tokens headPosition
+            let tokens, ruleNode = matchRule tokens headPosition
+            match untag ruleNode with
             | RuleNode (target, replacement, environment) ->
-                tokens, RuleNode (setIdentifier :: target, replacement, environment)
+                tokens, tag (RuleNode (setIdentifier :: target, replacement, environment)) headPosition
             | _ ->
                 raise (SyntaxException ("unexpected error", _position))
 
@@ -338,10 +371,10 @@ module RuleParser =
         /// </summary>
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/>
         /// is not a <see cref="RuleNode" />.</exception>
-        let prependToRule rule (nodes: Node list) =
-            match rule with
+        let prependToRule rule headPosition (nodes: Node list) =
+            match untag rule with
             | RuleNode (target, replacement, environment) ->
-                RuleNode ((List.concat [ nodes; target ]), replacement, environment)
+                tag (RuleNode (List.concat [ nodes; target ], replacement, environment)) headPosition
             | _ ->
                 raise (ArgumentException ("Must be a RuleNode", "rule"))
 
@@ -350,12 +383,17 @@ module RuleParser =
         /// </summary>
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
         /// or when the first element of the target segment is not a <see cref="SetIdentifierNode" />.</exception>
-        let prependToRuleSetIdentifier rule (nodes: Node list) =
-            match rule with
+        let prependToRuleSetIdentifier rule headPosition (nodes: Node list) =
+            match untag rule with
             | RuleNode (target, _relacement, _environment) ->
-                match target.Head with
+                match untag target.Head with
                 | SetIdentifierNode identifiers ->
-                    RuleNode ((List.concat [ nodes; identifiers ]), _relacement, _environment)
+                    tag
+                        (RuleNode (
+                            tag (SetIdentifierNode (List.concat [ nodes; identifiers ])) headPosition :: target.Tail,
+                            _relacement,
+                            _environment))
+                        headPosition
                 | _ ->
                     raise (ArgumentException ("First element of the target segment must be a SetIdentifierNode", "rule"))
             | _ ->
@@ -365,11 +403,11 @@ module RuleParser =
         /// Matches a feature definition.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let matchFeature tokens identifier =
+        let matchFeature tokens headPosition identifier =
             let tokens, _ = matchToken tokens RBrack
             let tokens, _ = matchToken tokens LBrace
             let tokens, memberList = matchMemberList tokens
-            tokens, FeatureDefinitionNode (identifier.value, memberList)
+            tokens, tag (FeatureDefinitionNode (identifier.value, memberList)) headPosition
 
         /// <summary>
         /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="SetIdentifierNode" />
@@ -379,14 +417,14 @@ module RuleParser =
         /// LBrack '[' is parsed just before entering this function.
         /// </remarks>
         /// <param name="tokens">The list of tokens.</param>
-        let rec matchFeature_SetIdentifier_Rule (tokens: Token list) (identifier:Token option) =
+        let rec matchFeature_SetIdentifier_Rule (tokens: Token list) headPosition (identifier:Token option) =
             match tokens.Head.tokenType with
             | Plus | Minus ->
-                let tokens, theSet = matchRuleStartingWithSetIdentifier tokens
+                let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
                 match identifier with
                 | Some i ->
                     // '[' Id [ '+' | '-' ] -> RuleNode (id :: target, replacement, environment)
-                    tokens, prependToRuleSetIdentifier theSet [ IdentifierNode i.value ]
+                    tokens, prependToRuleSetIdentifier theSet headPosition [ tag (IdentifierNode i.value) i.position ]
                 | None ->
                     // '[' [ '+' | '-' ] -> RuleNode (...)
                     tokens, theSet
@@ -394,7 +432,7 @@ module RuleParser =
                 match identifier with
                 | Some i ->
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
-                    matchFeature tokens i
+                    matchFeature tokens headPosition i
                 | None ->
                     // '[' ']' -> syntax error
                     raise (UnexpectedTokenException (Id, tokens.Head))
@@ -402,11 +440,14 @@ module RuleParser =
                 match identifier with
                 | Some i ->
                     // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: target.Tail, replacement, environment)
-                    let tokens, ruleNode = matchRule tokens
-                    tokens, prependToRule ruleNode [ IdentifierNode i.value; IdentifierNode tokens.Head.value ]
+                    let tokens, ruleNode = matchRule tokens tokens.Head.position
+                    tokens, prependToRule ruleNode headPosition
+                        [ tag (IdentifierNode i.value) i.position
+                          tag (IdentifierNode tokens.Head.value) tokens.Head.position
+                        ]
                 | None ->
                     // Store first identifier and see what we get next
-                    matchFeature_SetIdentifier_Rule tokens.Tail (Some tokens.Head)
+                    matchFeature_SetIdentifier_Rule tokens.Tail headPosition (Some tokens.Head)
             | _ ->
                 raise (ExpectedSetException ([ Plus; Minus; Id ], tokens.Head))
 
@@ -419,29 +460,31 @@ module RuleParser =
             try
                 match tokens with
                 | [] ->
-                    SyntaxError ("End of file", _position)
+                    NextResult.SyntaxError ("End of file", _position)
                 | x::xs ->
                     match x.tokenType with
                     | Whitespace ->
                         nextInternal xs
                     | Comment ->
-                        OK (xs, CommentNode (x.value.[1..].Trim()))
+                        let value = (x.value.[1..].Trim())
+                        NextResult.OK (xs, tag (CommentNode value) x.position)
                     | Utterance ->
-                        OK (matchRule tokens)
+                        NextResult.OK (matchRule tokens x.position)
                     | Id ->
-                        OK (matchSet_Rule xs x)
+                        NextResult.OK (matchSet_Rule xs x)
                     | LBrack ->
-                        OK (matchFeature_SetIdentifier_Rule xs None)
+                        NextResult.OK (matchFeature_SetIdentifier_Rule xs x.position None)
                     | _ ->
-                        SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
+                        NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
-                | :? SyntaxException as ex -> SyntaxError (ex.Message, _position)
+                | :? SyntaxException as ex ->
+                    NextResult.SyntaxError (ex.Message, _position)
    
         // Store result and update position before returning
         let result = (nextInternal tokens)
 
         match result with
-        | OK (nextTokens, node) ->
+        | NextResult.OK (nextTokens, node) ->
             if [] <> nextTokens then
                 _position <- nextTokens.Head.position
             result
@@ -459,8 +502,8 @@ module RuleParser =
             | _ ->
                 let result = next tokens
                 match result with
-                | OK (nextTokens, node) ->
+                | NextResult.OK (nextTokens, node) ->
                     parseInternal nextTokens (node :: out)
-                | SyntaxError (message, position) ->
+                | NextResult.SyntaxError (message, position) ->
                     raise (SyntaxException (message, position))
         parseInternal tokens []

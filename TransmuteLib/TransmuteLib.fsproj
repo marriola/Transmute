@@ -5,11 +5,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="BoundedList.fs" />
     <Compile Include="Exceptions.fs" />
     <Compile Include="Charset.fs" />
     <Compile Include="StateMachine.fs" />
     <Compile Include="Lexer.fs" />
     <Compile Include="RuleParser.fs" />
+    <Compile Include="SyntaxAnalyzer.fs" />
   </ItemGroup>
 
 </Project>
