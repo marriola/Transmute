@@ -25,7 +25,7 @@ type Match =
 /// Represents a transition table.
 /// </summary>
 /// <typeparam name="TState">The type of states in the state machine.</typeparam>
-type TransitionTable<'TState> = Dictionary<'TState * Match, 'TState>
+type TransitionTable<'TState> = IDictionary<'TState * Match, 'TState>
 
 /// <summary>
 /// Represents the transitions that can be taken from a state.
@@ -50,28 +50,16 @@ type CharStateTransition<'TState> = StateTransition<'TState, Match>
 /// <typeparam name="TState">The type of states in the state machine.</typeparam>
 /// <param name="classes">The list of characters and transitions that can be taken from them.</param>
 let createTransitionTable<'TState when 'TState : equality> (classes:CharStateTransition<'TState> list) =
-    // Add a list of keys with a single value
-    let addMany (table: TransitionTable<'TState>) (keys: ('TState * Match) list) (value:'TState) =
-        let rec addManyInternal keys value =
-            match keys with
-            | x::xs ->
-                let toState, on = x
-                table.[(value, on)] <- toState
-                addManyInternal xs value
-            | [] ->
-                ()
-        in
-            addManyInternal keys value
-
-    let rec fillInternal (table: TransitionTable<'TState>) classes =
-        match classes with
-        | x::xs ->
-            addMany table x.transitions x.state
-            fillInternal table xs
-        | [] ->
-            table
-    in
-        fillInternal (new TransitionTable<'TState>()) classes
+    let keys =
+        List.map
+            (fun c ->
+                List.map
+                    (fun t ->
+                        let state, symbol = t
+                        ((c.state, symbol), state))
+                    c.transitions)
+            classes
+    dict (List.concat keys)
 
 /// <summary>
 /// Creates a group of transitions from a state.
