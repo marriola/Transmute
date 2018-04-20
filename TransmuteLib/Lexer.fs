@@ -1,6 +1,7 @@
 ﻿namespace TransmuteLib
 
 open System.IO
+open Exceptions
 open StateMachine
 
 type TokenType =
@@ -160,6 +161,9 @@ module Lexer =
         let row, col = pos
         (row, col + 1)
 
+    let isFinal state =
+        stateTokens.ContainsKey state
+
     let rec lexInternal
         (stream: StreamReader)
         (value: StringBuilder)
@@ -168,17 +172,21 @@ module Lexer =
         (pos: int * int)
         (out: Token list) =
 
-        let rec step s c =
-            let matchSymbol, next = StateMachine.step table s c ERROR
-            // If we can't step from the current state, try stepping from START
-            if next = ERROR && stateTokens.ContainsKey currentState then
-                match step START c with
-                | _, ERROR ->
-                    raise (ApplicationException (sprintf "Unrecognized token '%s' at row %d, column %d" (value.ToString().Trim()) <|| startPos))
-                | x ->
-                    x
-            else
-                matchSymbol, next
+        let step nextValue state input =
+            let rec stepInternal state transitioningFromStartOnFail =
+                let matchSymbol, next = StateMachine.step table state input ERROR
+                // If we can't step from the current state, try stepping from START
+                if next = ERROR then
+                    if transitioningFromStartOnFail then
+                        if isFinal currentState then
+                            stepInternal START false
+                        else
+                            matchSymbol, next
+                    else
+                        raise (UnrecognizedTokenException (nextValue, pos))
+                else
+                    matchSymbol, next
+            stepInternal state true
 
         if stream.EndOfStream then
             OK (List.rev out)
@@ -186,8 +194,9 @@ module Lexer =
             // Peek the next input symbol and transition on it. If the transition is not an
             // epsilon transition, advance the lexer position and consume the input symbol.
             let nextChar = char (stream.Peek())
-            let matchSymbol, nextState = step currentState nextChar
-            let isFinal = stateTokens.ContainsKey nextState
+            let nextValue = value.ToString() + (string nextChar)
+            let matchSymbol, nextState = step nextValue currentState nextChar
+            let isNextFinal = isFinal nextState
             let isEpsilon = matchSymbol = Epsilon
             let nextPos =
                 if isEpsilon then
@@ -209,7 +218,7 @@ module Lexer =
             else
                 // Add token to output if on a final state
                 let nextOut =
-                    if isFinal then
+                    if isNextFinal then
                         { tokenType = stateTokens.[nextState];
                           value =
                             if currentState = Q_Whitespace then
@@ -222,12 +231,12 @@ module Lexer =
                         out
                 let nextStartPos =
                     // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
+                    if isNextFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
                         nextPos
                     else
                         startPos
 
-                if isFinal then
+                if isNextFinal then
                     ignore (value.Clear())
 
                 lexInternal stream value nextState nextStartPos nextPos nextOut
