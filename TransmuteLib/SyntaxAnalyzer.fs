@@ -4,7 +4,17 @@
     open Exceptions
 
     let validateRuleNode target replacement environment =
-        let rec onlyLastSegmentMayContainBoundaryNode kind nodes =
+        let rec onlyEnvironmentMayContainPlaceholderNode kind nodes =
+            if nodes = [] then
+                ()
+            else
+                let position, node = RuleParser.untagWithMetadata nodes.Head
+                match node with
+                | PlaceholderNode ->
+                    raise (SyntaxException (sprintf "%s segment cannot contain placeholder" kind, position))
+                | _ ->
+                    onlyEnvironmentMayContainPlaceholderNode kind nodes.Tail
+        let rec onlyEnvironmentMayContainBoundaryNode kind nodes =
             if nodes = [] then
                 ()
             else
@@ -13,7 +23,7 @@
                 | BoundaryNode ->
                     raise (SyntaxException (sprintf "%s segment cannot contain boundary" kind, position))
                 | _ ->
-                    onlyLastSegmentMayContainBoundaryNode kind nodes.Tail
+                    onlyEnvironmentMayContainBoundaryNode kind nodes.Tail
         let rec boundaryMayOnlyAppearAtEnds nodes =
             match nodes with
             | [] ->
@@ -39,9 +49,27 @@
                     raise (SyntaxException ("Boundary may only appear at beginning or end of the environment segment", position))
             | _::xs ->
                 boundaryMayOnlyAppearAtEnds xs
+        let onlyOnePlaceholderNodeIsAllowed nodes =
+            let rec validateInternal nodes found =
+                if nodes = [] then
+                    ()
+                else
+                    let position, node = RuleParser.untagWithMetadata nodes.Head
+                    match node with
+                    | PlaceholderNode ->
+                        if found then
+                            raise (SyntaxException ("Placeholder may not occur more than once", position))
+                        else
+                            validateInternal nodes.Tail true
+                    | _ ->
+                        validateInternal nodes.Tail found
+            validateInternal nodes false
                 
-        onlyLastSegmentMayContainBoundaryNode "Target" target
-        onlyLastSegmentMayContainBoundaryNode "Replacement" replacement
+        onlyEnvironmentMayContainBoundaryNode "Target" target
+        onlyEnvironmentMayContainBoundaryNode "Replacement" replacement
+        onlyEnvironmentMayContainPlaceholderNode "Target" target
+        onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
+        onlyOnePlaceholderNodeIsAllowed environment
         boundaryMayOnlyAppearAtEnds (makeBoundedList environment)
 
     let validate (nodes: Node list) =
