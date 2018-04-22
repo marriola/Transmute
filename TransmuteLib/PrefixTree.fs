@@ -3,9 +3,7 @@
 open System.Collections.Generic
 open System
 open TransmuteLib
-open Exceptions
 open TransmuteLib.RuleParser
-open Exceptions
 
 type PrefixTree =
     | Node of prefix:string * value:char * children:Dictionary<char, PrefixTree>
@@ -58,65 +56,27 @@ let makeTree set =
             loopOverSet set.Tail
     loopOverSet set
 
-// Compute the intersection of a list of sets or features
-// $voiced {
-//    k => g
-//    p => b
-//    t => d
-//    m̥ => m
-//    n̥ => n
-// }
-// $C { k p t g b d m n s z r l w j }
-// [$C+$voiced] => setIntersection SetIdentifierNode [ SetIdentifierTermNode "$C"; FeatureIdentifierNode ("$voiced", true) ]
+type PrefixTree with
+    /// <summary>
+    /// Creates a prefix tree from the members of a feature
+    /// </summary>
+    /// <param name="feature"></param>
+    /// <param name="isPresent"></param>
+    static member fromFeature feature isPresent =
+        makeTree (getFeatureMembers feature isPresent)
 
-let setIntersection (sets: IDictionary<string, Node>) (features: IDictionary<string, Node>) setIdentifier =
-    let rec inner (terms: Node list) (result: Set<string>) =
-        if terms.IsEmpty then
-            result
-        else
-            let setMembers =
-                match untag terms.Head with
-                | IdentifierNode name ->
-                    getSetMembers sets.[name] |> set
-                | FeatureIdentifierTermNode (isPresent, name) ->
-                    getFeatureMembers features.[name] isPresent |> set
-                | _ ->
-                    let position, node = untagWithMetadata terms.Head
-                    raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
-            let nextSet =
-                if result.IsEmpty then
-                    setMembers
-                else
-                    let differenceRight = result - setMembers
-                    let differenceLeft = setMembers - result
-                    result - differenceLeft - differenceRight
-            inner terms.Tail nextSet
-    match untag setIdentifier with
-    | SetIdentifierNode terms ->
-        inner terms (set []) |> List.ofSeq
-    | _ ->
-        raise (ArgumentException ("Must be a SetIdentifierNode", "setIdentifier"))
+    /// <summary>
+    /// Creates a prefix tree from the members of a set.
+    /// </summary>
+    /// <param name="set"></param>
+    static member fromSet set =
+        makeTree (getSetMembers set)
 
-/// <summary>
-/// Creates a prefix tree from the members of a feature
-/// </summary>
-/// <param name="feature"></param>
-/// <param name="isPresent"></param>
-let makeTreeFromFeature feature isPresent =
-    makeTree (getFeatureMembers feature isPresent)
-
-/// <summary>
-/// Creates a prefix tree from the members of a set.
-/// </summary>
-/// <param name="set"></param>
-let makeTreeFromSet set =
-    makeTree (getSetMembers set)
-
-/// <summary>
-/// Creates a prefix tree from the intersection of a list of sets and features.
-/// </summary>
-/// <param name="sets">The available sets.</param>
-/// <param name="features">The available features.</param>
-/// <param name="setIdentifier">The SetIdentifierNode listing the sets and features to intersect.</param>
-let makeTreeFromSetIntersection sets features setIdentifier =
-    setIntersection sets features setIdentifier |> makeTree
+    /// <summary>
+    /// Creates a prefix tree from the intersection of a list of sets and features.
+    /// </summary>
+    /// <param name="sets">The available sets.</param>
+    /// <param name="features">The available features.</param>
+    /// <param name="setIdentifier">The SetIdentifierNode listing the sets and features to intersect.</param>
+    static member fromSetIntersection sets features setIdentifier =
+        setIntersection sets features setIdentifier |> makeTree

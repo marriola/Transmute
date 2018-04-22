@@ -101,6 +101,8 @@ type ValidateResult =
     | SyntaxError of string * (int * int)
 
 module RuleParser =
+    open System.Collections.Generic
+
     let inline tag node position =
         TaggedNode (position, node)
 
@@ -146,6 +148,10 @@ module RuleParser =
         | _ ->
             raise (ArgumentException ("Must be a FeatureDefinitionNode", "feature"))
 
+    /// <summary>
+    /// Gets the members of the set.
+    /// </summary>
+    /// <param name="theSet"></param>
     let getSetMembers theSet =
         match untag theSet with
         | SetDefinitionNode (_, members) ->
@@ -159,11 +165,60 @@ module RuleParser =
         | _ ->
             raise (ArgumentException ("Must be a set", "theSet"))
 
+    let private makeSyntaxError node format =
+        let position, innerNode = untagWithMetadata node
+        raise (SyntaxException (format position innerNode, position))
+
+    let private undefinedSetOrFeature kind name position node =
+        sprintf "'%s' '%s' not defined" kind name
+
+    let private tryFindSetOrFeature fn kind node name =
+        try fn()
+        with
+            | :? KeyNotFoundException ->
+                undefinedSetOrFeature kind name
+                    |> makeSyntaxError node
+                    |> raise
+
+    /// <summary>
+    /// Computes the intersection of the sets and features named in the SetIdentifierNode.
+    /// </summary>
+    /// <param name="sets">The available sets.</param>
+    /// <param name="features">The available features.</param>
+    /// <param name="setIdentifier"></param>
+    let setIntersection (sets: IDictionary<string, Node>) (features: IDictionary<string, Node>) setIdentifier =
+        let rec inner (terms: Node list) (result: Set<string>) =
+            if terms.IsEmpty then
+                result
+            else
+                let setMembers =
+                    match untag terms.Head with
+                    | IdentifierNode name ->
+                        tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" terms.Head name |> set
+                    | FeatureIdentifierTermNode (isPresent, name) ->
+                        tryFindSetOrFeature (fun _ -> getFeatureMembers features.[name] isPresent) "Feature" terms.Head name |> set
+                    | _ ->
+                        let position, node = untagWithMetadata terms.Head
+                        raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
+                let nextSet =
+                    if result.IsEmpty then
+                        setMembers
+                    else
+                        let differenceRight = result - setMembers
+                        let differenceLeft = setMembers - result
+                        result - differenceLeft - differenceRight
+                inner terms.Tail nextSet
+        match untag setIdentifier with
+        | SetIdentifierNode terms ->
+            inner terms (set []) |> List.ofSeq
+        | _ ->
+            raise (ArgumentException ("Must be a SetIdentifierNode", "setIdentifier"))
+
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
     /// <param name="tokens">The list of tokens.</param>
-    let rec next tokens =
+    let next tokens =
         let mutable _position = (1, 1)
 
         /// <summary>
@@ -548,12 +603,16 @@ module RuleParser =
                     raise (SyntaxException (message, position))
         parseInternal tokens []
 
-    let filterMap (fn: 'a -> (string * 'a) option) nodes =
+    let private filterMap (fn: 'a -> (string * 'a) option) nodes =
         nodes
             |> List.map fn
             |> List.filter ((<>) None)
             |> List.map Option.get
 
+    /// <summary>
+    /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
+    /// </summary>
+    /// <param name="nodes"></param>
     let getFeatures nodes =
         dict
             (filterMap
@@ -564,6 +623,10 @@ module RuleParser =
                     | _ -> None)
                 nodes)
 
+    /// <summary>
+    /// Returns a dictionary of the elements of the Node list that are SetDefinitionNodes.
+    /// </summary>
+    /// <param name="nodes"></param>
     let getSets nodes =
         dict
             (filterMap

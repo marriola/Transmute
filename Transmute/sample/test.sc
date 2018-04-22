@@ -27,7 +27,9 @@ $C { k kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
   e => ˈe
   i => ˈi
   o => ˈo
+  ø => ˈø
   u => ˈu
+  y => ˈy
 }
 
 [$voiced] {
@@ -43,15 +45,22 @@ $C { k kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
 
 [$back] {
   ɑ
+  ˈɑ
   o
+  ˈo
   u
+  ˈu
 }
 
 [$round] {
   o
+  ˈo
   u
+  ˈu
   ø
+  ˈø
   y
+  ˈy
   k => kʷ
   g => gʷ
   t => p
@@ -60,8 +69,13 @@ $C { k kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
 
 [$front] {
   a
+  ˈa
   e
+  ˈe
   i
+  ˈi
   ø
+  ˈø
   y
+  ˈy
 }

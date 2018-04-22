@@ -33,8 +33,8 @@ let main argv =
             // Get SetIdentifierNode from first rule and create prefix tree
             let rule =
                 match untag rules.[1] with
-                | RuleNode (target, result, environment) ->
-                    let tree = makeTreeFromSetIntersection sets features target.[0]
+                | RuleNode (target, _, _) ->
+                    let tree = PrefixTree.fromSetIntersection sets features target.[0]
                     printfn "%s" (string tree)
             printfn "%s"
                 (List.fold
