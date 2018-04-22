@@ -1,5 +1,4 @@
-﻿# Boom
-; Rounded consonant becomes unrounded preceding an unrounded vowel
+﻿; Rounded consonant becomes unrounded preceding an unrounded vowel
 [$C+$round]/[-$round]/#_[$V-$round]_#
 
 ; Stress moves to initial syllable

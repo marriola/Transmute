@@ -12,6 +12,7 @@
     <Compile Include="Lexer.fs" />
     <Compile Include="RuleParser.fs" />
     <Compile Include="SyntaxAnalyzer.fs" />
+    <Compile Include="PrefixTree.fs" />
   </ItemGroup>
 
 </Project>

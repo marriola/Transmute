@@ -1,5 +1,7 @@
 ﻿open System
 open TransmuteLib
+open TransmuteLib.RuleParser
+open PrefixTree
 
 let validateOptions (options: Arguments.Options) =
     let mutable isValid = true
@@ -26,6 +28,14 @@ let main argv =
             printfn "Syntax error at row %d column %d: %s" row col msg
         | OK tokens ->
             let rules = RuleParser.parse tokens
+            let features = getFeatures rules
+            let sets = getSets rules
+            // Get SetIdentifierNode from first rule and create prefix tree
+            let rule =
+                match untag rules.[1] with
+                | RuleNode (target, result, environment) ->
+                    let tree = makeTreeFromSetIntersection sets features target.[0]
+                    printfn "%s" (string tree)
             printfn "%s"
                 (List.fold
                     (fun acc r ->

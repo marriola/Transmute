@@ -32,6 +32,14 @@ type Token =
       value: string
     }
 
+type Token with
+    static member identity token = token
+    static member make tokenType position value =
+        { tokenType = tokenType;
+          position = position;
+          value = value
+        }
+
 type State =
     | START
     | ERROR
@@ -59,6 +67,19 @@ type State =
     | Q_UtteranceFinal
     | Q_Comment
     | Q_CommentFinal
+
+type TokenType with
+    /// <summary>
+    /// Returns the token created with this type unmodified.
+    /// </summary>
+    member this.Identity () =
+        (this, Token.identity)
+    /// <summary>
+    /// Applies the function to modify the matched token.
+    /// </summary>
+    /// <param name="fn"></param>
+    member this.Then (fn: Token -> Token) =
+        (this, fn)
 
 type LexerResult =
     | OK of (Token list)
@@ -128,29 +149,35 @@ module Lexer =
             ]
 
     /// <summary>
-    /// Defines the final states and the token produced by each.
+    /// Removes the initial semicolon from the comment and trims whitespace.
     /// </summary>
-    let stateTokens =
+    /// <param name="token">The comment token.</param>
+    let trimComment token = Token.make token.tokenType token.position (token.value.[1..].Trim())
+
+    /// <summary>
+    /// Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
+    /// </summary>
+    let stateTokenTypes =
         (dict
-            [ (Q_WhitespaceFinal, Whitespace)
-              (Q_Separator, Separator)
-              (Q_LBrack, LBrack)
-              (Q_RBrack, RBrack)
-              (Q_LBrace, LBrace)
-              (Q_RBrace, RBrace)
-              (Q_LParen, LParen)
-              (Q_RParen, RParen)
-              (Q_Divider, Divider)
-              (Q_Placeholder, Placeholder)
-              (Q_Boundary, Boundary)
-              (Q_Plus, Plus)
-              (Q_Minus, Minus)
-              (Q_Pipe, Pipe)
-              (Q_Not, Not)
-              (Q_Gives, Gives)
-              (Q_IdentifierFinal, Id)
-              (Q_UtteranceFinal, Utterance)
-              (Q_CommentFinal, Comment)
+            [ (Q_WhitespaceFinal, Whitespace.Identity())
+              (Q_Separator, Separator.Identity())
+              (Q_LBrack, LBrack.Identity())
+              (Q_RBrack, RBrack.Identity())
+              (Q_LBrace, LBrace.Identity())
+              (Q_RBrace, RBrace.Identity())
+              (Q_LParen, LParen.Identity())
+              (Q_RParen, RParen.Identity())
+              (Q_Divider, Divider.Identity())
+              (Q_Placeholder, Placeholder.Identity())
+              (Q_Boundary, Boundary.Identity())
+              (Q_Plus, Plus.Identity())
+              (Q_Minus, Minus.Identity())
+              (Q_Pipe, Pipe.Identity())
+              (Q_Not, Not.Identity())
+              (Q_Gives, Gives.Identity())
+              (Q_IdentifierFinal, Id.Identity())
+              (Q_UtteranceFinal, Utterance.Identity())
+              (Q_CommentFinal, Comment.Then(trimComment))
           ])
 
     let incrRow pos =
@@ -162,7 +189,7 @@ module Lexer =
         (row, col + 1)
 
     let isFinal state =
-        stateTokens.ContainsKey state
+        stateTokenTypes.ContainsKey state
 
     let rec lexInternal
         (stream: StreamReader)
@@ -219,14 +246,13 @@ module Lexer =
                 // Add token to output if on a final state
                 let nextOut =
                     if isNextFinal then
-                        { tokenType = stateTokens.[nextState];
-                          value =
+                        let (tokenType, modifyToken) = stateTokenTypes.[nextState]
+                        let nextValue =
                             if currentState = Q_Whitespace then
                                 value.ToString()
                             else
-                                value.ToString().Trim();
-                          position = startPos
-                        } :: out
+                                value.ToString().Trim()
+                        modifyToken (Token.make tokenType startPos nextValue) :: out
                     else
                         out
                 let nextStartPos =
