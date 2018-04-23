@@ -1,24 +1,16 @@
-﻿module StateMachine
+﻿namespace TransmuteLib
 
 open System.Collections.Generic
 
-/// <summary>
 /// Represents how the the input symbol is matched to a transition. 
-/// </summary>
 type Match =
-    /// <summary>
-    /// The input symbol must match c/
-    /// </summary>
+    /// The input symbol must match a character
     | Char of char
 
-    /// <summary>
-    /// If no other transition applies, match the transition without consuming an input symbol.
-    /// </summary>
+    /// If no other transition applies, take the transition without consuming an input symbol.
     | Epsilon
 
-    /// <summary>
     /// If no other transition applies, accept any input symbol.
-    /// </summary>
     | Any
 
 /// <summary>
@@ -44,77 +36,81 @@ type StateTransition<'TState, 'TSymbol> =
 /// <typeparam name="TState">The type of states in the state machine.</typeparam>
 type CharStateTransition<'TState> = StateTransition<'TState, Match>
 
-/// <summary>
-/// Creates a transition table.
-/// </summary>
-/// <typeparam name="TState">The type of states in the state machine.</typeparam>
-/// <param name="classes">The list of characters and transitions that can be taken from them.</param>
-let createTransitionTable<'TState when 'TState : equality> (classes:CharStateTransition<'TState> list) =
-    let keys =
-        List.map
-            (fun c ->
-                List.map
-                    (fun t ->
-                        let state, symbol = t
-                        ((c.state, symbol), state))
-                    c.transitions)
-            classes
-    dict (List.concat keys)
+module StateMachine =
+    /// <summary>
+    /// Creates a transition table.
+    /// </summary>
+    /// <typeparam name="TState">The type of states in the state machine.</typeparam>
+    /// <param name="classes">The list of characters and transitions that can be taken from them.</param>
+    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (classes: StateTransition<'TState, 'TSymbol> list) =
+        classes
+            |> List.map
+                (fun c ->
+                    List.map
+                        (fun t ->
+                            let state, symbol = t
+                            ((c.state, symbol), state))
+                        c.transitions)
+            |> List.concat
+            |> dict
 
-/// <summary>
-/// Creates a group of transitions from a state.
-/// </summary>
-/// <param name="state">The state to transition from.</param>
-/// <param name="transitions">The transitions that can be taken from the state.</param>
-let transitionFrom state transitions =
-    { state = state;
-      transitions = transitions
-    }
+    /// <summary>
+    /// Creates a group of transitions from a state.
+    /// </summary>
+    /// <param name="state">The state to transition from.</param>
+    /// <param name="transitions">The transitions that can be taken from the state.</param>
+    let transitionFrom state transitions =
+        { state = state;
+          transitions = transitions
+        }
 
-/// <summary>
-/// Creates a transition to a state on an input symbol.
-/// </summary>
-/// <param name="c">The input symbol.</param>
-/// <param name="state">The state to transition to.</param>
-let on (c: char) state = (state, Char c)
+    /// <summary>
+    /// Creates a transition to a state on an input symbol.
+    /// </summary>
+    /// <param name="c">The input symbol.</param>
+    /// <param name="state">The state to transition to.</param>
+    let on c state = (state, Char c)
 
-/// <summary>
-/// Creates a transition to a state on an input symbol.
-/// </summary>
-/// <param name="state">The state to transition to.</param>
-/// <param name="c">The input symbol.</param>
-let transitionTo state (c: char) = (state, Char c)
+    /// <summary>
+    /// Creates a transition to a state on an input symbol.
+    /// </summary>
+    /// <param name="state">The state to transition to.</param>
+    /// <param name="c">The input symbol.</param>
+    let transitionTo state c = (state, Char c)
 
-/// <summary>
-/// Creates a transition to a state on any symbol not already matched.
-/// </summary>
-/// <param name="state">The state to transition to.</param>
-let anyTo state = (state, Any)
+    /// <summary>
+    /// Creates a transition to a state on any symbol not already matched.
+    /// </summary>
+    /// <param name="state">The state to transition to.</param>
+    let anyTo state = (state, Any)
 
-/// <summary>
-/// Creates a transition to a state that does not consume an input symbol.
-/// </summary>
-/// <param name="state">The state to transition to.</param>
-let epsilonTo state = (state, Epsilon)
+    /// <summary>
+    /// Creates a transition to a state that does not consume an input symbol.
+    /// </summary>
+    /// <param name="state">The state to transition to.</param>
+    let epsilonTo state = (state, Epsilon)
 
-/// <summary>
-/// Compute the result of transitioning from the current state on an input symbol.
-/// </summary>
-/// <param name="transitionTable">The transition table.</param>
-/// <param name="currentState">The current state to transition from.</param>
-/// <param name="inputSymbol">The input symbol to transition on.</param>
-/// <param name="failState">The error state to transition to if no other transition can be taken.</param>
-let step<'a> (transitionTable: TransitionTable<'a>) (currentState: 'a) (inputSymbol: char) (failState: 'a) =
-    let transition = (currentState, Char inputSymbol)
-    let transitionOnEpsilon = (currentState, Epsilon)
-    let transitionOnAny = (currentState, Any)
+    /// <summary>
+    /// Compute the result of transitioning from the current state on an input symbol.
+    /// </summary>
+    /// <param name="transitionTable">The transition table.</param>
+    /// <param name="currentState">The current state to transition from.</param>
+    /// <param name="inputSymbol">The input symbol to transition on.</param>
+    /// <param name="failState">The error state to transition to if no other transition can be taken.</param>
+    let step (transitionTable: TransitionTable<'a>) currentState inputSymbol failState =
+        let transition = (currentState, Char inputSymbol)
+        let transitionOnEpsilon = (currentState, Epsilon)
+        let transitionOnAny = (currentState, Any)
 
-    if transitionTable.ContainsKey(transition) then
-        (Char inputSymbol, transitionTable.[transition])
-    else if transitionTable.ContainsKey(transitionOnEpsilon) then
-        (Epsilon, transitionTable.[transitionOnEpsilon])
-    else if transitionTable.ContainsKey(transitionOnAny) then
-        (Any, transitionTable.[transitionOnAny])
-    else
-        (Char inputSymbol, failState)
+        if transitionTable.ContainsKey(transition) then
+            (Char inputSymbol, transitionTable.[transition])
+
+        else if transitionTable.ContainsKey(transitionOnEpsilon) then
+            (Epsilon, transitionTable.[transitionOnEpsilon])
+
+        else if transitionTable.ContainsKey(transitionOnAny) then
+            (Any, transitionTable.[transitionOnAny])
+
+        else
+            (Char inputSymbol, failState)
 

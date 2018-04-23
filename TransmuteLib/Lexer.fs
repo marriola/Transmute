@@ -1,29 +1,67 @@
 ﻿namespace TransmuteLib
 
 open System.IO
-open Exceptions
-open StateMachine
+open TransmuteLib.StateMachine
 
 type TokenType =
+    /// An error token.
     | Error
+
+    /// A whitespace token.
     | Whitespace
+
+    /// A '.' token.
     | Separator
+
+    /// A '[' token.
     | LBrack
+
+    /// A ']' token.
     | RBrack
+
+    /// A '{' token.
     | LBrace
+
+    /// A '}' token.
     | RBrace
+
+    /// A '(' token.
     | LParen
+
+    /// A ')' token.
     | RParen
+
+    /// A '/' token.
     | Divider
+
+    /// A '_' token.
     | Placeholder
+
+    /// A '#' token.
     | Boundary
+
+    /// A '=>' token.
     | Gives
+
+    /// A '+' token.
     | Plus
+
+    /// A '-' token.
     | Minus
+
+    /// A '|' token.
     | Pipe
+
+    /// A '!' token.
     | Not
+
+    /// An identifier token.
     | Id
+
+    /// An utterance token.
     | Utterance
+
+    /// A comment token.
     | Comment
 
 type Token =
@@ -181,7 +219,7 @@ module Lexer =
           ])
 
     let incrRow pos =
-        let row, col = pos
+        let row, _ = pos
         (row + 1, 1)
 
     let incrCol pos =
@@ -199,18 +237,12 @@ module Lexer =
         (pos: int * int)
         (out: Token list) =
 
-        let step nextValue state input =
+        let step state input =
             let rec stepInternal state transitioningFromStartOnFail =
                 let matchSymbol, next = StateMachine.step table state input ERROR
-                // If we can't step from the current state, try stepping from START
-                if next = ERROR then
-                    if transitioningFromStartOnFail then
-                        if isFinal currentState then
-                            stepInternal START false
-                        else
-                            matchSymbol, next
-                    else
-                        raise (UnrecognizedTokenException (nextValue, pos))
+                // If we can't step from the current state, and the current state is final, try stepping from START
+                if next = ERROR && transitioningFromStartOnFail && isFinal currentState then
+                    stepInternal START false
                 else
                     matchSymbol, next
             stepInternal state true
@@ -221,8 +253,7 @@ module Lexer =
             // Peek the next input symbol and transition on it. If the transition is not an
             // epsilon transition, advance the lexer position and consume the input symbol.
             let nextChar = char (stream.Peek())
-            let nextValue = value.ToString() + (string nextChar)
-            let matchSymbol, nextState = step nextValue currentState nextChar
+            let matchSymbol, nextState = step currentState nextChar
             let isNextFinal = isFinal nextState
             let isEpsilon = matchSymbol = Epsilon
             let nextPos =
@@ -270,6 +301,6 @@ module Lexer =
     let lex (filename: string) =
         try
             use stream = new StreamReader(filename, true)
-            lexInternal stream (new StringBuilder()) START (1, 1) (1, 1) []
+            lexInternal stream (new StringBuilder()) START (1, 1) (1, 1) List.empty
         with
             | ex -> FileError ex.Message

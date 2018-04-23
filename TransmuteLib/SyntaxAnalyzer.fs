@@ -1,14 +1,16 @@
-﻿module SyntaxAnalyzer
-    open BoundedList
-    open TransmuteLib
-    open Exceptions
+﻿namespace TransmuteLib
 
-    let validateRuleNode target replacement environment =
+module SyntaxAnalyzer =
+    open TransmuteLib
+    open TransmuteLib.Exceptions
+    open TransmuteLib.Node
+
+    let private validateRuleNode target replacement environment =
         let rec onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) =
             if nodes.IsEmpty then
                 ()
             else
-                let position, node = RuleParser.untagWithMetadata nodes.Head
+                let position, node = Node.untagWithMetadata nodes.Head
                 match node with
                 | PlaceholderNode ->
                     raise (SyntaxException (sprintf "%s segment cannot contain placeholder" kind, position))
@@ -19,7 +21,7 @@
             if nodes.IsEmpty then
                 ()
             else
-                let position, node = RuleParser.untagWithMetadata nodes.Head
+                let position, node = Node.untagWithMetadata nodes.Head
                 match node with
                 | BoundaryNode ->
                     raise (SyntaxException (sprintf "%s segment cannot contain boundary" kind, position))
@@ -57,7 +59,7 @@
                 if nodes.IsEmpty then
                     ()
                 else
-                    let position, node = RuleParser.untagWithMetadata nodes.Head
+                    let position, node = Node.untagWithMetadata nodes.Head
                     match node with
                     | PlaceholderNode ->
                         if found then
@@ -73,7 +75,7 @@
                 if nodes.IsEmpty then
                     ()
                 else
-                    let position, node = RuleParser.untagWithMetadata nodes.Head
+                    let position, node = Node.untagWithMetadata nodes.Head
                     match node with
                     | OptionalNode [] ->
                         raise (SyntaxException ("Optional node may not be empty", position))
@@ -86,7 +88,7 @@
         onlyEnvironmentMayContainPlaceholderNode "Target" target
         onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
         onlyOnePlaceholderNodeIsAllowed environment
-        boundaryMayOnlyAppearAtEnds (makeBoundedList environment)
+        boundaryMayOnlyAppearAtEnds (BoundedList.fromList(environment))
         optionalNodeMayNotBeEmpty environment
 
     let validate (nodes: Node list) =
@@ -94,7 +96,7 @@
             if nodes.IsEmpty then
                 OK
             else
-                let position, head = RuleParser.untagWithMetadata nodes.Head
+                let position, head = Node.untagWithMetadata nodes.Head
                 match head with
                 | RuleNode (target, replacement, environment) ->
                     validateRuleNode target replacement environment

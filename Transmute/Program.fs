@@ -1,7 +1,7 @@
 ﻿open System
 open TransmuteLib
 open TransmuteLib.RuleParser
-open PrefixTree
+open TransmuteLib.Node
 
 let validateOptions (options: Arguments.Options) =
     let mutable isValid = true
@@ -34,16 +34,14 @@ let main argv =
             let rule =
                 match untag rules.[1] with
                 | RuleNode (target, _, _) ->
-                    let tree = PrefixTree.fromSetIntersection sets features target.[0]
+                    let tree = PrefixTree.fromSet sets.["$V"] //.fromSetIntersection sets features target.[0]
                     printfn "%s" (string tree)
-            printfn "%s"
-                (List.fold
-                    (fun acc r ->
-                        acc + (sprintf
-                            "%s\n" 
-                            (r.ToString())))
-                    ""
-                    rules)
+                rules
+                    |> List.fold
+                        (fun acc r ->
+                            acc + (sprintf "%s\n" <| string r))
+                        ""
+                    |> printfn "%s"
             match SyntaxAnalyzer.validate rules with
             | ValidateResult.OK ->
                 printfn "Passed validation!"

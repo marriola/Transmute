@@ -1,4 +1,4 @@
-﻿module Exceptions
+﻿namespace TransmuteLib.Exceptions
 
 open System
 
