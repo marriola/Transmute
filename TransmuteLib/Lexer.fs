@@ -2,81 +2,7 @@
 
 open System.IO
 open TransmuteLib.StateMachine
-
-type TokenType =
-    /// An error token.
-    | Error
-
-    /// A whitespace token.
-    | Whitespace
-
-    /// A '.' token.
-    | Separator
-
-    /// A '[' token.
-    | LBrack
-
-    /// A ']' token.
-    | RBrack
-
-    /// A '{' token.
-    | LBrace
-
-    /// A '}' token.
-    | RBrace
-
-    /// A '(' token.
-    | LParen
-
-    /// A ')' token.
-    | RParen
-
-    /// A '/' token.
-    | Divider
-
-    /// A '_' token.
-    | Placeholder
-
-    /// A '#' token.
-    | Boundary
-
-    /// A '=>' token.
-    | Gives
-
-    /// A '+' token.
-    | Plus
-
-    /// A '-' token.
-    | Minus
-
-    /// A '|' token.
-    | Pipe
-
-    /// A '!' token.
-    | Not
-
-    /// An identifier token.
-    | Id
-
-    /// An utterance token.
-    | Utterance
-
-    /// A comment token.
-    | Comment
-
-type Token =
-    { tokenType: TokenType;
-      position: int * int;
-      value: string
-    }
-
-type Token with
-    static member identity token = token
-    static member make tokenType position value =
-        { tokenType = tokenType;
-          position = position;
-          value = value
-        }
+open TransmuteLib.Token
 
 type State =
     | START
@@ -106,19 +32,6 @@ type State =
     | Q_Comment
     | Q_CommentFinal
 
-type TokenType with
-    /// <summary>
-    /// Returns the token created with this type unmodified.
-    /// </summary>
-    member this.Identity () =
-        (this, Token.identity)
-    /// <summary>
-    /// Applies the function to modify the matched token.
-    /// </summary>
-    /// <param name="fn"></param>
-    member this.Then (fn: Token -> Token) =
-        (this, fn)
-
 type LexerResult =
     | OK of (Token list)
     | SyntaxError of (string * int * int)
@@ -128,27 +41,26 @@ module Lexer =
     open System.Text
     open System
 
-    let identifierTransitions =
-        List.concat
-            [ List.map (transitionTo Q_Identifier) (Charset.make '0' '9')
-              List.map (transitionTo Q_Identifier) (Charset.make 'A' 'Z')
-              List.map (transitionTo Q_Identifier) (Charset.make 'a' 'z')
-            ]
-
-    let utteranceTransitions =
-        List.concat
-            [ List.map (transitionTo Q_Utterance) (Charset.make 'a' 'z')
-              List.map (transitionTo Q_Utterance) (Charset.make '\u0250' '\u0341')
-              List.map (transitionTo Q_Utterance) (List.ofSeq "æðøçθβɸ")
-            ]
-
-    let whitespaceTransitions =
-        List.map (transitionTo Q_Whitespace) (List.ofSeq " \t\r\n")
-    
     /// <summary>
     /// Defines the transition table for the lexer.
     /// </summary>
     let table =
+        let identifierTransitions =
+            onMany
+                [ seq { '0'..'9' };
+                  seq { 'A'..'Z' };
+                  seq { 'a'..'z' } ]
+                Q_Identifier
+
+        let utteranceTransitions =
+            onMany
+                [ seq { 'a'..'z' };
+                  seq { '\u0250'..'\u0341' };
+                  "æðøçθβɸ" :> char seq ]
+                Q_Utterance
+
+        let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
+
         createTransitionTable
             [ transitionFrom START whitespaceTransitions
               transitionFrom Q_Whitespace whitespaceTransitions
@@ -190,7 +102,7 @@ module Lexer =
     /// Removes the initial semicolon from the comment and trims whitespace.
     /// </summary>
     /// <param name="token">The comment token.</param>
-    let trimComment token = Token.make token.tokenType token.position (token.value.[1..].Trim())
+    let trimComment token = { token with value = token.value.[1..].Trim() }
 
     /// <summary>
     /// Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
@@ -283,7 +195,7 @@ module Lexer =
                                 value.ToString()
                             else
                                 value.ToString().Trim()
-                        modifyToken (Token.make tokenType startPos nextValue) :: out
+                        modifyToken { tokenType = tokenType; position = startPos; value = nextValue } :: out
                     else
                         out
                 let nextStartPos =

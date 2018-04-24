@@ -2,16 +2,8 @@
 
 open TransmuteLib.Exceptions
 open TransmuteLib.Node
+open TransmuteLib.Token
 open System
-
-type UnexpectedTokenException(expected:TokenType, got:Token) =
-    inherit SyntaxException(sprintf "Expected '%s', got '%s'" (expected.ToString()) (got.tokenType.ToString()), got.position)
-
-type ExpectedSetException(expected:TokenType list, got:Token) =
-    inherit ApplicationException(
-        (sprintf "Expected one of %s, got '%s' at row %d, column %d"
-            (String.concat ", " (List.map string expected))
-            (got.tokenType.ToString()) <|| got.position))
 
 type RuleParserResult =
     | OK of Node list
@@ -41,7 +33,7 @@ module RuleParser =
             match tokens with
             | [] ->
                 raise (ArgumentException ("tokens", "Must not be empty"))
-            | { tokenType = Whitespace }::xs ->
+            | OfType Whitespace _::xs ->
                 matchToken xs target
             | { tokenType = tokenType } as x::xs ->
                 if tokenType = target then
@@ -58,7 +50,7 @@ module RuleParser =
             match tokens with
             | [] ->
                 raise (ArgumentException ("tokens", "Must not be empty"))
-            | { tokenType = Whitespace }::xs ->
+            | OfType Whitespace _::xs ->
                 matchSet xs targetTypes
             | { tokenType = tokenType } as x::xs ->
                 if List.contains tokenType targetTypes then
@@ -91,10 +83,10 @@ module RuleParser =
             match tokens with
             | [] ->
                 raise (SyntaxException ("Expected identifier, '+' or '-', got end of file", _position))
-            | { tokenType = Id }::_ ->
+            | OfType Id _::_ ->
                 matchSetIdentifierTerm tokens
-            | { tokenType = Plus }::_
-            | { tokenType = Minus }::_ ->
+            | OfType Plus _::_
+            | OfType Minus _::_ ->
                 matchFeatureIdentifierTerm tokens
             | x::_ ->
                 raise (ExpectedSetException ([ Id; Plus; Minus ], x))
@@ -108,7 +100,7 @@ module RuleParser =
                 match tokens with
                 | [] ->
                     raise (SyntaxException ("Expected ']', got end of file", _position))
-                | { tokenType = RBrack }::xs ->
+                | OfType RBrack _::xs ->
                     xs, Node.tag (SetIdentifierNode (List.rev result)) headPosition
                 | _ ->
                     let tokens, term = matchSetOrFeatureIdentifierTerm tokens
@@ -129,9 +121,9 @@ module RuleParser =
             /// <param name="result">The contents of the node.</param>
             let rec matchDisjunct tokens startToken result =
                 match tokens with
-                | { tokenType = Whitespace }::xs ->
+                | OfType Whitespace _::xs ->
                     matchDisjunct xs startToken result
-                | { tokenType = RParen }::xs ->
+                | OfType RParen _::xs ->
                     xs, Node.tag (DisjunctNode (List.rev result)) startToken.position
                 | _ ->
                     let tokens, ruleSegment = matchRuleSegment tokens in
@@ -146,11 +138,11 @@ module RuleParser =
                 let tokens, lparen = matchToken tokens LParen
                 let rec matchOptional_DisjunctInteral tokens result =
                     match tokens with
-                    | { tokenType = Whitespace }::xs ->
+                    | OfType Whitespace _::xs ->
                         matchOptional_DisjunctInteral xs result
-                    | { tokenType = RParen }::xs ->
+                    | OfType RParen _::xs ->
                         xs, Node.tag (OptionalNode (List.rev result)) lparen.position
-                    | { tokenType = Pipe }::xs ->
+                    | OfType Pipe _::xs ->
                         matchDisjunct xs lparen result
                     | _ ->
                         let tokens, ruleSegment = matchRuleSegment tokens
@@ -162,26 +154,24 @@ module RuleParser =
                 match tokens with
                 | [] ->
                     tokens, List.rev result
-                | x::xs ->
-                    match x.tokenType with
-                    | Separator ->
-                        matchRuleSegmentInternal xs result
-                    | Id ->
-                        matchRuleSegmentInternal xs (Node.tag (IdentifierNode x.value) x.position :: result)
-                    | Utterance ->
-                        matchRuleSegmentInternal xs (Node.tag (UtteranceNode x.value) x.position :: result)
-                    | Placeholder ->
-                        matchRuleSegmentInternal xs (Node.tag PlaceholderNode x.position :: result)
-                    | Boundary ->
-                        matchRuleSegmentInternal xs (Node.tag BoundaryNode x.position :: result)
-                    | LBrack ->
-                        let tokens, setIdentifier = matchSetIdentifier xs x.position
-                        matchRuleSegmentInternal tokens (setIdentifier :: result)
-                    | LParen ->
-                        let tokens, optional = matchOptional_Disjunct tokens
-                        matchRuleSegmentInternal tokens (optional :: result)
-                    | _ ->
-                        tokens, List.rev result
+                | OfType Separator _::xs ->
+                    matchRuleSegmentInternal xs result
+                | OfType Id x::xs ->
+                    matchRuleSegmentInternal xs (Node.tag (IdentifierNode x.value) x.position :: result)
+                | OfType Utterance x::xs ->
+                    matchRuleSegmentInternal xs (Node.tag (UtteranceNode x.value) x.position :: result)
+                | OfType Placeholder x::xs ->
+                    matchRuleSegmentInternal xs (Node.tag PlaceholderNode x.position :: result)
+                | OfType Boundary x::xs ->
+                    matchRuleSegmentInternal xs (Node.tag BoundaryNode x.position :: result)
+                | OfType LBrack x::xs ->
+                    let tokens, setIdentifier = matchSetIdentifier xs x.position
+                    matchRuleSegmentInternal tokens (setIdentifier :: result)
+                | OfType LParen x::xs ->
+                    let tokens, optional = matchOptional_Disjunct tokens
+                    matchRuleSegmentInternal tokens (optional :: result)
+                | _ ->
+                    tokens, List.rev result
             matchRuleSegmentInternal tokens []
 
         /// <summary>
@@ -191,9 +181,9 @@ module RuleParser =
         /// <param name="utterance">The utterance already matched.</param>
         let rec matchUtterance_Transformation tokens utterance =
             match tokens with
-            | { tokenType = Whitespace }::xs ->
+            | OfType Whitespace _::xs ->
                 matchUtterance_Transformation xs utterance
-            | { tokenType = Gives }::xs ->
+            | OfType Gives _::xs ->
                 let tokens, result = matchToken xs Utterance
                 let targetNode = Node.tag (UtteranceNode utterance.value) utterance.position
                 let resultNode = Node.tag (UtteranceNode result.value) result.position
@@ -211,13 +201,13 @@ module RuleParser =
                 match tokens with
                 | [] ->
                     raise (SyntaxException ("Expected member list, got end of file", _position))
-                | { tokenType = Whitespace }::xs
-                | { tokenType = Comment }::xs ->
+                | OfType Whitespace _::xs
+                | OfType Comment _::xs ->
                     matchMemberListInternal xs result
-                | { tokenType = Utterance } as x::xs ->
+                | OfType Utterance x::xs ->
                     let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
                     matchMemberListInternal tokens (utteranceOrTransformation :: result)
-                | { tokenType = RBrace }::xs ->
+                | OfType RBrace _::xs ->
                     xs, List.rev result
                 | x::_ ->
                     raise (UnexpectedTokenException (Utterance, x))
@@ -259,12 +249,12 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let matchSet_Rule tokens identifier =
             let tokens, nextToken = matchSet tokens [ LBrace; Utterance ]
-            match nextToken.tokenType with
-            | LBrace ->
+            match nextToken with
+            | OfType LBrace _ ->
                 // TODO: include members of other sets
                 let tokens, members = matchMemberList tokens
                 tokens, Node.tag (SetDefinitionNode (identifier.value, members)) identifier.position
-            | Utterance ->
+            | OfType Utterance _ ->
                 let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
                 tokens, ruleNode
             | _ ->
@@ -326,6 +316,7 @@ module RuleParser =
             let tokens, memberList = matchMemberList tokens
             tokens, Node.tag (FeatureDefinitionNode (identifier.value, memberList)) headPosition
 
+
         /// <summary>
         /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="SetIdentifierNode" />
         /// or a <see cref="RuleNode" />.
@@ -336,8 +327,10 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let rec matchFeature_SetIdentifier_Rule tokens headPosition identifier =
             match tokens with
-            | { tokenType = Plus }::_
-            | { tokenType = Minus }::_ ->
+            | [] ->
+                raise (SyntaxException(sprintf "Expected feature identifier term, identifier or ']'; got end of file", _position))
+            | OfType Plus _::_
+            | OfType Minus _::_ ->
                 let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
                 match identifier with
                 | Some i ->
@@ -346,7 +339,7 @@ module RuleParser =
                 | None ->
                     // '[' [ '+' | '-' ] -> RuleNode (...)
                     tokens, theSet
-            | { tokenType = RBrack } as x::_ ->
+            | OfType RBrack x::_ ->
                 match identifier with
                 | Some i ->
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
@@ -354,14 +347,14 @@ module RuleParser =
                 | None ->
                     // '[' ']' -> syntax error
                     raise (UnexpectedTokenException (Id, x))
-            | { tokenType = Id; value = value; position = position } as x::xs ->
+            | OfType Id x::xs ->
                 match identifier with
                 | Some i ->
                     // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: target.Tail, replacement, environment)
-                    let tokens, ruleNode = matchRule tokens position
+                    let tokens, ruleNode = matchRule tokens x.position
                     tokens, prependToRule ruleNode headPosition
                         [ Node.tag (IdentifierNode i.value) i.position
-                          Node.tag (IdentifierNode value) position
+                          Node.tag (IdentifierNode x.value) x.position
                         ]
                 | None ->
                     // Store first identifier and see what we get next
@@ -379,20 +372,18 @@ module RuleParser =
                 match tokens with
                 | [] ->
                     NextResult.SyntaxError ("End of file", _position)
+                | OfType Whitespace _::xs ->
+                    nextInternal xs
+                | OfType Comment x::xs ->
+                    NextResult.OK (xs, Node.tag (CommentNode x.value) x.position)
+                | OfType Utterance x::xs ->
+                    NextResult.OK (matchRule tokens x.position)
+                | OfType Id x::xs ->
+                    NextResult.OK (matchSet_Rule xs x)
+                | OfType LBrack x::xs ->
+                    NextResult.OK (matchFeature_SetIdentifier_Rule xs x.position None)
                 | x::xs ->
-                    match x.tokenType with
-                    | Whitespace ->
-                        nextInternal xs
-                    | Comment ->
-                        NextResult.OK (xs, Node.tag (CommentNode x.value) x.position)
-                    | Utterance ->
-                        NextResult.OK (matchRule tokens x.position)
-                    | Id ->
-                        NextResult.OK (matchSet_Rule xs x)
-                    | LBrack ->
-                        NextResult.OK (matchFeature_SetIdentifier_Rule xs x.position None)
-                    | _ ->
-                        NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
+                    NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
                 | :? SyntaxException as ex ->
                     NextResult.SyntaxError (ex.Message, _position)

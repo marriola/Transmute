@@ -45,12 +45,7 @@ module StateMachine =
     let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (classes: StateTransition<'TState, 'TSymbol> list) =
         classes
             |> List.map
-                (fun c ->
-                    List.map
-                        (fun t ->
-                            let state, symbol = t
-                            ((c.state, symbol), state))
-                        c.transitions)
+                (fun c -> c.transitions |> List.map (fun t -> (c.state, snd t), fst t))
             |> List.concat
             |> dict
 
@@ -61,7 +56,7 @@ module StateMachine =
     /// <param name="transitions">The transitions that can be taken from the state.</param>
     let transitionFrom state transitions =
         { state = state;
-          transitions = transitions
+          transitions = List.ofSeq transitions
         }
 
     /// <summary>
@@ -72,23 +67,34 @@ module StateMachine =
     let on c state = (state, Char c)
 
     /// <summary>
+    /// Creates a list of transitions to a state from many input symbols.
+    /// </summary>
+    /// <param name="charsets">A list of character sequences.</param>
+    /// <param name="state">The state to transition to.</param>
+    let onMany charsets state =
+        charsets
+        |> Seq.map (fun cset -> cset |> Seq.map (fun c -> (state, Char c)))
+        |> Seq.concat
+        |> List.ofSeq
+
+    /// <summary>
     /// Creates a transition to a state on an input symbol.
     /// </summary>
     /// <param name="state">The state to transition to.</param>
     /// <param name="c">The input symbol.</param>
-    let transitionTo state c = (state, Char c)
+    let transitionTo state c = state, Char c
 
     /// <summary>
     /// Creates a transition to a state on any symbol not already matched.
     /// </summary>
     /// <param name="state">The state to transition to.</param>
-    let anyTo state = (state, Any)
+    let anyTo state = state, Any
 
     /// <summary>
     /// Creates a transition to a state that does not consume an input symbol.
     /// </summary>
     /// <param name="state">The state to transition to.</param>
-    let epsilonTo state = (state, Epsilon)
+    let epsilonTo state = state, Epsilon
 
     /// <summary>
     /// Compute the result of transitioning from the current state on an input symbol.
@@ -98,19 +104,19 @@ module StateMachine =
     /// <param name="inputSymbol">The input symbol to transition on.</param>
     /// <param name="failState">The error state to transition to if no other transition can be taken.</param>
     let step (transitionTable: TransitionTable<'a>) currentState inputSymbol failState =
-        let transition = (currentState, Char inputSymbol)
-        let transitionOnEpsilon = (currentState, Epsilon)
-        let transitionOnAny = (currentState, Any)
+        let transition = currentState, Char inputSymbol
+        let transitionOnEpsilon = currentState, Epsilon
+        let transitionOnAny = currentState, Any
 
         if transitionTable.ContainsKey(transition) then
-            (Char inputSymbol, transitionTable.[transition])
+            Char inputSymbol, transitionTable.[transition]
 
         else if transitionTable.ContainsKey(transitionOnEpsilon) then
-            (Epsilon, transitionTable.[transitionOnEpsilon])
+            Epsilon, transitionTable.[transitionOnEpsilon]
 
         else if transitionTable.ContainsKey(transitionOnAny) then
-            (Any, transitionTable.[transitionOnAny])
+            Any, transitionTable.[transitionOnAny]
 
         else
-            (Char inputSymbol, failState)
+            Char inputSymbol, failState
 
