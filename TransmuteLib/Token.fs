@@ -93,9 +93,8 @@ module Token =
     let (|OfType|_|) tt token = 
         match token with
         | { tokenType = tokenType } as x ->
-            if tokenType = tt then
-                Some x
-            else
-                None
+            if tokenType = tt
+                then Some x
+                else None
         | _ ->
             None

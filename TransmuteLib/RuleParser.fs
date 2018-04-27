@@ -18,6 +18,7 @@ type ValidateResult =
     | SyntaxError of string * (int * int)
 
 module RuleParser =
+
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
@@ -326,39 +327,42 @@ module RuleParser =
         /// </remarks>
         /// <param name="tokens">The list of tokens.</param>
         let rec matchFeature_SetIdentifier_Rule tokens headPosition identifier =
+            let idCata fSome fNone (id: Token option) =
+                match id with
+                | Some i -> fSome i
+                | None -> fNone()
+
             match tokens with
             | [] ->
                 raise (SyntaxException(sprintf "Expected feature identifier term, identifier or ']'; got end of file", _position))
             | OfType Plus _::_
             | OfType Minus _::_ ->
                 let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
-                match identifier with
-                | Some i ->
+                identifier
+                |> idCata
                     // '[' Id [ '+' | '-' ] -> RuleNode (id :: target, replacement, environment)
-                    tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (IdentifierNode i.value) i.position ]
-                | None ->
+                    (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (IdentifierNode i.value) i.position ])
                     // '[' [ '+' | '-' ] -> RuleNode (...)
-                    tokens, theSet
+                    (fun _ -> tokens, theSet)
             | OfType RBrack x::_ ->
-                match identifier with
-                | Some i ->
+                identifier
+                |> idCata
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
-                    matchFeature tokens headPosition i
-                | None ->
+                    (fun i -> matchFeature tokens headPosition i)
                     // '[' ']' -> syntax error
-                    raise (UnexpectedTokenException (Id, x))
+                    (fun _ -> raise (UnexpectedTokenException (Id, x)))
             | OfType Id x::xs ->
-                match identifier with
-                | Some i ->
+                identifier
+                |> idCata
                     // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: target.Tail, replacement, environment)
-                    let tokens, ruleNode = matchRule tokens x.position
-                    tokens, prependToRule ruleNode headPosition
-                        [ Node.tag (IdentifierNode i.value) i.position
-                          Node.tag (IdentifierNode x.value) x.position
-                        ]
-                | None ->
+                    (fun i ->
+                        let tokens, ruleNode = matchRule tokens x.position
+                        tokens, prependToRule ruleNode headPosition
+                            [ Node.tag (IdentifierNode i.value) i.position
+                              Node.tag (IdentifierNode x.value) x.position
+                            ])
                     // Store first identifier and see what we get next
-                    matchFeature_SetIdentifier_Rule xs headPosition (Some x)
+                    (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))
             | x::_ ->
                 raise (ExpectedSetException ([ Plus; Minus; Id ], x))
 
