@@ -3,7 +3,8 @@
 open System.Collections.Generic
 
 type PrefixTree =
-    | PrefixNode of prefix:string * value:char * children:Dictionary<char, PrefixTree>
+    | PrefixNode of prefix:string * value:char * children:IDictionary<char, PrefixTree>
+    | Leaf of prefix:string * value:char
 
 module PrefixTree =
     open System
@@ -25,39 +26,29 @@ module PrefixTree =
     let START_MATCH = '␂'
     let END_MATCH = '␃'
 
+    let private isEmpty = String.length >> (=) 0
+
     /// <summary>
     /// Creates a prefix tree from a set of utterances.
     /// </summary>
     /// <param name="set">The set of utterances.</param>
     let makeTree set =
-        let rec inner root subtree accumulator utterance =
-            if utterance = "" then
-                root
-            else
-                let headSymbol = utterance.[0]
-                let rest = utterance.[1..]
-                let next =
-                    if headSymbol = NUL then
-                        accumulator
-                    else
-                        accumulator + (string headSymbol)
-                match subtree with
-                | PrefixNode (_, _, children) ->
-                    if children.ContainsKey headSymbol then
-                        inner root children.[headSymbol] next rest
-                    else
-                        let nextSubtree = PrefixNode(next, headSymbol, new Dictionary<char, PrefixTree>())
-                        children.[headSymbol] <- inner nextSubtree nextSubtree next rest
-                        root
-        let root = PrefixNode ("", NUL, new Dictionary<char, PrefixTree>())
-        let rec loopOverSet (set: string list) =
-            if set.IsEmpty then
-                root
-            else
-                let suffixedUtterance = set.Head + (string NUL)
-                ignore (inner root root "" suffixedUtterance)
-                loopOverSet set.Tail
-        loopOverSet set
+        let rec inner set acc =
+            let final =
+                if List.exists isEmpty set
+                    then [ NUL, Leaf (acc, NUL) ]
+                    else []
+            let followSet =
+                set
+                |> List.where (not << isEmpty)
+                |> List.groupBy Seq.head
+                |> List.map (fun (prefixChar, subset) ->
+                    let subset = subset |> List.map (fun s -> s.[1..])
+                    let nextAcc = acc + (string prefixChar)
+                    let node = PrefixNode (nextAcc, prefixChar, inner subset nextAcc)
+                    prefixChar, node)
+            List.concat [ followSet; final ] |> dict
+        PrefixNode ("", '\u0000', inner set "")
 
     /// <summary>
     /// Creates a syntax error from a tagged node.
@@ -100,7 +91,7 @@ module PrefixTree =
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier"></param>
-    let internal setIntersection (sets: IDictionary<string, Node>) (features: IDictionary<string, Node>) setIdentifier =
+    let internal setIntersection (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
         let rec inner (terms: Node list) (result: Set<string>) =
             match terms with
             | [] ->
@@ -151,5 +142,5 @@ type PrefixTree with
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier">The SetIdentifierNode listing the sets and features to intersect.</param>
-    static member fromSetIntersection sets features setIdentifier =
-        PrefixTree.setIntersection sets features setIdentifier |> PrefixTree.makeTree
+    static member fromSetIntersection features sets setIdentifier =
+        PrefixTree.setIntersection features sets setIdentifier |> PrefixTree.makeTree
