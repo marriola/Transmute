@@ -124,11 +124,7 @@ module PrefixTree =
                         let position, node = Node.untagWithMetadata x
                         raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
                 inner xs nextSet
-        match Node.untag setIdentifier with
-        | SetIdentifierNode terms ->
-            inner terms alphabet |> List.ofSeq
-        | _ ->
-            raise (ArgumentException ("Must be a SetIdentifierNode", "setIdentifier"))
+        inner setIdentifier alphabet |> List.ofSeq
 
 type PrefixTree with
     /// <summary>
