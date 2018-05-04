@@ -4,7 +4,7 @@ open System.IO
 open TransmuteLib.StateMachine
 open TransmuteLib.Token
 
-type State =
+type LexerState =
     | START
     | ERROR
     | Q_Whitespace
@@ -61,7 +61,7 @@ module Lexer =
 
         let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
 
-        createTransitionTable
+        createTransitionTableFromClasses
             [ transitionFrom START whitespaceTransitions
               transitionFrom Q_Whitespace whitespaceTransitions
               transitionFrom Q_Whitespace [ epsilonTo Q_WhitespaceFinal ]
@@ -144,7 +144,7 @@ module Lexer =
     let rec lexInternal
         (stream: StreamReader)
         (value: StringBuilder)
-        (currentState: State)
+        (currentState: LexerState)
         (startPos: int * int)
         (pos: int * int)
         (out: Token list) =

@@ -47,5 +47,7 @@ let main argv =
                 printfn "Passed validation!"
             | ValidateResult.SyntaxError (message, (row, col)) ->
                 printfn "Syntax error at row %d column %d: %s" row col message
+            let r = SoundChangeRule.createStateMachine features sets rules.[1]
+            printfn "%s" (string r)
     Console.ReadKey()
     0 // return an integer exit code

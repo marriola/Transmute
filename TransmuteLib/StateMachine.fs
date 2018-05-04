@@ -13,11 +13,15 @@ type Match =
     /// If no other transition applies, accept any input symbol.
     | Any
 
+type Edge<'TState> = 'TState * Match
+
+type Transition<'TState> = Edge<'TState> * 'TState list
+
 /// <summary>
 /// Represents a transition table.
 /// </summary>
 /// <typeparam name="TState">The type of states in the state machine.</typeparam>
-type TransitionTable<'TState> = IDictionary<'TState * Match, 'TState>
+type TransitionTable<'TState> = IDictionary<'TState * Match, 'TState list>
 
 /// <summary>
 /// Represents the transitions that can be taken from a state.
@@ -42,12 +46,20 @@ module StateMachine =
     /// </summary>
     /// <typeparam name="TState">The type of states in the state machine.</typeparam>
     /// <param name="classes">The list of characters and transitions that can be taken from them.</param>
-    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (classes: StateTransition<'TState, 'TSymbol> list) =
+    let createTransitionTableFromClasses<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (classes: StateTransition<'TState, 'TSymbol> list) =
         classes
-            |> List.map
-                (fun c -> c.transitions |> List.map (fun t -> (c.state, snd t), fst t))
-            |> List.concat
-            |> dict
+        |> List.map
+            (fun c -> c.transitions |> List.map (fun t -> (c.state, snd t), [ fst t ]))
+        |> List.concat
+        |> dict
+
+    let groupTransitions transitions =
+        transitions
+        |> List.groupBy (fun t -> fst t)
+        |> List.map (fun (key, lst) -> key, lst |> List.map snd |> List.concat)
+
+    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (transitions: Transition<'TState> list) =
+        groupTransitions transitions |> dict
 
     /// <summary>
     /// Creates a group of transitions from a state.
@@ -109,13 +121,13 @@ module StateMachine =
         let transitionOnAny = currentState, Any
 
         if transitionTable.ContainsKey(transition) then
-            Char inputSymbol, transitionTable.[transition]
+            Char inputSymbol, transitionTable.[transition].[0]
 
         else if transitionTable.ContainsKey(transitionOnEpsilon) then
-            Epsilon, transitionTable.[transitionOnEpsilon]
+            Epsilon, transitionTable.[transitionOnEpsilon].[0]
 
         else if transitionTable.ContainsKey(transitionOnAny) then
-            Any, transitionTable.[transitionOnAny]
+            Any, transitionTable.[transitionOnAny].[0]
 
         else
             Char inputSymbol, failState

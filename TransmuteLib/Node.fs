@@ -104,9 +104,9 @@ module Node =
 
     let private filterMap (fn: 'a -> (string * 'a) option) nodes =
         nodes
-            |> List.map fn
-            |> List.filter ((<>) None)
-            |> List.map Option.get
+        |> List.map fn
+        |> List.filter ((<>) None)
+        |> List.map Option.get
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
@@ -114,13 +114,13 @@ module Node =
     /// <param name="nodes"></param>
     let getFeatures nodes =
         nodes
-            |> filterMap
-                (fun x ->
-                    match untag x with
-                    | FeatureDefinitionNode (name, members) ->
-                        Some (name, FeatureDefinitionNode (name, members))
-                    | _ -> None)
-            |> dict
+        |> filterMap
+            (fun x ->
+                match untag x with
+                | FeatureDefinitionNode (name, members) ->
+                    Some (name, FeatureDefinitionNode (name, members))
+                | _ -> None)
+        |> dict
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are SetDefinitionNodes.
@@ -128,20 +128,20 @@ module Node =
     /// <param name="nodes"></param>
     let getSets nodes =
         nodes
-            |> filterMap
-                (fun x ->
-                    match untag x with
-                    | SetDefinitionNode (name, members) ->
-                        Some (name, SetDefinitionNode (name, members))
-                    | _ -> None)
-            |> dict
+        |> filterMap
+            (fun x ->
+                match untag x with
+                | SetDefinitionNode (name, members) ->
+                    Some (name, SetDefinitionNode (name, members))
+                | _ -> None)
+        |> dict
 
     /// <summary>
     /// Gets the members of the feature.
     /// </summary>
     /// <param name="feature">The feature.</param>
     /// <param name="isPresent">If true, takes the right hand side from each transformation; otherwise, takes the left hand side.</param>
-    let getFeatureMembers feature isPresent =
+    let getFeatureMembers isPresent feature =
         let rec inner members out =
             match members with
             | [] ->
@@ -175,3 +175,12 @@ module Node =
             List.map (fun x -> getStringValue x) members
         | _ ->
             raise (ArgumentException ("Must be a set", "theSet"))
+
+    let getAlphabet features sets =
+        [ List.map (getFeatureMembers true) features;
+          List.map (getFeatureMembers false) features;
+          List.map getSetMembers sets ]
+        |> List.map List.concat
+        |> List.concat
+        |> set
+

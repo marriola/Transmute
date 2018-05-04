@@ -3,8 +3,10 @@
 open System.Collections.Generic
 
 type PrefixTree =
-    | PrefixNode of prefix:string * value:char * children:IDictionary<char, PrefixTree>
-    | Leaf of prefix:string * value:char
+    | Root of children:PrefixTree list
+    //| PrefixNode of prefix:string * value:char * children:IDictionary<char, PrefixTree>
+    | Node of prefix:string * value:char * children:PrefixTree list
+    | Leaf of utterance:string
 
 module PrefixTree =
     open System
@@ -36,8 +38,8 @@ module PrefixTree =
         let rec inner set acc =
             let final =
                 if List.exists isEmpty set
-                    then [ NUL, Leaf (acc, NUL) ]
-                    else []
+                    then [ Leaf acc ]
+                    else List.empty
             let followSet =
                 set
                 |> List.where (not << isEmpty)
@@ -45,10 +47,10 @@ module PrefixTree =
                 |> List.map (fun (prefixChar, subset) ->
                     let subset = subset |> List.map (fun s -> s.[1..])
                     let nextAcc = acc + (string prefixChar)
-                    let node = PrefixNode (nextAcc, prefixChar, inner subset nextAcc)
-                    prefixChar, node)
-            List.concat [ followSet; final ] |> dict
-        PrefixNode ("", '\u0000', inner set "")
+                    let node = Node (nextAcc, prefixChar, inner subset nextAcc)
+                    node)
+            followSet @ final
+        Root (inner set "")
 
     /// <summary>
     /// Creates a syntax error from a tagged node.
@@ -85,38 +87,46 @@ module PrefixTree =
                     |> makeSyntaxError node
                     |> raise
 
+    let private difference x y = x - y
+    let private intersect x y =
+        let differenceRight = x - y
+        let differenceLeft = y - x
+        x - differenceLeft - differenceRight
+
     /// <summary>
     /// Computes the intersection of the sets and features named in the SetIdentifierNode.
     /// </summary>
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier"></param>
-    let internal setIntersection (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
+    let internal setIntersection (alphabet: Set<string>) (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
         let rec inner (terms: Node list) (result: Set<string>) =
+            let addToSet isPresent s =
+                if isPresent
+                    then intersect result s
+                    else difference result s
+
             match terms with
             | [] ->
                 result
             | x::xs ->
-                let setMembers =
+                let nextSet =
                     match Node.untag x with
-                    | IdentifierNode name ->
-                        tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name |> set
+                    | SetIdentifierTermNode name ->
+                        tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
+                        |> set
+                        |> addToSet true
                     | FeatureIdentifierTermNode (isPresent, name) ->
-                        tryFindSetOrFeature (fun _ -> getFeatureMembers features.[name] isPresent) "Feature" x name |> set
+                        tryFindSetOrFeature (fun _ -> getFeatureMembers true features.[name]) "Feature" x name
+                        |> set
+                        |> addToSet isPresent
                     | _ ->
                         let position, node = Node.untagWithMetadata x
                         raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
-                let nextSet =
-                    if result.IsEmpty then
-                        setMembers
-                    else
-                        let differenceRight = result - setMembers
-                        let differenceLeft = setMembers - result
-                        result - differenceLeft - differenceRight
                 inner xs nextSet
         match Node.untag setIdentifier with
         | SetIdentifierNode terms ->
-            inner terms Set.empty |> List.ofSeq
+            inner terms alphabet |> List.ofSeq
         | _ ->
             raise (ArgumentException ("Must be a SetIdentifierNode", "setIdentifier"))
 
@@ -127,7 +137,7 @@ type PrefixTree with
     /// <param name="feature"></param>
     /// <param name="isPresent"></param>
     static member fromFeature feature isPresent =
-        PrefixTree.makeTree (Node.getFeatureMembers feature isPresent)
+        PrefixTree.makeTree (Node.getFeatureMembers isPresent feature)
 
     /// <summary>
     /// Creates a prefix tree from the members of a set.
@@ -142,5 +152,10 @@ type PrefixTree with
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier">The SetIdentifierNode listing the sets and features to intersect.</param>
-    static member fromSetIntersection features sets setIdentifier =
-        PrefixTree.setIntersection features sets setIdentifier |> PrefixTree.makeTree
+    static member fromSetIntersection (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
+        let getVal (kvp: KeyValuePair<'a, 'b>) = kvp.Value
+        let alphabet =
+            Node.getAlphabet
+                (Seq.map getVal features |> List.ofSeq)
+                (Seq.map getVal sets |> List.ofSeq)
+        PrefixTree.setIntersection alphabet features sets setIdentifier |> PrefixTree.makeTree
