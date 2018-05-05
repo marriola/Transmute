@@ -51,20 +51,27 @@ module SoundChangeRule =
         let rec inner states (input: Node list) current transitions isAtBeginning isSubtreeFinal =
             let makeFinal state = { state with IsFinal = true }
 
+            let inline giveTrue () = true
+            let inline giveFalse () = false
+
             let endCata fEnd fNotEnd =
-                match input.Tail with
-                | [] -> fEnd()
-                | _ -> fNotEnd()
+                if not isSubtreeFinal then
+                    fNotEnd()
+                else
+                    match input with
+                    | _::[] -> fEnd()
+                    | _ -> fNotEnd()
 
-            let atEnd() = endCata (fun _ -> true) (fun _ -> false)
+            let atEnd() = endCata giveTrue giveFalse
 
-            /// Creates a state that matches an input symbol.
+            /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
                 let states, target = getNextState states
                 let target = endCata (fun _ -> makeFinal target) (fun _ -> target)
                 let transitions = (on c current, [target]) :: transitions
                 states, transitions, target
 
+            /// Creates a series of states and transitions that match each character of an utterance.
             let transformUtterance utterance =
                 let rec innerTransformUtterance utterance states transitions next =
                     match utterance with
@@ -72,38 +79,50 @@ module SoundChangeRule =
                         states, transitions, next
                     | c::xs ->
                         let states, target = getNextState states
+                        let target =
+                            if isSubtreeFinal
+                                then makeFinal target
+                                else target
                         innerTransformUtterance xs states ((on c next, [target]) :: transitions) target
 
                 innerTransformUtterance (List.ofSeq utterance) states transitions current
 
+            /// Computes the intersection of a list of feature and set identifiers, and creates a
+            /// tree of states and transitions that match each member of the intersection.
             let transformSet setId =
                 let states, lastState = getNextState states
+                let lastState =
+                    endCata
+                        (fun _ -> makeFinal lastState)
+                        (fun _ -> lastState)
+
                 let rec innerTransformSet states transitions curState tree =
                     match tree with
                     | PrefixTree.Root children
                     | PrefixTree.Node (_, _, children) ->
+                        // Create states for each child and transitions to them
                         let follows =
-                            children
-                            |> List.fold
+                            List.fold
                                 (fun acc n ->
-                                    let states, transitions, _ = List.head acc
+                                    let states, transitions = List.head acc
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = getNextState states
                                         let transitions = ((curState, Match.Char c), [nextState]) :: transitions
-                                        innerTransformSet states transitions nextState n :: acc
+                                        let x, y, _ = innerTransformSet states transitions nextState n
+                                        (x, y) :: acc
                                     | PrefixTree.Leaf _ ->
                                         let transitions = ((curState, Epsilon), [lastState]) :: transitions
-                                        (states, transitions, lastState) :: acc
+                                        (states, transitions) :: acc
                                     | Root _ ->
-                                        failwith "Root should never have another Root as a descendant")
-                                [ states, transitions, curState ]
-                        let states, transitions, _ = List.head follows
-                        let lastState =
-                            endCata
-                                (fun _ -> makeFinal lastState)
-                                (fun _ -> lastState)
-                        states, transitions, lastState
+                                        failwith "A Root should never have another Root as a descendant")
+                                [ states, transitions ]
+                                children
+                        match follows with
+                        | (states, transitions)::_ ->
+                            states, transitions, lastState
+                        | _ ->
+                            failwith "children must not be empty"
                     | PrefixTree.Leaf _ ->
                         states, transitions, curState
 
@@ -114,6 +133,8 @@ module SoundChangeRule =
                 match input with
                 | [] ->
                     Done
+                | TaggedNode (_, PlaceholderNode)::_ ->
+                    HasNext (inner states target current transitions true (atEnd()))
                 | TaggedNode (_, BoundaryNode)::_ ->
                     let boundaryChar = if isAtBeginning then Special.START else Special.END
                     HasNext (matchCharacter boundaryChar)
@@ -121,17 +142,19 @@ module SoundChangeRule =
                     HasNext (transformUtterance utterance)
                 | TaggedNode (_, SetIdentifierNode setId)::_ ->
                     HasNext (transformSet setId)
+                | TaggedNode (_, (IdentifierNode _ as id))::_ ->
+                    HasNext (transformSet [ id ])
                 | _ ->
                     failwithf "Unexpected '%s'" (string input.Head)
 
             match generatorState with
             | Done ->
-                transitions, current
+                states, transitions, current
             | HasNext (states, transitions, theNext) ->
                 inner states input.Tail theNext transitions false isSubtreeFinal
 
         let initialStates = Seq.initInfinite (State.make << sprintf "q%d")
-        let ts, _ = inner initialStates environment START List.empty true true
+        let _, ts, _ = inner initialStates environment START List.empty true true
 
         ts |> List.rev |> groupTransitions
 

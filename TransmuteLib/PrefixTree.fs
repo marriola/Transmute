@@ -1,19 +1,16 @@
 ﻿namespace TransmuteLib
 
 open System.Collections.Generic
+open TransmuteLib
+open TransmuteLib.Node
+open TransmuteLib.Exceptions
 
 type PrefixTree =
     | Root of children:PrefixTree list
-    //| PrefixNode of prefix:string * value:char * children:IDictionary<char, PrefixTree>
     | Node of prefix:string * value:char * children:PrefixTree list
     | Leaf of utterance:string
 
 module PrefixTree =
-    open System
-    open TransmuteLib
-    open TransmuteLib.Node
-    open TransmuteLib.Exceptions
-
     // maketree [ "k"; "kw"; "g"; "gw"; "p"; "b"; "t"; "d" ]
 
     //                Ø
@@ -112,7 +109,8 @@ module PrefixTree =
             | x::xs ->
                 let nextSet =
                     match Node.untag x with
-                    | SetIdentifierTermNode name ->
+                    | SetIdentifierTermNode name
+                    | IdentifierNode name ->
                         tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
                         |> set
                         |> addToSet true
