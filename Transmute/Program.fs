@@ -33,7 +33,7 @@ let main argv =
 
             // Get SetIdentifierNode from first rule and create prefix tree
             let rule =
-                match untag rules.[2] with
+                match untag rules.[0] with
                 | RuleNode (target, _, _) ->
                     let tree = PrefixTree.fromSet sets.["$V"] //.fromSetIntersection sets features target.[0]
                     printfn "%s" (string tree)
@@ -51,7 +51,12 @@ let main argv =
                 printfn "Syntax error at row %d column %d: %s" row col message
 
             SoundChangeRule.createStateMachine features sets rules.[0]
-            |> List.map (fun ((fromState, m), toState) -> sprintf "(%s, %s) -> %s" (string fromState) (string m) (string toState))
+            |> List.sortBy (fun ((fromState, _), _) ->
+                match fromState.Name with
+                | "S" -> 0
+                | "Error" -> Int32.MaxValue
+                | x -> int x.[1..])
+            |> List.map (fun ((fromState, m), toState) -> sprintf "(%s, %s)\t-> %s" (string fromState) (string m) (string toState))
             |> String.concat "\n"
             |> Console.WriteLine
 

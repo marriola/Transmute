@@ -129,12 +129,24 @@ module SoundChangeRule =
                 PrefixTree.fromSetIntersection features sets setId
                 |> innerTransformSet states transitions current
 
+            let transformOptional children =
+                let states, lastState = getNextState states
+                let lastState =
+                    endCata
+                        (fun _ -> makeFinal lastState)
+                        (fun _ -> lastState)
+                let _, transitions, subtreeLast = inner states children current transitions true false
+                let transitions =
+                    List.concat
+                        [ [ ((current, Epsilon), [lastState])
+                            ((subtreeLast, Epsilon), [lastState]) ]
+                          transitions ]
+                states, transitions, lastState
+
             let generatorState =
                 match input with
                 | [] ->
                     Done
-                | TaggedNode (_, PlaceholderNode)::_ ->
-                    HasNext (inner states target current transitions true (atEnd()))
                 | TaggedNode (_, BoundaryNode)::_ ->
                     let boundaryChar = if isAtBeginning then Special.START else Special.END
                     HasNext (matchCharacter boundaryChar)
@@ -144,6 +156,10 @@ module SoundChangeRule =
                     HasNext (transformSet setId)
                 | TaggedNode (_, (IdentifierNode _ as id))::_ ->
                     HasNext (transformSet [ id ])
+                | TaggedNode (_, PlaceholderNode)::_ ->
+                    HasNext (inner states target current transitions true (atEnd()))
+                | TaggedNode (_, OptionalNode children)::_ ->
+                    HasNext (transformOptional children)
                 | _ ->
                     failwithf "Unexpected '%s'" (string input.Head)
 

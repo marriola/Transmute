@@ -1,4 +1,7 @@
-﻿$C//_$C
+﻿$V//$C_#
+
+; /i/ is elided when preceded by a syllable and followed by a syllable with /i/ as the nucleus
+i//$V$C_($C)$C.i
 
 ; Rounded consonant becomes unrounded preceding an unrounded vowel
 [$C+$round]/[-$round]/[$V-$round]#
@@ -12,9 +15,6 @@ r/[-$voiced]/[$C-$voiced]_#
 
 ; /r/ becomes voiceless when following a voiceless consonant in onset position
 r/[-$voiced]/#[-$voiced]_
-
-; /i/ is elided when preceded by a syllable and followed by a syllable with /i/ as the nucleus
-i//$V$C_($C)$C.i
 
 ea/ɛː/_
 ai/eː/_
