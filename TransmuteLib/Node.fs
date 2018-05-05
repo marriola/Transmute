@@ -41,7 +41,7 @@ type Node =
     | OptionalNode of Node list
 
     /// Defines a set of lists of nodes, only one of which may be matched.
-    | DisjunctNode of Node list
+    | DisjunctNode of Node list list
 
     /// Represents a node tagged with metadata.
     | TaggedNode of pos:(int * int) * Node

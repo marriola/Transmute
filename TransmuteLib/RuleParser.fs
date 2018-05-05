@@ -128,7 +128,7 @@ module RuleParser =
                     xs, Node.tag (DisjunctNode (List.rev result)) startToken.position
                 | _ ->
                     let tokens, ruleSegment = matchRuleSegment tokens in
-                    (List.rev ruleSegment) @ result
+                    ruleSegment :: result
                     |> matchDisjunct tokens startToken
 
             /// <summary>
@@ -144,7 +144,7 @@ module RuleParser =
                     | OfType RParen _::xs ->
                         xs, Node.tag (OptionalNode (List.rev result)) lparen.position
                     | OfType Pipe _::xs ->
-                        matchDisjunct xs lparen result
+                        matchDisjunct xs lparen [result]
                     | _ ->
                         let tokens, ruleSegment = matchRuleSegment tokens
                         (List.rev ruleSegment) @ result

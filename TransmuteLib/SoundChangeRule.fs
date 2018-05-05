@@ -37,6 +37,7 @@ module SoundChangeRule =
     let makeFinal state = { state with IsFinal = true }
 
     let private START = State.make "S"
+    let private ERROR = State.make "Error"
 
     let private buildNFA features sets target result environment =
         let getNextState states =
@@ -62,7 +63,7 @@ module SoundChangeRule =
                     | _::[] -> fEnd()
                     | _ -> fNotEnd()
 
-            let atEnd() = endCata giveTrue giveFalse
+            let isInputAtEnd() = endCata giveTrue giveFalse
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
@@ -104,25 +105,22 @@ module SoundChangeRule =
                         let follows =
                             List.fold
                                 (fun acc n ->
-                                    let states, transitions = List.head acc
+                                    let states, transitions = acc
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = getNextState states
                                         let transitions = ((curState, Match.Char c), [nextState]) :: transitions
-                                        let x, y, _ = innerTransformSet states transitions nextState n
-                                        (x, y) :: acc
+                                        let states, transitions, _ = innerTransformSet states transitions nextState n
+                                        states, transitions
                                     | PrefixTree.Leaf _ ->
                                         let transitions = ((curState, Epsilon), [lastState]) :: transitions
-                                        (states, transitions) :: acc
+                                        states, transitions
                                     | Root _ ->
                                         failwith "A Root should never have another Root as a descendant")
-                                [ states, transitions ]
+                                (states, transitions)
                                 children
-                        match follows with
-                        | (states, transitions)::_ ->
-                            states, transitions, lastState
-                        | _ ->
-                            failwith "children must not be empty"
+                        let states, transitions = follows
+                        states, transitions, lastState
                     | PrefixTree.Leaf _ ->
                         states, transitions, curState
 
@@ -137,10 +135,36 @@ module SoundChangeRule =
                         (fun _ -> lastState)
                 let _, transitions, subtreeLast = inner states children current transitions true false
                 let transitions =
-                    List.concat
-                        [ [ ((current, Epsilon), [lastState])
-                            ((subtreeLast, Epsilon), [lastState]) ]
-                          transitions ]
+                    [ (current, Epsilon), [lastState]
+                      (subtreeLast, Epsilon), [lastState] ] @
+                    transitions
+                states, transitions, lastState
+
+            let transformDisjunct branches =
+                let states, lastState = getNextState states
+                let lastState =
+                    endCata
+                        (fun _ -> makeFinal lastState)
+                        (fun _ -> lastState)
+                // Build subtree for each branch
+                let follows =
+                    List.fold
+                        (fun ((states, transitions, _)::_ as acc) branch ->
+                            inner states branch current transitions true (isSubtreeFinal && isInputAtEnd()) :: acc)
+                        [ states, transitions, current ]
+                        branches
+                let states, transitions, _ = List.head follows
+                // Transition from last state of each subtree to lastState.
+                // Reverse the list and take the tail first so we don't epsilon from current to lastState.
+                let subtreeFinalToLastState =
+                    follows
+                    |> List.rev
+                    |> List.tail
+                    |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), [lastState])
+                let transitions =
+                    [ (current, Any), [ERROR] ] @ // Go to ERROR if we can't match anything
+                    subtreeFinalToLastState @
+                    transitions
                 states, transitions, lastState
 
             let generatorState =
@@ -157,9 +181,11 @@ module SoundChangeRule =
                 | TaggedNode (_, (IdentifierNode _ as id))::_ ->
                     HasNext (transformSet [ id ])
                 | TaggedNode (_, PlaceholderNode)::_ ->
-                    HasNext (inner states target current transitions true (atEnd()))
+                    HasNext (inner states target current transitions true (isInputAtEnd()))
                 | TaggedNode (_, OptionalNode children)::_ ->
                     HasNext (transformOptional children)
+                | TaggedNode (_, DisjunctNode branches):: _ ->
+                    HasNext (transformDisjunct branches)
                 | _ ->
                     failwithf "Unexpected '%s'" (string input.Head)
 

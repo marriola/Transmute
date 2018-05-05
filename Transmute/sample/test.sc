@@ -1,4 +1,6 @@
-﻿$V//$C_#
+﻿a/æa/_(h|(l|r)$C)
+
+$V//$C_#
 
 ; /i/ is elided when preceded by a syllable and followed by a syllable with /i/ as the nucleus
 i//$V$C_($C)$C.i
