@@ -9,8 +9,8 @@ i//$V$C_($C)$C.i
 [$C+$round]/[-$round]/[$V-$round]#
 
 ; Stress moves to initial syllable
-[+$stressed]/[-$stressed]/_
-[-$stressed]/[+$stressed]/#($C)($C)_
+[$V+$stressed]/[-$stressed]/_
+[$V-$stressed]/[+$stressed]/#($C)($C)_
 
 ; /r/ becomes voiceless when preceding a voiceless consonant in coda position
 r/[-$voiced]/[$C-$voiced]_#
@@ -30,6 +30,7 @@ $V {
 $C { k kʰ kʰʷ kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
 
 [$stressed] {
+  ɑ => ˈɑ
   a => ˈa
   e => ˈe
   i => ˈi

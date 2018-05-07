@@ -40,7 +40,7 @@ module SoundChangeRule =
     let private ERROR = State.make "Error"
 
     let private buildNFA features sets target result environment =
-        let getNextState states =
+        let takeState states =
             Seq.tail states, Seq.head states
 
         /// <param name="states">An infinite sequence of functions that create states.</param>
@@ -65,10 +65,17 @@ module SoundChangeRule =
 
             let isInputAtEnd() = endCata giveTrue giveFalse
 
+            let getNextState states =
+                let states, nextState = takeState states
+                let nextState =
+                    endCata
+                        (fun _ -> makeFinal nextState)
+                        (fun _ -> nextState)
+                states, nextState
+
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
                 let states, target = getNextState states
-                let target = endCata (fun _ -> makeFinal target) (fun _ -> target)
                 let transitions = (on c current, [target]) :: transitions
                 states, transitions, target
 
@@ -80,10 +87,6 @@ module SoundChangeRule =
                         states, transitions, next
                     | c::xs ->
                         let states, target = getNextState states
-                        let target =
-                            if isSubtreeFinal
-                                then makeFinal target
-                                else target
                         innerTransformUtterance xs states ((on c next, [target]) :: transitions) target
 
                 innerTransformUtterance (List.ofSeq utterance) states transitions current
@@ -92,10 +95,6 @@ module SoundChangeRule =
             /// tree of states and transitions that match each member of the intersection.
             let transformSet setId =
                 let states, lastState = getNextState states
-                let lastState =
-                    endCata
-                        (fun _ -> makeFinal lastState)
-                        (fun _ -> lastState)
 
                 let rec innerTransformSet states transitions curState tree =
                     match tree with
@@ -108,7 +107,7 @@ module SoundChangeRule =
                                     let states, transitions = acc
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
-                                        let states, nextState = getNextState states
+                                        let states, nextState = takeState states
                                         let transitions = ((curState, Match.Char c), [nextState]) :: transitions
                                         let states, transitions, _ = innerTransformSet states transitions nextState n
                                         states, transitions
@@ -129,11 +128,7 @@ module SoundChangeRule =
 
             let transformOptional children =
                 let states, lastState = getNextState states
-                let lastState =
-                    endCata
-                        (fun _ -> makeFinal lastState)
-                        (fun _ -> lastState)
-                let _, transitions, subtreeLast = inner states children current transitions true false
+                let states, transitions, subtreeLast = inner states children current transitions true false
                 let transitions =
                     [ (current, Epsilon), [lastState]
                       (subtreeLast, Epsilon), [lastState] ] @
@@ -142,10 +137,6 @@ module SoundChangeRule =
 
             let transformDisjunct branches =
                 let states, lastState = getNextState states
-                let lastState =
-                    endCata
-                        (fun _ -> makeFinal lastState)
-                        (fun _ -> lastState)
                 // Build subtree for each branch
                 let follows =
                     List.fold
@@ -195,10 +186,10 @@ module SoundChangeRule =
             | HasNext (states, transitions, theNext) ->
                 inner states input.Tail theNext transitions false isSubtreeFinal
 
-        let initialStates = Seq.initInfinite (State.make << sprintf "q%d")
+        let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
         let _, ts, _ = inner initialStates environment START List.empty true true
-
-        ts |> List.rev |> groupTransitions
+        let ts = ts |> List.rev |> groupTransitions
+        ts
 
     let createStateMachine features sets rule =
         match untag rule with

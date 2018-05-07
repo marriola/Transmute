@@ -16,6 +16,10 @@ let validateOptions (options: Arguments.Options) =
 
 [<EntryPoint>]
 let main argv =
+#if DEBUG
+    // Force .NET to load System.Core so we can inspect enumerables in the debugger
+    System.Linq.Enumerable.Count([]) |> ignore
+#endif
     Console.OutputEncoding <- Text.Encoding.UTF8
     let options = Arguments.parse argv
     if not (validateOptions options) then
@@ -50,12 +54,7 @@ let main argv =
             | ValidateResult.SyntaxError (message, (row, col)) ->
                 printfn "Syntax error at row %d column %d: %s" row col message
 
-            SoundChangeRule.createStateMachine features sets rules.[0]
-            |> List.sortBy (fun ((fromState, _), _) ->
-                match fromState.Name with
-                | "S" -> 0
-                | "Error" -> Int32.MaxValue
-                | x -> int x.[1..])
+            SoundChangeRule.createStateMachine features sets rules.[8]
             |> List.map (fun ((fromState, m), toState) -> sprintf "(%s, %s)\t-> %s" (string fromState) (string m) (string toState))
             |> String.concat "\n"
             |> Console.WriteLine

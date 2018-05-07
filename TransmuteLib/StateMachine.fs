@@ -58,7 +58,7 @@ module StateMachine =
         |> List.groupBy (fun t -> fst t)
         |> List.map (fun (key, lst) -> key, lst |> List.map snd |> List.concat)
 
-    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (transitions: Transition<'TState> list) =
+    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TState : comparison and 'TSymbol : equality> (transitions: Transition<'TState> list) =
         groupTransitions transitions |> dict
 
     /// <summary>
