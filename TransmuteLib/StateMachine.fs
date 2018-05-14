@@ -58,7 +58,7 @@ module StateMachine =
         |> List.groupBy (fun t -> fst t)
         |> List.map (fun (key, lst) -> key, lst |> List.map snd |> List.concat)
 
-    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TState : comparison and 'TSymbol : equality> (transitions: Transition<'TState> list) =
+    let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (transitions: Transition<'TState> list) =
         groupTransitions transitions |> dict
 
     /// <summary>
@@ -114,8 +114,8 @@ module StateMachine =
     /// <param name="transitionTable">The transition table.</param>
     /// <param name="currentState">The current state to transition from.</param>
     /// <param name="inputSymbol">The input symbol to transition on.</param>
-    /// <param name="failState">The error state to transition to if no other transition can be taken.</param>
-    let step (transitionTable: TransitionTable<'a>) currentState inputSymbol failState =
+    /// <param name="errorState">The error state to transition to if no other transition can be taken.</param>
+    let step errorState (transitionTable: TransitionTable<'a>) currentState inputSymbol =
         let transition = currentState, Char inputSymbol
         let transitionOnEpsilon = currentState, Epsilon
         let transitionOnAny = currentState, Any
@@ -130,5 +130,54 @@ module StateMachine =
             Any, transitionTable.[transitionOnAny].[0]
 
         else
-            Char inputSymbol, failState
+            Char inputSymbol, errorState
 
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="transitionTable">The transition table.</param>
+    /// <param name="startState">The start state.</param>
+    /// <param name="errorState">The error state.</param>
+    /// <param name="initialValue">The initial value.</param>
+    /// <param name="fError">Produces a value when the state machine fails.</param>
+    /// <param name="fTransition">Produces the next value from a transition.</param>
+    /// <param name="fAccept">Returns true if the state is a final state; otherwise, false.</param>
+    /// <param name="fFinish">Produces the final return value of the state machine.</param>
+    /// <param name="input">The input to iterate over.</param>
+    let runStateMachine<'TState, 'TValue, 'TResult when 'TState : equality>
+        fError fTransition fAccept fFinish
+        (transitionTable: TransitionTable<'TState>)
+        (startState:'TState)
+        (errorState:'TState)
+        (initialValue: 'TValue)
+        transitionFromStartOnFail
+        input
+        : 'TResult =
+
+        let rec inner currentValue currentState inputPosition (input: string) =
+            let step state nextSymbol =
+                let rec stepInternal state transitioningFromStartOnFail =
+                    let matchSymbol, next = step errorState transitionTable state nextSymbol
+                    // If we can't step from the current state, and the current state is final, try stepping from START
+                    if next = errorState && transitioningFromStartOnFail && fAccept state then
+                        stepInternal startState false
+                    else
+                        matchSymbol, next
+                stepInternal state transitionFromStartOnFail
+
+            if inputPosition >= input.Length then
+                fFinish currentValue
+            else
+                //let nextSymbol, xs = Seq.head input, Seq.tail input
+                let nextSymbol = input.[inputPosition]
+                let matchSymbol, nextState = step currentState nextSymbol
+                let nextInputPosition = if matchSymbol = Epsilon then inputPosition else inputPosition + 1
+                if nextState = errorState then
+                    fError currentValue
+                else
+                    let isNextFinal = fAccept nextState
+                    let isEpsilon = matchSymbol = Epsilon
+                    let nextValue = fTransition isNextFinal isEpsilon nextSymbol currentState nextState currentValue
+                    inner nextValue nextState nextInputPosition input
+
+        inner initialValue startState 0 input

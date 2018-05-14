@@ -19,8 +19,12 @@ type State =
     static member make name =
         { Name = name;
           IsTarget = false;
-          IsFinal = false
-        }
+          IsFinal = false }
+
+    static member merge states =
+        { Name = states |> List.map (fun s -> s.Name) |> String.concat "";
+          IsTarget = states |> List.exists (fun s -> s.IsTarget);
+          IsFinal = states |> List.exists (fun s -> s.IsFinal) }
 
     override this.ToString() =
         if this.IsFinal then
@@ -38,6 +42,41 @@ module SoundChangeRule =
 
     let private START = State.make "S"
     let private ERROR = State.make "Error"
+
+    let computeFollowSet transitions state =
+        let rec inner states result =
+            match states with
+            | [] ->
+                List.rev result
+            | x::xs ->
+                // State to which we can ε transition from x
+                let followStates =
+                    transitions
+                    |> List.filter (function
+                        | ((from, Epsilon), _) when from = x -> true
+                        | _ -> false)
+                    |> List.map (fun (_, ``to``) -> ``to``)
+                    |> List.concat
+                    |> set
+                // Non-ε transitions we can take from those states
+                let followTransitions =
+                    transitions
+                    |> List.filter (fun ((from, input), _) -> input <> Epsilon && followStates.Contains(from))
+                    |> List.map (fun ((_, input), ``to``) -> input, ``to``)
+                // States to which we can ε transition
+                let nextStates =
+                    followStates
+                    |> Seq.filter (fun s ->
+                        transitions
+                            |> List.exists (function
+                                | (from, Epsilon), _ when from = s -> true
+                                | _ -> false))
+                    |> List.ofSeq
+                inner (nextStates @ xs) (followTransitions @ result)
+        inner [state] []
+
+    let private removeNondeterminism (transitions: ((State * Match) * State list) list) =
+        transitions
 
     let private buildNFA features sets target result environment =
         let takeState states =
@@ -139,17 +178,16 @@ module SoundChangeRule =
                 let states, lastState = getNextState states
                 // Build subtree for each branch
                 let follows =
-                    List.fold
-                        (fun ((states, transitions, _)::_ as acc) branch ->
+                    List.foldBack
+                        (fun branch ((states, transitions, _)::_ as acc) ->
                             inner states branch current transitions true (isSubtreeFinal && isInputAtEnd()) :: acc)
-                        [ states, transitions, current ]
                         branches
+                        [ states, transitions, current ]
                 let states, transitions, _ = List.head follows
                 // Transition from last state of each subtree to lastState.
                 // Reverse the list and take the tail first so we don't epsilon from current to lastState.
                 let subtreeFinalToLastState =
                     follows
-                    |> List.rev
                     |> List.tail
                     |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), [lastState])
                 let transitions =
@@ -188,8 +226,10 @@ module SoundChangeRule =
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
         let _, ts, _ = inner initialStates environment START List.empty true true
-        let ts = ts |> List.rev |> groupTransitions
         ts
+        |> List.rev
+        |> groupTransitions
+        |> removeNondeterminism
 
     let createStateMachine features sets rule =
         match untag rule with

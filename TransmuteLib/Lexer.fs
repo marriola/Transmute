@@ -141,78 +141,46 @@ module Lexer =
     let isFinal state =
         stateTokenTypes.ContainsKey state
 
-    let rec lexInternal
-        (stream: StreamReader)
-        (value: StringBuilder)
-        (currentState: LexerState)
-        (startPos: int * int)
-        (pos: int * int)
-        (out: Token list) =
-
-        let step state input =
-            let rec stepInternal state transitioningFromStartOnFail =
-                let matchSymbol, next = StateMachine.step table state input ERROR
-                // If we can't step from the current state, and the current state is final, try stepping from START
-                if next = ERROR && transitioningFromStartOnFail && isFinal currentState then
-                    stepInternal START false
-                else
-                    matchSymbol, next
-            stepInternal state true
-
-        if stream.EndOfStream then
-            OK (List.rev out)
-        else
-            // Peek the next input symbol and transition on it. If the transition is not an
-            // epsilon transition, advance the lexer position and consume the input symbol.
-            let nextChar = char (stream.Peek())
-            let matchSymbol, nextState = step currentState nextChar
-            let isNextFinal = isFinal nextState
-            let isEpsilon = matchSymbol = Epsilon
-            let nextPos =
-                if isEpsilon then
-                    pos
-                else if nextChar = '\n' then
-                    incrRow pos
-                else
-                    incrCol pos
-
-            ignore (
-                if isEpsilon then
-                    value
-                else
-                    value.Append(stream.Read() |> char))
-
-            if nextState = ERROR then
-                let row, col = startPos in
-                    SyntaxError (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col)
-            else
-                // Add token to output if on a final state
-                let nextOut =
-                    if isNextFinal then
-                        let (tokenType, modifyToken) = stateTokenTypes.[nextState]
-                        let nextValue =
-                            if currentState = Q_Whitespace then
-                                value.ToString()
-                            else
-                                value.ToString().Trim()
-                        modifyToken { tokenType = tokenType; position = startPos; value = nextValue } :: out
-                    else
-                        out
-                let nextStartPos =
-                    // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isNextFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(nextChar)) then
-                        nextPos
-                    else
-                        startPos
-
-                if isNextFinal then
-                    ignore (value.Clear())
-
-                lexInternal stream value nextState nextStartPos nextPos nextOut
-
     let lex (filename: string) =
         try
             use stream = new StreamReader(filename, true)
-            lexInternal stream (new StringBuilder()) START (1, 1) (1, 1) List.empty
+            stream.ReadToEnd()
+            |> runStateMachine
+                (fun (_, (row, col), value, _) ->
+                    SyntaxError (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col))
+                (fun isNextFinal isEpsilon inputSymbol currentState nextState (startPos, pos, value: StringBuilder, acc) ->
+                    let nextPos =
+                        if isEpsilon then
+                            pos
+                        else if inputSymbol = '\n' then
+                            incrRow pos
+                        else
+                            incrCol pos
+                    if not isEpsilon then
+                        value.Append(inputSymbol) |> ignore
+                    // Add token to output if on a final state
+                    let nextAcc =
+                        if isNextFinal then
+                            let (tokenType, modifyToken) = stateTokenTypes.[nextState]
+                            let nextValue =
+                                if currentState = Q_Whitespace then
+                                    value.ToString()
+                                else
+                                    value.ToString().Trim()
+                            modifyToken { tokenType = tokenType; position = startPos; value = nextValue } :: acc
+                        else
+                            acc
+                    let nextStartPos =
+                        // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
+                        if isNextFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(inputSymbol)) then
+                            nextPos
+                        else
+                            startPos
+                    if isNextFinal then
+                        value.Clear() |> ignore
+                    nextStartPos, nextPos, value, nextAcc)
+                (fun state -> isFinal state)
+                (fun (_, _, _, acc) -> List.rev acc |> OK)
+                table START ERROR ((1, 1), (1, 1), new StringBuilder(), []) true
         with
             | ex -> FileError ex.Message

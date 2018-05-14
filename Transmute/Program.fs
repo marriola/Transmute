@@ -24,40 +24,48 @@ let main argv =
     let options = Arguments.parse argv
     if not (validateOptions options) then
         Environment.Exit(0)
-    let result = Lexer.lex options.rulesFile in
-        match result with
-        | FileError msg ->
-            printfn "%s" msg
-        | SyntaxError (msg, row, col) ->
-            printfn "Syntax error at row %d column %d: %s" row col msg
-        | OK tokens ->
-            let rules = RuleParser.parse tokens
-            let features = getFeatures rules
-            let sets = getSets rules
+    match Lexer.lex options.rulesFile with
+    | FileError msg ->
+        printfn "%s" msg
+    | SyntaxError (msg, row, col) ->
+        printfn "Syntax error at row %d column %d: %s" row col msg
+    | OK tokens ->
+        let rules = RuleParser.parse tokens
+        let features = getFeatures rules
+        let sets = getSets rules
 
-            // Get SetIdentifierNode from first rule and create prefix tree
-            let rule =
-                match untag rules.[0] with
-                | RuleNode (target, _, _) ->
-                    let tree = PrefixTree.fromSet sets.["$V"] //.fromSetIntersection sets features target.[0]
-                    printfn "%s" (string tree)
-                rules
-                    |> List.fold
-                        (fun acc r ->
-                            acc + (sprintf "%s\n" <| string r))
-                        ""
-                    |> printfn "%s"
+        // Get SetIdentifierNode from first rule and create prefix tree
+        let rule =
+            match untag rules.[0] with
+            | RuleNode (target, _, _) ->
+                let tree = PrefixTree.fromSet sets.["$V"] //.fromSetIntersection sets features target.[0]
+                printfn "%s" (string tree)
+            rules
+                |> List.fold
+                    (fun acc r ->
+                        acc + (sprintf "%s\n" <| string r))
+                    ""
+                |> printfn "%s"
 
-            match SyntaxAnalyzer.validate rules with
-            | ValidateResult.OK ->
-                printfn "Passed validation!"
-            | ValidateResult.SyntaxError (message, (row, col)) ->
-                printfn "Syntax error at row %d column %d: %s" row col message
+        match SyntaxAnalyzer.validate rules with
+        | ValidateResult.OK ->
+            printfn "Passed validation!"
+        | ValidateResult.SyntaxError (message, (row, col)) ->
+            printfn "Syntax error at row %d column %d: %s" row col message
 
-            SoundChangeRule.createStateMachine features sets rules.[8]
-            |> List.map (fun ((fromState, m), toState) -> sprintf "(%s, %s)\t-> %s" (string fromState) (string m) (string toState))
+        let transitions = SoundChangeRule.createStateMachine features sets rules.[8]
+
+        transitions
+            |> List.indexed
+            |> List.map (fun (i, ((fromState, m), toState)) -> sprintf "%d.\t(%s, %s)\t-> %s" i (string fromState) (string m) (string toState))
             |> String.concat "\n"
             |> Console.WriteLine
 
-    Console.ReadKey()
+        List.item 4 transitions |> fst |> fst
+        |> SoundChangeRule.computeFollowSet transitions
+        |> List.map (fun (input, ``to``) -> sprintf "%s, %s" (string input) (string ``to``))
+        |> String.concat "\n"
+        |> Console.WriteLine
+
+    (Console.ReadKey())
     0 // return an integer exit code
