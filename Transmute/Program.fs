@@ -34,19 +34,6 @@ let main argv =
         let features = getFeatures rules
         let sets = getSets rules
 
-        // Get SetIdentifierNode from first rule and create prefix tree
-        let rule =
-            match untag rules.[0] with
-            | RuleNode (target, _, _) ->
-                let tree = PrefixTree.fromSet sets.["$V"] //.fromSetIntersection sets features target.[0]
-                printfn "%s" (string tree)
-            rules
-                |> List.fold
-                    (fun acc r ->
-                        acc + (sprintf "%s\n" <| string r))
-                    ""
-                |> printfn "%s"
-
         match SyntaxAnalyzer.validate rules with
         | ValidateResult.OK ->
             printfn "Passed validation!"

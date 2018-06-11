@@ -33,14 +33,14 @@ module RuleParser =
         let rec matchToken tokens target =
             match tokens with
             | [] ->
-                raise (ArgumentException ("tokens", "Must not be empty"))
+                invalidArg "tokens" "Must not be empty"
             | OfType Whitespace _::xs ->
                 matchToken xs target
             | { tokenType = tokenType } as x::xs ->
                 if tokenType = target then
                     xs, x
                 else
-                    raise (UnexpectedTokenException (target, x))
+                    unexpectedToken [target] x
 
         /// <summary>
         /// Matches a token to one of a set of token types.
@@ -50,14 +50,14 @@ module RuleParser =
         let rec matchOneOf tokens targetTypes =
             match tokens with
             | [] ->
-                raise (ArgumentException ("tokens", "Must not be empty"))
+                invalidArg "tokens" "Must not be empty"
             | OfType Whitespace _::xs ->
                 matchOneOf xs targetTypes
             | { tokenType = tokenType } as x::xs ->
                 if List.contains tokenType targetTypes then
                     xs, x
                 else
-                    raise (ExpectedSetException (targetTypes, x))
+                    unexpectedToken targetTypes x
 
         /// <summary>
         /// Matches a <see cref="FeatureIdentifierTermNode" />.
@@ -90,7 +90,7 @@ module RuleParser =
             | OfType Minus _::_ ->
                 matchFeatureIdentifierTerm tokens
             | x::_ ->
-                raise (ExpectedSetException ([ Id; Plus; Minus ], x))
+                unexpectedToken [ Id; Plus; Minus ] x
 
         /// <summary>
         /// Matches a <see cref="SetIdentifierNode" />.
@@ -100,7 +100,8 @@ module RuleParser =
             let rec matchSetIdentifierInternal tokens result =
                 match tokens with
                 | [] ->
-                    raise (SyntaxException ("Expected ']', got end of file", _position))
+                    invalidSyntax _position "Expected ']', got end of file"
+                    //raise (SyntaxException ("Expected ']', got end of file", _position))
                 | OfType RBrack _::xs ->
                     xs, Node.tag (SetIdentifierNode (List.rev result)) headPosition
                 | _ ->
@@ -153,8 +154,6 @@ module RuleParser =
 
             let rec inner tokens result =
                 match tokens with
-                | [] ->
-                    tokens, List.rev result
                 | OfType Separator _::xs ->
                     inner xs result
                 | OfType Id x::xs ->
@@ -212,7 +211,7 @@ module RuleParser =
                 | OfType RBrace _::xs ->
                     xs, List.rev result
                 | x::_ ->
-                    raise (UnexpectedTokenException (Utterance, x))
+                    unexpectedToken [Utterance] x
             matchMemberListInternal tokens []
 
         /// <summary>
@@ -291,7 +290,7 @@ module RuleParser =
             | RuleNode (target, replacement, environment) ->
                 Node.tag (RuleNode (nodes @ target, replacement, environment)) headPosition
             | _ ->
-                raise (ArgumentException ("Must be a RuleNode", "rule"))
+                invalidArg "rule" "Must be a RuleNode"
 
         /// <summary>
         /// Prepends a node list to the initial SetIdentifierNode of the target segment of a RuleNode.
@@ -310,9 +309,9 @@ module RuleParser =
                             _environment))
                         headPosition
                 | _ ->
-                    raise (ArgumentException ("First element of the target segment must be a SetIdentifierNode", "rule"))
+                    invalidArg "rule" "First element of the target segment must be a SetIdentifierNode"
             | _ ->
-                raise (ArgumentException ("Must be a RuleNode", "rule"))
+                invalidArg "rule" "Must be a RuleNode"
                     
         /// <summary>
         /// Matches a feature definition.
@@ -357,7 +356,7 @@ module RuleParser =
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
                     (fun i -> matchFeature tokens headPosition i)
                     // '[' ']' -> syntax error
-                    (fun _ -> raise (UnexpectedTokenException (Id, x)))
+                    (fun _ -> unexpectedToken [Id] x)
             | OfType Id x::xs ->
                 identifier
                 |> optionalCata
@@ -371,7 +370,7 @@ module RuleParser =
                     // Store first identifier and see what we get next
                     (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))
             | x::_ ->
-                raise (ExpectedSetException ([ Plus; Minus; Id ], x))
+                unexpectedToken [ Plus; Minus; Id ] x
 
         /// <summary>
         /// Determines which rule to match to the available tokens.
@@ -393,7 +392,7 @@ module RuleParser =
                     NextResult.OK (matchSet_Rule xs x)
                 | OfType LBrack x::xs ->
                     NextResult.OK (matchFeature_SetIdentifier_Rule xs x.position None)
-                | x::xs ->
+                | x::_ ->
                     NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
                 | :? SyntaxException as ex ->

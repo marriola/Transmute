@@ -23,11 +23,14 @@ ai/eː/_
 au/oː/_
 
 $V {
-    ɑ a e i o ø u y             ; Stressed
-    ˈɑ ˈa ˈe ˈi ˈo ˈø ˈu ˈy     ; Unstressed
+    a i u
+    ˈa ˈi ˈu
+    ; ɑ a e i o ø u y             ; Stressed
+    ; ˈɑ ˈa ˈe ˈi ˈo ˈø ˈu ˈy     ; Unstressed
 }
 
-$C { k kʰ kʰʷ kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
+; $C { k kʰ kʰʷ kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
+$C { k kʰ kʰʷ kʷ p t g gʷ b d }
 
 [$stressed] {
   ɑ => ˈɑ

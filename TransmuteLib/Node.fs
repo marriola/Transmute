@@ -49,7 +49,6 @@ type Node =
 /// Provides functions on the Node type.
 module Node =
     open System
-    open TransmuteLib.Exceptions
 
     let tag node position =
         TaggedNode (position, node)
@@ -76,7 +75,7 @@ module Node =
         | TransformationNode (target, _) ->
             target
         | _ ->
-            raise (ArgumentException ("this", "Must be a TranformationNode"))
+            invalidArg "this" "Must be a TranformationNode"
 
     /// Gets the right string value of a TransformationNode.
     let getRight node =
@@ -84,7 +83,7 @@ module Node =
         | TransformationNode (_, result)->
             result
         | _ ->
-            raise (ArgumentException ("this", "Must be a TranformationNode"))
+            invalidArg "this" "Must be a TranformationNode"
 
     /// Gets the string value of a node.
     let getStringValue node =
@@ -100,13 +99,7 @@ module Node =
         | FeatureDefinitionNode (name, _) ->
             name
         | _ ->
-            raise (ArgumentException("this", "Must be one of UtteranceNode, CommentNode, IdentifierNode, SetIdentifierTermNode"))
-
-    let private filterMap (fn: 'a -> (string * 'a) option) nodes =
-        nodes
-        |> List.map fn
-        |> List.filter ((<>) None)
-        |> List.map Option.get
+            invalidArg "this" "Must be one of UtteranceNode, CommentNode, IdentifierNode, SetIdentifierTermNode"
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
@@ -114,7 +107,7 @@ module Node =
     /// <param name="nodes"></param>
     let getFeatures nodes =
         nodes
-        |> filterMap
+        |> List.choose
             (fun x ->
                 match untag x with
                 | FeatureDefinitionNode (name, members) ->
@@ -128,7 +121,7 @@ module Node =
     /// <param name="nodes"></param>
     let getSets nodes =
         nodes
-        |> filterMap
+        |> List.choose
             (fun x ->
                 match untag x with
                 | SetDefinitionNode (name, members) ->
@@ -157,24 +150,24 @@ module Node =
                         | UtteranceNode value -> value
                     | x ->
                         let position, node = untagWithMetadata x
-                        raise (SyntaxException (sprintf "Unrecognized token '%s'" (string node), position))
+                        Exceptions.invalidSyntax position (sprintf "Unrecognized token '%s'" (string node))
                 inner xs (next :: out)
         match feature with
         | FeatureDefinitionNode (_, members) ->
             inner members []
         | _ ->
-            raise (ArgumentException ("Must be a FeatureDefinitionNode", "feature"))
+            invalidArg "feature" "Must be a FeatureDefinitionNode"
 
     /// <summary>
     /// Gets the members of the set.
     /// </summary>
     /// <param name="theSet"></param>
-    let getSetMembers theSet =
-        match untag theSet with
+    let getSetMembers setNode =
+        match untag setNode with
         | SetDefinitionNode (_, members) ->
             List.map (fun x -> getStringValue x) members
         | _ ->
-            raise (ArgumentException ("Must be a set", "theSet"))
+            invalidArg "setNode" "Must be a set"
 
     let getAlphabet features sets =
         [ List.map (getFeatureMembers true) features;

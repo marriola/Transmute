@@ -90,11 +90,9 @@ type TokenType with
 
 module Token =
     /// Matches a token on its type.
-    let (|OfType|_|) tt token = 
+    let (|OfType|_|) tokenType token = 
         match token with
-        | { tokenType = tokenType } as x ->
-            if tokenType = tt
-                then Some x
-                else None
+        | { tokenType = tt } as x when tt = tokenType ->
+            Some x
         | _ ->
             None

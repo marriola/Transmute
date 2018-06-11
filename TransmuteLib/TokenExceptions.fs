@@ -1,13 +1,17 @@
-﻿namespace TransmuteLib.Exceptions
+﻿namespace TransmuteLib
 
-open TransmuteLib
-open System
+[<CompilationRepresentationAttribute(CompilationRepresentationFlags.ModuleSuffix)>]
+module Exceptions =
+    open Exceptions
 
-type UnexpectedTokenException(expected:TokenType, got:Token) =
-    inherit SyntaxException(sprintf "Expected '%s', got '%s'" (expected.ToString()) (got.tokenType.ToString()), got.position)
-
-type ExpectedSetException(expected:TokenType list, got:Token) =
-    inherit ApplicationException(
-        (sprintf "Expected one of %s, got '%s' at row %d, column %d"
-            (String.concat ", " (List.map string expected))
-            (got.tokenType.ToString()) <|| got.position))
+    /// <summary>
+    /// Raises a <see cref="SyntaxException"/> for an unexpected token.
+    /// </summary>
+    /// <param name="expected">The types of tokens that were expected.</param>
+    /// <param name="got">The unexpected token that was encountered.</param>
+    let unexpectedToken (expected: TokenType list) got =
+        let message =
+            sprintf "Expected one of %s, got '%s'"
+                (expected |> List.map string |> String.concat ",")
+                (string got.tokenType)
+        invalidSyntax got.position message

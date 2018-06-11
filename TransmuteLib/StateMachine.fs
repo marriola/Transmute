@@ -13,9 +13,7 @@ type Match =
     /// If no other transition applies, accept any input symbol.
     | Any
 
-type Edge<'TState> = 'TState * Match
-
-type Transition<'TState> = Edge<'TState> * 'TState list
+type Transition<'TState> = ('TState * Match) * 'TState list
 
 /// <summary>
 /// Represents a transition table.

@@ -1,13 +1,14 @@
-﻿namespace TransmuteLib.Exceptions
+﻿namespace TransmuteLib
 
 open System
 
+/// The exception that is thrown when a syntax error has been encountered.
 type SyntaxException(message, pos) =
     inherit ApplicationException(
         let row, col = pos
-        in sprintf "%s at line %d, column %d" message row col)
+        sprintf "%s at line %d, column %d" message row col)
     override this.Message = message
     member this.Position = pos
 
-type UnrecognizedTokenException(value, pos) =
-    inherit ApplicationException(sprintf "Unrecognized token '%s' at line %d, column %d" value <|| pos)
+module Exceptions =
+    let invalidSyntax position message = raise (SyntaxException(message, position))
