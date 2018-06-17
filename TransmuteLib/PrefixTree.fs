@@ -44,8 +44,7 @@ module PrefixTree =
                 |> List.map (fun (prefixChar, subset) ->
                     let subset = subset |> List.map (fun s -> s.[1..])
                     let nextAcc = acc + (string prefixChar)
-                    let node = Node (nextAcc, prefixChar, inner subset nextAcc)
-                    node)
+                    Node (nextAcc, prefixChar, inner subset nextAcc))
             followSet @ final
         Root (inner set "")
 

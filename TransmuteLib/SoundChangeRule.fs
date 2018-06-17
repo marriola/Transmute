@@ -24,10 +24,9 @@ type RuleState =
         static member merge states =
             let statesToMerge =
                 states
-                |> Seq.map (function
+                |> Seq.collect (function
                     | State _ as state -> [ state ]
                     | MergedState states -> states)
-                |> Seq.concat
                 |> Seq.distinct
                 |> Seq.sortBy RuleState.ord
                 |> List.ofSeq
@@ -70,6 +69,8 @@ type RuleGeneratorState =
     | Done
 
 module SoundChangeRule =
+    open System.Text
+
     let private START = RuleState.make "S"
     let private ERROR = RuleState.make "Error"
 
@@ -133,7 +134,6 @@ module SoundChangeRule =
                         | (from, Epsilon), _ when from = x -> true
                         | _ -> false)
                     |> List.map (fun (_, ``to``) -> ``to``)
-                    |> List.concat
                     |> set
                 // Non-ε transitions we can take from those states
                 let followTransitions =
@@ -153,9 +153,10 @@ module SoundChangeRule =
 
     let private convertToDfa (table: Transition<RuleState> list) =
         let followTransitions origin transitions =
+            // For each transition, get the states that can be reached from its destination by
+            // non-epsilon transitions, and create transitions to them from the given state.
             transitions
-            |> List.map (getDest >> List.head >> computeFollowSet table)
-            |> List.concat
+            |> List.collect (getDest >> computeFollowSet table)
             |> List.distinct
             |> List.map (fun (input, dest) -> (origin, input), dest)
 
@@ -166,9 +167,21 @@ module SoundChangeRule =
                 match transitions with
                 | [] -> acc |> List.ofSeq
                 | _ ->
+                    let dests =
+                        transitions
+                        |> List.map getDest
+                        |> List.distinct
+                    let v =
+                        table
+                        |> List.where (fun ((_, on), _) -> on = Epsilon)
+
+                    // Cross each transition with each state that can be reached from its destination by a non-epsilon transition.
+                    // Keep the original transition as well if its destination also has one or more non-epsilon transitions.
                     let followTransitions =
                         transitions
-                        |> List.map (fun ((origin, input), dest::_ as t) ->
+                        |> List.collect (fun ((origin, input), dest as t) ->
+                            // Return all epsilon transitions from states that include the destination, plus the
+                            // original transition if the destination has non-epsilon transitions or is final.
                             let originalTransition =
                                 if RuleState.isFinal dest || hasNonEpsilonTransition table dest
                                     then [t]
@@ -180,15 +193,15 @@ module SoundChangeRule =
                                         Some ((origin, input), follow)
                                     | _ -> None)
                             originalTransition @ followedTransitions)
-                        |> List.concat
-                        |> List.where (fun ((_, follow::_) as t) -> RuleState.isFinal follow || not <| List.contains t transitions)
                         |> List.distinct
+                    // Follow transitions to states with epsilon transitions that we haven't already been to
                     let nextTransitions =
                         followTransitions
-                        |> List.where (fun (_, follow::_) -> hasEpsilonTransition table follow)
+                        |> List.where (fun ((_, follow) as t) -> not <| List.contains t transitions && hasEpsilonTransition table follow)
+                    // Accumulate states 
                     let nextAcc =
-                        transitions @ followTransitions
-                        |> List.where (fun (_, follow::_) -> RuleState.isFinal follow || hasNonEpsilonTransition table follow)
+                        followTransitions
+                        |> List.where (fun (_, follow) -> RuleState.isFinal follow || hasNonEpsilonTransition table follow)
                         |> Set.ofList
                         |> Set.union acc
                     inner nextAcc nextTransitions
@@ -199,50 +212,53 @@ module SoundChangeRule =
             match stack with
             | [] -> dfaTransitions |> List.ofSeq
             | current::stack ->
-                // Separate out epsilon and non-epsilon transitions
+                // Separate epsilon and non-epsilon transitions
                 let epsilonTransitions, nonEpsilonTransitions =
                     transitionsFrom table current
                     |> List.partition (fun ((_, c), _) -> c = Epsilon)
-                // Follow epsilon transitions to next state with non-epsilon transitions
+                // Follow epsilon transitions to the next state with non-epsilon transitions
                 let followedEpsilonTransitions = followTransitions current epsilonTransitions
                 // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
                 let transitionsFromCurrent =
                     nonEpsilonTransitions @ followedEpsilonTransitions |> followDestination
-                // Group all transitions by input symbol, merging states that can be reached by the same input symbol.
+                // Group all transitions by input symbol
                 let groupedTransitions =
                     transitionsFromCurrent
                     |> List.distinct
                     |> List.groupBy getInput
+                // Merge states that can be reached by the same input symbol
                 let mergedTransitions =
                     groupedTransitions
-                    |> List.where (fun (_, dests) -> List.length dests > 1)
+                    |> List.where (fun (_, dests) -> List.length dests >= 2)
                     |> List.map (fun (on, dests) ->
                         let mergedState =
                             dests
                             |> List.map getDest
-                            |> List.concat
                             |> List.distinct
                             |> RuleState.merge
-                        (current, on), [mergedState])
+                        (current, on), mergedState)
+                // All other transitions
                 let singleTransitions =
                     groupedTransitions
                     |> List.where (getDest >> List.length >> (=) 1)
-                    |> List.map getDest
-                    |> List.concat
-                let transitionsToTake = mergedTransitions @ singleTransitions |> List.distinct
+                    |> List.collect snd
+                let allTransitions =
+                    mergedTransitions @ singleTransitions
+                    |> List.distinct
+                // Follow transitions that don't go to the current state or a state already in the stack
                 let nextStack =
-                    transitionsToTake
+                    allTransitions
                     |> List.map getDest
-                    |> List.concat
                     |> List.where (fun s -> s <> current && not (List.contains s stack))
                     |> List.append stack
                     |> List.distinct
                 let nextTransitions =
-                    transitionsToTake
+                    allTransitions
                     |> Set.ofList
                     |> Set.union dfaTransitions
                 inner nextStack nextTransitions
 
+        printf "NFA:\n\n"
         table
         |> List.indexed
         |> List.map (fun (i, ((fromState, m), toState)) -> sprintf "%d.\t(%s, %s)\t-> %s" i (string fromState) (string m) (string toState))
@@ -286,7 +302,7 @@ module SoundChangeRule =
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
                 let states, target = getNextState states
-                let transitions = (on c current, [target]) :: transitions
+                let transitions = (on c current, target) :: transitions
                 states, transitions, target
 
             /// Creates a series of states and transitions that match each character of an utterance.
@@ -297,7 +313,7 @@ module SoundChangeRule =
                         states, transitions, next
                     | c::xs ->
                         let states, target = getNextState states
-                        innerTransformUtterance xs states ((on c next, [target]) :: transitions) target
+                        innerTransformUtterance xs states ((on c next, target) :: transitions) target
 
                 innerTransformUtterance (List.ofSeq utterance) states transitions current
 
@@ -318,11 +334,11 @@ module SoundChangeRule =
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = takeState states
-                                        let transitions = ((curState, Match.Char c), [nextState]) :: transitions
+                                        let transitions = ((curState, Match.Char c), nextState) :: transitions
                                         let states, transitions, _ = innerTransformSet states transitions nextState n
                                         states, transitions
                                     | PrefixTree.Leaf _ ->
-                                        let transitions = ((curState, Epsilon), [lastState]) :: transitions
+                                        let transitions = ((curState, Epsilon), lastState) :: transitions
                                         states, transitions
                                     | Root _ ->
                                         failwith "A Root should never have another Root as a descendant")
@@ -340,8 +356,8 @@ module SoundChangeRule =
                 let states, lastState = getNextState states
                 let states, transitions, subtreeLast = inner states children current transitions true false
                 let transitions =
-                    [ (current, Epsilon), [lastState]
-                      (subtreeLast, Epsilon), [lastState] ] @
+                    [ (current, Epsilon), lastState
+                      (subtreeLast, Epsilon), lastState ] @
                     transitions
                 states, transitions, lastState
 
@@ -360,9 +376,9 @@ module SoundChangeRule =
                 let subtreeFinalToLastState =
                     follows
                     |> List.tail
-                    |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), [lastState])
+                    |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), lastState)
                 let transitions =
-                    [ (current, Any), [ERROR] ] @ // Go to ERROR if we can't match anything
+                    [ (current, Any), ERROR ] @ // Go to ERROR if we can't match anything
                     subtreeFinalToLastState @
                     transitions
                 states, transitions, lastState
@@ -399,8 +415,9 @@ module SoundChangeRule =
         let _, ts, _ = inner initialStates environment START List.empty true true
         ts
         |> List.rev
-        |> groupTransitions
+        //|> groupTransitions
         |> convertToDfa
+        |> dict
 
     let createStateMachine features sets rule =
         match untag rule with
@@ -408,3 +425,22 @@ module SoundChangeRule =
             buildNFA features sets target result environment
         | _ ->
             raise (ArgumentException("Must be a RuleNode", "rule"))
+
+    type Result =
+        | Match of result:string
+        | Mismatch
+
+    let matchRule rule word =
+        runStateMachine
+            { transitionTable = rule;
+              startState = START;
+              errorState = ERROR;
+              initialValue = false;
+              transitionFromStartOnFail = true }
+            // Ignore errors, just keep appending characters
+            // (fun next pos value -> next (value.Append(word.[pos])) START (pos + 1) word)
+            (fun _ _ _ -> Mismatch)
+            (fun isNextFinal isEpsilon inputSymbol currentState nextState value -> isNextFinal)
+            RuleState.isFinal
+            (fun value -> value |> string |> Match)
+            (sprintf "%c%s%c" Special.START word Special.END)

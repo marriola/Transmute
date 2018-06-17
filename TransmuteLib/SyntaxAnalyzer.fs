@@ -2,8 +2,6 @@
 
 module SyntaxAnalyzer =
     open TransmuteLib
-    open TransmuteLib.Exceptions
-    open TransmuteLib.Node
 
     let private validateRuleNode target replacement environment =
         let rec onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) =
@@ -88,7 +86,7 @@ module SyntaxAnalyzer =
         onlyEnvironmentMayContainPlaceholderNode "Target" target
         onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
         onlyOnePlaceholderNodeIsAllowed environment
-        boundaryMayOnlyAppearAtEnds (BoundedList.fromList(environment))
+        boundaryMayOnlyAppearAtEnds (BoundedList.fromList environment)
         optionalNodeMayNotBeEmpty environment
 
     let validate (nodes: Node list) =
@@ -96,9 +94,8 @@ module SyntaxAnalyzer =
             if nodes.IsEmpty then
                 OK
             else
-                let position, head = Node.untagWithMetadata nodes.Head
-                match head with
-                | RuleNode (target, replacement, environment) ->
+                match nodes with
+                | TaggedNode (_, RuleNode (target, replacement, environment))::_ ->
                     validateRuleNode target replacement environment
                     validateInternal nodes.Tail
                 | _ ->

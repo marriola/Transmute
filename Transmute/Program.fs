@@ -40,19 +40,20 @@ let main argv =
         | ValidateResult.SyntaxError (message, (row, col)) ->
             printfn "Syntax error at row %d column %d: %s" row col message
 
-        let transitions = SoundChangeRule.createStateMachine features sets rules.[8]
+        let transitions = SoundChangeRule.createStateMachine features sets rules.[0]
 
+        printf "\nDFA:\n\n"
         transitions
+            |> List.ofSeq
+            |> List.map (fun pair -> pair.Key, pair.Value)
             |> List.indexed
             |> List.map (fun (i, ((fromState, m), toState)) -> sprintf "%d.\t(%s, %s)\t-> %s" i (string fromState) (string m) (string toState))
             |> String.concat "\n"
             |> Console.WriteLine
 
-        List.item 4 transitions |> fst |> fst
-        |> SoundChangeRule.computeFollowSet transitions
-        |> List.map (fun (input, ``to``) -> sprintf "%s, %s" (string input) (string ``to``))
-        |> String.concat "\n"
-        |> Console.WriteLine
+        match SoundChangeRule.matchRule transitions "ald" with
+        | SoundChangeRule.Result.Mismatch -> printf "no match\n"
+        | SoundChangeRule.Result.Match s -> printf "match? %s\n" s
 
     (Console.ReadKey())
     0 // return an integer exit code

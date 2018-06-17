@@ -13,13 +13,13 @@ type Match =
     /// If no other transition applies, accept any input symbol.
     | Any
 
-type Transition<'TState> = ('TState * Match) * 'TState list
+type Transition<'TState> = ('TState * Match) * 'TState
 
 /// <summary>
 /// Represents a transition table.
 /// </summary>
 /// <typeparam name="TState">The type of states in the state machine.</typeparam>
-type TransitionTable<'TState> = IDictionary<'TState * Match, 'TState list>
+type TransitionTable<'TState> = IDictionary<'TState * Match, 'TState>
 
 /// <summary>
 /// Represents the transitions that can be taken from a state.
@@ -46,15 +46,15 @@ module StateMachine =
     /// <param name="classes">The list of characters and transitions that can be taken from them.</param>
     let createTransitionTableFromClasses<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (classes: StateTransition<'TState, 'TSymbol> list) =
         classes
-        |> List.map
-            (fun c -> c.transitions |> List.map (fun t -> (c.state, snd t), [ fst t ]))
-        |> List.concat
+        |> List.collect (fun c ->
+            c.transitions
+            |> List.map (fun (dest, on) -> (c.state, on), dest))
         |> dict
 
     let groupTransitions transitions =
         transitions
         |> List.groupBy (fun t -> fst t)
-        |> List.map (fun (key, lst) -> key, lst |> List.map snd |> List.concat)
+        //|> List.map (fun (key, lst) -> key, lst |> List.map snd)
 
     let createTransitionTable<'TState, 'TSymbol when 'TState : equality and 'TSymbol : equality> (transitions: Transition<'TState> list) =
         groupTransitions transitions |> dict
@@ -83,8 +83,7 @@ module StateMachine =
     /// <param name="state">The state to transition to.</param>
     let onMany charsets state =
         charsets
-        |> Seq.map (fun cset -> cset |> Seq.map (fun c -> (state, Char c)))
-        |> Seq.concat
+        |> Seq.collect (fun cset -> cset |> Seq.map (fun c -> (state, Char c)))
         |> List.ofSeq
 
     /// <summary>
@@ -119,16 +118,24 @@ module StateMachine =
         let transitionOnAny = currentState, Any
 
         if transitionTable.ContainsKey(transition) then
-            Char inputSymbol, transitionTable.[transition].[0]
+            Char inputSymbol, transitionTable.[transition]
 
         else if transitionTable.ContainsKey(transitionOnEpsilon) then
-            Epsilon, transitionTable.[transitionOnEpsilon].[0]
+            Epsilon, transitionTable.[transitionOnEpsilon]
 
         else if transitionTable.ContainsKey(transitionOnAny) then
-            Any, transitionTable.[transitionOnAny].[0]
+            Any, transitionTable.[transitionOnAny]
 
         else
             Char inputSymbol, errorState
+
+    type Config<'TState, 'TValue, 'TResult> =
+        { transitionTable: TransitionTable<'TState>;
+          startState:'TState;
+          errorState:'TState;
+          initialValue: 'TValue;
+          transitionFromStartOnFail: bool
+        }
 
     /// <summary>
     /// 
@@ -143,14 +150,19 @@ module StateMachine =
     /// <param name="fFinish">Produces the final return value of the state machine.</param>
     /// <param name="input">The input to iterate over.</param>
     let runStateMachine<'TState, 'TValue, 'TResult when 'TState : equality>
-        fError fTransition fAccept fFinish
-        (transitionTable: TransitionTable<'TState>)
-        (startState:'TState)
-        (errorState:'TState)
-        (initialValue: 'TValue)
-        transitionFromStartOnFail
+        (config: Config<'TState, 'TValue, 'TResult>)
+        fError
+        fTransition
+        fAccept
+        fFinish
         input
         : 'TResult =
+        let { transitionTable=transitionTable;
+              startState=startState;
+              errorState=errorState;
+              initialValue=initialValue;
+              transitionFromStartOnFail=transitionFromStartOnFail;
+            } = config
 
         let rec inner currentValue currentState inputPosition (input: string) =
             let step state nextSymbol =
@@ -171,7 +183,7 @@ module StateMachine =
                 let matchSymbol, nextState = step currentState nextSymbol
                 let nextInputPosition = if matchSymbol = Epsilon then inputPosition else inputPosition + 1
                 if nextState = errorState then
-                    fError currentValue
+                    fError inner inputPosition currentValue
                 else
                     let isNextFinal = fAccept nextState
                     let isEpsilon = matchSymbol = Epsilon

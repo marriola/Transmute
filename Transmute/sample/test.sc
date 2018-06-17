@@ -6,7 +6,7 @@ $V//$C_#
 i//$V$C_($C)$C.i
 
 ; Rounded consonant becomes unrounded preceding an unrounded vowel
-[$C+$round]/[-$round]/[$V-$round]#
+[$C+$round]/[-$round]/[$V-$round]_#
 
 ; Stress moves to initial syllable
 [$V+$stressed]/[-$stressed]/_
@@ -23,14 +23,14 @@ ai/eː/_
 au/oː/_
 
 $V {
-    a i u
-    ˈa ˈi ˈu
-    ; ɑ a e i o ø u y             ; Stressed
-    ; ˈɑ ˈa ˈe ˈi ˈo ˈø ˈu ˈy     ; Unstressed
+    ; a i u
+    ; ˈa ˈi ˈu
+    ɑ a e i o ø u y             ; Stressed
+    ˈɑ ˈa ˈe ˈi ˈo ˈø ˈu ˈy     ; Unstressed
 }
 
-; $C { k kʰ kʰʷ kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
-$C { k kʰ kʰʷ kʷ p t g gʷ b d }
+$C { k kʰ kʰʷ kʷ p t g gʷ b d x f θ s z m n w j ʔ r }
+; $C { k kʰ kʰʷ kʷ p t g gʷ b d }
 
 [$stressed] {
   ɑ => ˈɑ

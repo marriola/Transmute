@@ -146,8 +146,14 @@ module Lexer =
             use stream = new StreamReader(filename, true)
             stream.ReadToEnd()
             |> runStateMachine
-                (fun (_, (row, col), value, _) ->
-                    SyntaxError (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col))
+                { transitionTable = table;
+                  startState = START;
+                  errorState = ERROR;
+                  initialValue = ((1, 1), (1, 1), new StringBuilder(), []);
+                  transitionFromStartOnFail = true }
+                (fun next pos (_, (row, col), value, _) ->
+                    (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col)
+                    |> SyntaxError)
                 (fun isNextFinal isEpsilon inputSymbol currentState nextState (startPos, pos, value: StringBuilder, acc) ->
                     let nextPos =
                         if isEpsilon then
@@ -181,6 +187,6 @@ module Lexer =
                     nextStartPos, nextPos, value, nextAcc)
                 (fun state -> isFinal state)
                 (fun (_, _, _, acc) -> List.rev acc |> OK)
-                table START ERROR ((1, 1), (1, 1), new StringBuilder(), []) true
+
         with
             | ex -> FileError ex.Message

@@ -173,7 +173,6 @@ module Node =
         [ List.map (getFeatureMembers true) features;
           List.map (getFeatureMembers false) features;
           List.map getSetMembers sets ]
-        |> List.map List.concat
-        |> List.concat
+        |> List.collect List.concat
         |> set
 
