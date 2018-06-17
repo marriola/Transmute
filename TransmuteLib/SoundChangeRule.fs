@@ -167,14 +167,6 @@ module SoundChangeRule =
                 match transitions with
                 | [] -> acc |> List.ofSeq
                 | _ ->
-                    let dests =
-                        transitions
-                        |> List.map getDest
-                        |> List.distinct
-                    let v =
-                        table
-                        |> List.where (fun ((_, on), _) -> on = Epsilon)
-
                     // Cross each transition with each state that can be reached from its destination by a non-epsilon transition.
                     // Keep the original transition as well if its destination also has one or more non-epsilon transitions.
                     let followTransitions =
@@ -267,7 +259,7 @@ module SoundChangeRule =
 
         inner [START] (Set.empty)
 
-    let private buildNFA features sets target result environment =
+    let private buildStateMachine features sets target result environment =
         let takeState (states: RuleState seq) =
             Seq.tail states, Seq.head states
 
@@ -375,6 +367,7 @@ module SoundChangeRule =
                 // Reverse the list and take the tail first so we don't epsilon from current to lastState.
                 let subtreeFinalToLastState =
                     follows
+                    |> List.rev
                     |> List.tail
                     |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), lastState)
                 let transitions =
@@ -422,7 +415,7 @@ module SoundChangeRule =
     let createStateMachine features sets rule =
         match untag rule with
         | RuleNode (target, result, environment) ->
-            buildNFA features sets target result environment
+            buildStateMachine features sets target result environment
         | _ ->
             raise (ArgumentException("Must be a RuleNode", "rule"))
 
