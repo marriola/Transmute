@@ -83,12 +83,6 @@ module PrefixTree =
                     |> makeSyntaxError node
                     |> raise
 
-    let private difference x y = x - y
-    let private intersect x y =
-        let differenceRight = x - y
-        let differenceLeft = y - x
-        x - differenceLeft - differenceRight
-
     /// <summary>
     /// Computes the intersection of the sets and features named in the SetIdentifierNode.
     /// </summary>
@@ -99,8 +93,8 @@ module PrefixTree =
         let rec inner (terms: Node list) (result: Set<string>) =
             let addToSet isPresent s =
                 if isPresent
-                    then intersect result s
-                    else difference result s
+                    then Set.intersect result s
+                    else Set.difference result s
 
             match terms with
             | [] ->
@@ -114,9 +108,17 @@ module PrefixTree =
                         |> set
                         |> addToSet true
                     | FeatureIdentifierTermNode (isPresent, name) ->
-                        tryFindSetOrFeature (fun _ -> getFeatureMembers true features.[name]) "Feature" x name
-                        |> set
-                        |> addToSet isPresent
+                        if features.ContainsKey(name) then
+                            getFeatureMembers isPresent features.[name]
+                            |> set
+                            |> Set.intersect result
+                        elif sets.ContainsKey(name) then
+                            let setMembers = getSetMembers sets.[name] |> set
+                            if isPresent
+                                then Set.intersect result setMembers
+                                else Set.difference result setMembers
+                        else
+                            failwithf "%s is not defined" name
                     | _ ->
                         let position, node = Node.untagWithMetadata x
                         raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
