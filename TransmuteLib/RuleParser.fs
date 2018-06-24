@@ -318,7 +318,6 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchFeature tokens headPosition identifier =
-            let tokens, _ = matchToken tokens RBrack
             let tokens, _ = matchToken tokens LBrace
             let tokens, memberList = matchMemberList tokens
             tokens, Node.tag (FeatureDefinitionNode (identifier.value, memberList)) headPosition
@@ -350,11 +349,11 @@ module RuleParser =
                     (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (IdentifierNode i.value) i.position ])
                     // '[' [ '+' | '-' ] -> RuleNode (...)
                     (fun _ -> tokens, theSet)
-            | OfType RBrack x::_ ->
+            | OfType RBrack x::xs ->
                 identifier
                 |> optionalCata
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
-                    (fun i -> matchFeature tokens headPosition i)
+                    (fun i -> matchFeature xs headPosition i)
                     // '[' ']' -> syntax error
                     (fun _ -> unexpectedToken [Id] x)
             | OfType Id x::xs ->
@@ -396,7 +395,7 @@ module RuleParser =
                     NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
                 | :? SyntaxException as ex ->
-                    NextResult.SyntaxError (ex.Message, _position)
+                    NextResult.SyntaxError (ex.Message, ex.Position)
    
         // Store result and update position before returning
         let result = (nextInternal tokens)
