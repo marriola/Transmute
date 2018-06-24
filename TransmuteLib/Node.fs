@@ -46,6 +46,52 @@ type Node =
     /// Represents a node tagged with metadata.
     | TaggedNode of pos:(int * int) * Node
 
+    with
+    override this.ToString() =
+        match this with
+        | TaggedNode (_, node) -> node.ToString()
+        | PlaceholderNode -> "_"
+        | BoundaryNode -> "#"
+        | CommentNode text -> sprintf "; %s" text
+        | UtteranceNode value
+        | IdentifierNode value
+        | SetIdentifierTermNode value -> value
+        | FeatureIdentifierTermNode (isPresent, name) ->
+            let sign = if isPresent then "+" else "-"
+            sprintf "%s%s" sign name
+        | SetIdentifierNode terms ->
+            terms
+            |> List.map string
+            |> String.concat ""
+            |> sprintf "[%s]"
+        | SetDefinitionNode (name, members) ->
+            members
+            |> List.map string
+            |> String.concat " "
+            |> sprintf "%s { %s }" name
+        | TransformationNode (target, result) ->
+            sprintf "%s => %s" (string target) (string result)
+        | FeatureDefinitionNode (name, members) ->
+            members 
+            |> List.map string
+            |> String.concat "; "
+            |> sprintf "[%s] { %s }" name
+        | OptionalNode children ->
+            children
+            |> List.map string
+            |> String.concat ""
+            |> sprintf "(%s)"
+        | DisjunctNode branches ->
+            branches
+            |> List.collect (List.map string)
+            |> String.concat "|"
+            |> sprintf "(%s)"
+        | RuleNode (target, replacement, environment) ->
+            sprintf "%s/%s/%s"
+                (target |> List.map string |> String.concat "")
+                (replacement |> List.map string |> String.concat "")
+                (environment |> List.map string |> String.concat "")
+
 /// Provides functions on the Node type.
 module Node =
     open System
