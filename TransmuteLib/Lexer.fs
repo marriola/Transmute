@@ -56,7 +56,7 @@ module Lexer =
             onMany
                 [ seq { 'a'..'z' };
                   seq { '\u0250'..'\u0341' };
-                  "æðøçθβɸ" :> char seq ]
+                  "æðøçɸβθχ" :> char seq ]
                 Q_Utterance
 
         let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
