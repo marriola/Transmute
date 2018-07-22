@@ -11,10 +11,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="sample\protogermanic.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <Content Include="sample\test.sc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <ItemGroup />
 
   <ItemGroup>
     <ProjectReference Include="..\TransmuteLib\TransmuteLib.fsproj" />

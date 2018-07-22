@@ -121,7 +121,7 @@ module PrefixTree =
                             failwithf "%s is not defined" name
                     | _ ->
                         let position, node = Node.untagWithMetadata x
-                        raise (SyntaxException (sprintf "Unexpected token '%s'" (string node), position))
+                        SyntaxException (sprintf "Unexpected token '%s'" (string node), position) |> raise
                 inner xs nextSet
         inner setIdentifier alphabet |> List.ofSeq
 

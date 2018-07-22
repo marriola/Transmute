@@ -4,78 +4,78 @@ open System
 open Node
 open StateMachine
 
-type Special =
-    static member START = '␂'
-    static member END = '␃'
-    static member JOINER = '\u200d'
-
-type RuleState =
-    | State of name:string * isTarget:bool * isFinal:bool
-    | MergedState of RuleState list
-    with
-        static member make name = State (name, isTarget=false, isFinal=false)
-        
-        static member makeFinal = function
-            | State (name, isTarget, _) ->
-                State (name, isTarget, isFinal=true)
-            | MergedState _ as state ->
-                failwithf "%s is a merged state; it cannot be made final" (string state)
-
-        static member merge states =
-            let statesToMerge =
-                states
-                |> Seq.collect (function
-                    | State _ as state -> [ state ]
-                    | MergedState states -> states)
-                |> Seq.distinct
-                |> Seq.sortBy RuleState.ord
-                |> List.ofSeq
-            match statesToMerge with
-            | [state] -> state
-            | _ -> MergedState statesToMerge
-
-        static member isFinal = function
-            | State (_, _, isFinal) -> isFinal
-            | MergedState states ->
-                List.exists RuleState.isFinal states
-
-        static member isTarget = function
-            | State (_, isTarget, _) -> isTarget
-            | MergedState states ->
-                List.exists RuleState.isTarget states
-
-        static member name = function
-            | State (name, _, _) -> name
-            | MergedState states ->
-                states
-                |> Seq.map RuleState.name
-                |> String.concat (string Special.JOINER)
-
-        static member ord = function
-            | State (name, _, _) ->
-                match name.[1..] with
-                | "" -> -1
-                | x -> int x
-            | MergedState _ ->
-                failwith "Merged states have no ordinal"
-
-        override this.ToString() =
-            if RuleState.isFinal this
-                then RuleState.name this |> sprintf "(%s)"
-                else RuleState.name this |> sprintf "%s"
-
-type RuleGeneratorState =
-    | HasNext of RuleState seq * Transition<RuleState> list * RuleState
-    | Done
-
 module SoundChangeRule =
     open System.Text
 
-    let private START = RuleState.make "S"
-    let private ERROR = RuleState.make "Error"
+    type private Special =
+        static member START = '␂'
+        static member END = '␃'
+        static member JOINER = '\u200d'
+
+    type State =
+        | State of name:string * isTarget:bool * isFinal:bool
+        | MergedState of State list
+        with
+            static member make name = State (name, isTarget=false, isFinal=false)
+        
+            static member makeFinal = function
+                | State (name, isTarget, _) ->
+                    State (name, isTarget, isFinal=true)
+                | MergedState _ as state ->
+                    failwithf "%s is a merged state; it cannot be made final" (string state)
+
+            static member merge states =
+                let statesToMerge =
+                    states
+                    |> Seq.collect (function
+                        | State _ as state -> [ state ]
+                        | MergedState states -> states)
+                    |> Seq.distinct
+                    |> Seq.sortBy State.ord
+                    |> List.ofSeq
+                match statesToMerge with
+                | [state] -> state
+                | _ -> MergedState statesToMerge
+
+            static member isFinal = function
+                | State (_, _, isFinal) -> isFinal
+                | MergedState states ->
+                    List.exists State.isFinal states
+
+            static member isTarget = function
+                | State (_, isTarget, _) -> isTarget
+                | MergedState states ->
+                    List.exists State.isTarget states
+
+            static member name = function
+                | State (name, _, _) -> name
+                | MergedState states ->
+                    states
+                    |> Seq.map State.name
+                    |> String.concat (string Special.JOINER)
+
+            static member ord = function
+                | State (name, _, _) ->
+                    match name.[1..] with
+                    | "" -> -1
+                    | x -> int x
+                | MergedState _ ->
+                    failwith "Merged states have no ordinal"
+
+            override this.ToString() =
+                if State.isFinal this
+                    then State.name this |> sprintf "(%s)"
+                    else State.name this |> sprintf "%s"
+
+    type private RuleGeneratorState =
+        | HasNext of State seq * Transition<State> list * State
+        | Done
+
+    let private START = State.make "S"
+    let private ERROR = State.make "Error"
 
     /// Returns true if both states are equal, or if one state is a merged state that contains the other.
-    let inline (<%>) x y =
+    let inline private (<%>) x y =
         match x, y with
         | (State _ as a), (State _ as b)
         | (MergedState _ as a), (MergedState _ as b) when a = b -> true
@@ -83,20 +83,20 @@ module SoundChangeRule =
         | MergedState children, (State _ as s) when List.contains s children -> true
         | _ -> false
 
-    let (|IsOrContains|_|) x y =
+    let private (|IsOrContains|_|) x y =
         if x <%> y
             then Some x
             else None
 
-    let getFrom ((from, _), _) = from
-    let getInput ((_, on), _) = on
-    let getDest (_, ``to``) = ``to``
+    let private getFrom ((from, _), _) = from
+    let private getInput ((_, on), _) = on
+    let private getDest (_, ``to``) = ``to``
 
-    let hasEpsilonTransitions transitions state =
+    let private hasEpsilonTransitions transitions state =
         transitions
         |> List.exists (fun ((from, c), _) -> c = Epsilon && state <%> from)
 
-    let transitionsFrom transitions state =
+    let private transitionsFrom transitions state =
         transitions
         |> List.choose (fun ((from, on), ``to``) ->
             match state with
@@ -104,24 +104,24 @@ module SoundChangeRule =
                 Some ((state, on), ``to``)
             | _ -> None)
 
-    let replaceOrigin state ((from, on), ``to`` as t) =
+    let private replaceOrigin state ((from, on), ``to`` as t) =
         if from <%> state
             then (state, on), ``to``
             else t
         
-    let replaceDest state ((from, on), ``to`` as t) =
+    let private replaceDest state ((from, on), ``to`` as t) =
         if ``to`` <%> state
             then (from, on), state
             else t
 
-    let hasTransition fInputSymbol transitions state =
+    let private hasTransition fInputSymbol transitions state =
         transitions
         |> List.exists (fun ((from, on), _) -> on |> fInputSymbol && from = state)
 
-    let hasEpsilonTransition transitions state = hasTransition ((=) Epsilon) transitions state
-    let hasNonEpsilonTransition transitions state = hasTransition ((<>) Epsilon) transitions state
+    let private hasEpsilonTransition transitions state = hasTransition ((=) Epsilon) transitions state
+    let private hasNonEpsilonTransition transitions state = hasTransition ((<>) Epsilon) transitions state
 
-    let computeFollowSet transitions state =
+    let private computeFollowSet transitions state =
         let rec inner states result =
             match states with
             | [] ->
@@ -151,7 +151,7 @@ module SoundChangeRule =
                 inner (nextStates @ xs) (followTransitions @ result)
         inner [state] []
 
-    let private convertToDfa (table: Transition<RuleState> list) =
+    let private convertToDfa (table: Transition<State> list) =
         let followTransitions origin transitions =
             // For each transition, get the states that can be reached from its destination by
             // non-epsilon transitions, and create transitions to them from the given state.
@@ -175,7 +175,7 @@ module SoundChangeRule =
                             // Return all epsilon transitions from states that include the destination, plus the
                             // original transition if the destination has non-epsilon transitions or is final.
                             let originalTransition =
-                                if RuleState.isFinal dest || hasNonEpsilonTransition table dest
+                                if State.isFinal dest || hasNonEpsilonTransition table dest
                                     then [t]
                                     else []
                             let followedTransitions =
@@ -193,7 +193,7 @@ module SoundChangeRule =
                     // Accumulate states 
                     let nextAcc =
                         followTransitions
-                        |> List.where (fun (_, follow) -> RuleState.isFinal follow || hasNonEpsilonTransition table follow)
+                        |> List.where (fun (_, follow) -> State.isFinal follow || hasNonEpsilonTransition table follow)
                         |> Set.ofList
                         |> Set.union acc
                     inner nextAcc nextTransitions
@@ -227,7 +227,7 @@ module SoundChangeRule =
                             dests
                             |> List.map getDest
                             |> List.distinct
-                            |> RuleState.merge
+                            |> State.merge
                         (current, on), mergedState)
                 // All other transitions
                 let singleTransitions =
@@ -260,7 +260,7 @@ module SoundChangeRule =
         inner [START] (Set.empty)
 
     let private buildStateMachine features sets target result environment =
-        let takeState (states: RuleState seq) =
+        let takeState (states: State seq) =
             Seq.tail states, Seq.head states
 
         /// <param name="states">An infinite sequence of functions that create states.</param>
@@ -287,7 +287,7 @@ module SoundChangeRule =
                 let states, nextState = takeState states
                 let nextState =
                     endCata
-                        (fun _ -> RuleState.makeFinal nextState)
+                        (fun _ -> State.makeFinal nextState)
                         (fun _ -> nextState)
                 states, nextState
 
@@ -319,10 +319,10 @@ module SoundChangeRule =
                     | PrefixTree.Root children
                     | PrefixTree.Node (_, _, children) ->
                         // Create states for each child and transitions to them
-                        let follows =
-                            List.fold
-                                (fun acc n ->
-                                    let states, transitions = acc
+                        let states, transitions =
+                            children
+                            |> List.fold
+                                (fun (states, transitions) n ->
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = takeState states
@@ -335,8 +335,6 @@ module SoundChangeRule =
                                     | Root _ ->
                                         failwith "A Root should never have another Root as a descendant")
                                 (states, transitions)
-                                children
-                        let states, transitions = follows
                         states, transitions, lastState
                     | PrefixTree.Leaf _ ->
                         states, transitions, curState
@@ -404,7 +402,7 @@ module SoundChangeRule =
             | HasNext (states, transitions, theNext) ->
                 inner states input.Tail theNext transitions false isSubtreeFinal
 
-        let initialStates = Seq.initInfinite (sprintf "q%d" >> RuleState.make)
+        let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
         let _, ts, _ = inner initialStates environment START List.empty true true
         ts
         |> List.rev
@@ -412,7 +410,7 @@ module SoundChangeRule =
         |> convertToDfa
         |> dict
 
-    let createStateMachine features sets rule =
+    let compile features sets rule =
         match untag rule with
         | RuleNode (target, result, environment) ->
             buildStateMachine features sets target result environment
@@ -423,17 +421,16 @@ module SoundChangeRule =
         | Match of result:string
         | Mismatch
 
-    let matchRule rule word =
-        runStateMachine
-            { transitionTable = rule;
-              startState = START;
-              errorState = ERROR;
-              initialValue = false;
-              transitionFromStartOnFail = true }
-            // Ignore errors, just keep appending characters
-            // (fun next pos value -> next (value.Append(word.[pos])) START (pos + 1) word)
-            (fun _ _ _ -> Mismatch)
-            (fun isNextFinal isEpsilon inputSymbol currentState nextState value -> isNextFinal)
-            RuleState.isFinal
-            (fun value -> value |> string |> Match)
-            (sprintf "%c%s%c" Special.START word Special.END)
+    let matchWord rule word =
+        stateMachineConfig()
+        |> withTransitions rule
+        |> withStartState START
+        |> withErrorState ERROR
+        |> withInitialValue false
+        |> withTransitionFromStartOnFail
+        |> onError (fun _ _ _ -> Restart)
+        |> onTransition (fun isNextFinal _ _ _ _ value -> isNextFinal || value)
+        |> onAccept State.isFinal
+        |> onFinish (fun value -> value |> string |> Match)
+        |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
+            
