@@ -140,51 +140,78 @@ module Lexer =
     let private isFinal state =
         stateTokenTypes.ContainsKey state
 
+    type LexerValue =
+        { startPos: int * int
+          pos: int * int
+          canRestart: bool
+          builder: char list
+          acc: Token list }
+
+    let builderToString (builder: char list) =
+        System.String.Concat(builder |> List.rev |> Array.ofList)
+
     let lex (filename: string) =
         try
             use stream = new StreamReader(filename, true)
+            let content = stream.ReadToEnd()
             stateMachineConfig()
             |> withTransitions table
             |> withStartState START
             |> withErrorState ERROR
-            |> withInitialValue ((1, 1), (1, 1), new StringBuilder(), [])
-            |> withTransitionFromStartOnFail
-            |> onError (fun next pos (_, (row, col), value, _) ->
-                (sprintf "Unrecognized token '%s'" (value.ToString().Trim()), row, col)
-                |> SyntaxError |> Stop)
-            |> onTransition (fun isNextFinal isEpsilon inputSymbol currentState nextState (startPos, pos, value: StringBuilder, acc) ->
+            |> withInitialValue
+                { startPos = 1, 1
+                  pos = 1, 1
+                  canRestart = true
+                  builder = []
+                  acc = [] }
+            |> onError (fun currentState ({ canRestart = canRestart; builder = builder; pos = row, col } as currentValue) _ ->
+                if canRestart && isFinal currentState then
+                    Restart { currentValue with canRestart = false }
+                else
+                    (sprintf "Unrecognized token '%s'" ((builderToString builder).Trim()), row, col)
+                    |> SyntaxError |> Stop)
+            |> onTransition (fun isNextFinal isEpsilon inputSymbol currentState nextState value ->
                 let nextPos =
                     if isEpsilon then
-                        pos
+                        value.pos
                     else if inputSymbol = '\n' then
-                        incrRow pos
+                        incrRow value.pos
                     else
-                        incrCol pos
-                if not isEpsilon then
-                    value.Append(inputSymbol) |> ignore
+                        incrCol value.pos
+                let builder =
+                    if not isEpsilon
+                        then inputSymbol :: value.builder
+                        else value.builder
                 // Add token to output if on a final state
                 let nextAcc =
                     if isNextFinal then
                         let (tokenType, modifyToken) = stateTokenTypes.[nextState]
                         let nextValue =
-                            if currentState = Q_Whitespace then
-                                value.ToString()
-                            else
-                                value.ToString().Trim()
-                        modifyToken { tokenType = tokenType; position = startPos; value = nextValue } :: acc
+                            let v = builderToString builder
+                            if currentState = Q_Whitespace
+                                then v
+                                else v.Trim()
+                        modifyToken { tokenType = tokenType; position = value.startPos; value = nextValue } :: value.acc
                     else
-                        acc
+                        value.acc
                 let nextStartPos =
                     // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isNextFinal || (value.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(inputSymbol)) then
+                    if isNextFinal || (builder.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(inputSymbol)) then
                         nextPos
                     else
-                        startPos
-                if isNextFinal then
-                    value.Clear() |> ignore
-                nextStartPos, nextPos, value, nextAcc)
+                        value.startPos
+                let builder =
+                    if isNextFinal
+                        then []
+                        else builder
+                { value with
+                  startPos = nextStartPos
+                  pos = nextPos
+                  canRestart = true
+                  builder = builder
+                  acc = nextAcc })
             |> onAccept (fun state -> isFinal state)
-            |> onFinish (fun (_, _, _, acc) -> List.rev acc |> OK)
-            |> runStateMachine (stream.ReadToEnd())
+            |> onFinish (fun { acc = acc } ->  acc |> List.rev |> OK)
+            |> runStateMachine content
         with
             | ex -> FileError ex.Message

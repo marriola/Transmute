@@ -66,7 +66,7 @@ let main argv =
         |> String.concat "\n"
         |> Console.WriteLine
 
-        match SoundChangeRule.matchWord rule "kχptos" with
+        match SoundChangeRule.matchWord rule "snt" with
         | SoundChangeRule.Result.Mismatch -> printf "no match\n"
         | SoundChangeRule.Result.Match result -> printf "match: %s\n" result
 

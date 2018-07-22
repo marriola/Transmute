@@ -427,8 +427,7 @@ module SoundChangeRule =
         |> withStartState START
         |> withErrorState ERROR
         |> withInitialValue false
-        |> withTransitionFromStartOnFail
-        |> onError (fun _ _ _ -> Restart)
+        |> onError (fun _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
         |> onTransition (fun isNextFinal _ _ _ _ value -> isNextFinal || value)
         |> onAccept State.isFinal
         |> onFinish (fun value -> value |> string |> Match)

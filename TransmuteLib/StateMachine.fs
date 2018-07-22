@@ -129,154 +129,112 @@ module StateMachine =
         else
             Char inputSymbol, errorState
 
-    type ErrorAction<'TResult> =
-        | Restart
+    type ErrorAction<'TValue, 'TResult> =
+        | Restart of 'TValue
         | Stop of 'TResult
 
     type Config<'TState, 'TValue, 'TResult when 'TState : equality> =
-        { transitionTable: TransitionTable<'TState> option;
-          startState:'TState option;
-          errorState:'TState option;
-          initialValue: 'TValue option;
-          transitionFromStartOnFail: bool;
-          fError: (('TValue -> 'TState -> int -> string -> 'TResult) -> int -> 'TValue -> ErrorAction<'TResult>) option;
-          fTransition: (bool -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue) option;
-          fAccept: ('TState -> bool) option;
-          fFinish: ('TValue -> 'TResult) option
+        { transitionTable: unit -> TransitionTable<'TState>
+          startState: unit -> 'TState
+          errorState: unit -> 'TState
+          initialValue: unit -> 'TValue
+          fError: unit -> ('TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
+          fTransition: unit -> (bool -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
+          fAccept: unit -> ('TState -> bool)
+          fFinish: unit -> ('TValue -> 'TResult)
         }
 
-    type CompleteConfig<'TState, 'TValue, 'TResult when 'TState : equality> =
-        { transitionTable: TransitionTable<'TState>;
-          startState:'TState;
-          errorState:'TState;
-          initialValue: 'TValue;
-          transitionFromStartOnFail: bool;
-          fError: (('TValue -> 'TState -> int -> string -> 'TResult) -> int -> 'TValue -> ErrorAction<'TResult>);
-          fTransition: (bool -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue);
-          fAccept: ('TState -> bool);
-          fFinish: ('TValue -> 'TResult)
-        }
+    let private require msg = (fun () -> failwithf "%s required" msg)
+    let private provide x = (fun () -> x)
 
     let stateMachineConfig<'TState, 'TValue, 'TResult when 'TState : equality> () : Config<'TState, 'TValue, 'TResult> =
-        { transitionTable = None
-          startState = None
-          errorState = None
-          initialValue = None
-          transitionFromStartOnFail = false;
-          fError = None;
-          fTransition = None;
-          fAccept = None;
-          fFinish = None }
+        { transitionTable = require "transition table"
+          startState = require "start state"
+          errorState = require "error state"
+          initialValue = require "initial value"
+          fError = require "error function"
+          fTransition = require "transition function"
+          fAccept = require "accept function"
+          fFinish = require "finish function" }
 
-    let withTransitions table (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with transitionTable = Some table }
+    let withTransitions table config =
+        { config with transitionTable = provide table }
 
-    let withStartState state (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with startState = Some state }
+    let withStartState state config =
+        { config with startState = provide state }
 
-    let withErrorState state (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with errorState = Some state }
+    let withErrorState state config =
+        { config with errorState = provide state }
 
-    let withInitialValue value (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with initialValue = Some value }
+    let withInitialValue value config =
+        { config with initialValue = provide value }
 
-    let withTransitionFromStartOnFail (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with transitionFromStartOnFail = true }
+    let onError fError config =
+        { config with fError = provide fError }
 
-    let onError fError (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with fError = Some fError }
+    let onTransition fTransition config =
+        { config with fTransition = provide fTransition }
 
-    let onTransition fTransition (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with fTransition = Some fTransition }
+    let onAccept fAccept config =
+        { config with fAccept = provide fAccept }
 
-    let onAccept fAccept (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with fAccept = Some fAccept }
+    let onFinish fFinish config =
+        { config with fFinish = provide fFinish }
 
-    let onFinish fFinish (config: Config<'TState, 'TValue, 'TResult>) =
-        { config with fFinish = Some fFinish }
-
-    let private completeConfig (config: Config<'TState, 'TValue, 'TResult>) =
-        if Option.isSome config.transitionTable
-            || Option.isSome config.startState
-            || Option.isSome config.errorState
-            || Option.isSome config.initialValue
-            || Option.isSome config.fError
-            || Option.isSome config.fTransition
-            || Option.isSome config.fAccept
-            || Option.isSome config.fFinish then
-            { transitionTable = Option.get config.transitionTable
-              startState = Option.get config.startState
-              errorState = Option.get config.errorState
-              initialValue = Option.get config.initialValue
-              transitionFromStartOnFail = config.transitionFromStartOnFail;
-              fError = Option.get config.fError
-              fTransition = Option.get config.fTransition
-              fAccept = Option.get config.fAccept
-              fFinish = Option.get config.fFinish }
-        else
-            failwith "Configuration is incomplete"
+    let private completeConfig config =
+        ( config.transitionTable(),
+          config.startState(),
+          config.errorState(),
+          config.initialValue(),
+          config.fError(),
+          config.fTransition(),
+          config.fAccept(),
+          config.fFinish() )
 
     /// <summary>
-    /// 
+    /// Runs the specified state machine. 
     /// </summary>
-    /// <param name="transitionTable">The transition table.</param>
-    /// <param name="startState">The start state.</param>
-    /// <param name="errorState">The error state.</param>
-    /// <param name="initialValue">The initial value.</param>
-    /// <param name="fError">Produces a value when the state machine fails.</param>
-    /// <param name="fTransition">Produces the next value from a transition.</param>
-    /// <param name="fAccept">Returns true if the state is a final state; otherwise, false.</param>
-    /// <param name="fFinish">Produces the final return value of the state machine.</param>
     /// <param name="input">The input to iterate over.</param>
+    /// <param name="config">The state machine configuration.</param>
     let runStateMachine<'TState, 'TValue, 'TResult when 'TState : equality>
         input
         (config: Config<'TState, 'TValue, 'TResult>)
         : 'TResult =
-        let { transitionTable=transitionTable;
-              startState=startState;
-              errorState=errorState;
-              initialValue=initialValue;
-              transitionFromStartOnFail=transitionFromStartOnFail;
-              fError=fError;
-              fTransition=fTransition;
-              fAccept=fAccept;
-              fFinish=fFinish
-            } = completeConfig config
+        let ( transitionTable,
+              startState,
+              errorState,
+              initialValue,
+              fError,
+              fTransition,
+              fAccept,
+              fFinish
+            ) = completeConfig config
 
-        let rec inner currentValue currentState inputPosition (input: string) =
-            let step state nextSymbol =
-                let rec stepInternal state transitioningFromStartOnFail =
-                    let matchSymbol, next = step errorState transitionTable state nextSymbol
-                    // If we can't step from the current state, and the current state is final, try stepping from START
-                    if next = errorState && transitioningFromStartOnFail && fAccept state then
-                        stepInternal startState false
-                    else
-                        matchSymbol, next
-                stepInternal state transitionFromStartOnFail
-
-            if inputPosition >= input.Length then
+        let rec inner currentValue currentState input =
+            match input with
+            | [] ->
                 fFinish currentValue
-            else
-                //let nextSymbol, xs = Seq.head input, Seq.tail input
-                let nextSymbol = input.[inputPosition]
-                let matchSymbol, nextState = step currentState nextSymbol
-                let nextInputPosition = if matchSymbol = Epsilon then inputPosition else inputPosition + 1
+            | nextSymbol::rest ->
+                let matchSymbol, nextState = step errorState transitionTable currentState nextSymbol
+                let nextInput = if matchSymbol = Epsilon then input else rest
 
                 let isNextFinal = fAccept nextState
                 let isEpsilon = matchSymbol = Epsilon
-                let nextValue = fTransition isNextFinal isEpsilon nextSymbol currentState nextState currentValue
+                let getNextValue = fTransition isNextFinal isEpsilon nextSymbol currentState nextState
 
                 if nextState = errorState then
-                    match fError inner inputPosition nextValue with
-                    | Restart when currentState <> startState ->
-                        inner nextValue startState inputPosition input
-                    | Restart when inputPosition < input.Length - 1 ->
-                        inner nextValue startState nextInputPosition input
-                    | Restart ->
-                        fFinish currentValue
+                    match fError currentState currentValue getNextValue with
+                    | Restart value when currentState <> startState ->
+                        inner value startState input
+                    | Restart value when rest <> [] ->
+                        inner value startState nextInput
+                    | Restart value ->
+                        fFinish value
                     | Stop result ->
                         result
                 else
-                    inner nextValue nextState nextInputPosition input
+                    inner (getNextValue currentValue) nextState nextInput
 
-        inner initialValue startState 0 input
+        input
+        |> List.ofSeq
+        |> inner initialValue startState
