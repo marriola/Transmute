@@ -5,16 +5,16 @@ type Node =
     | CommentNode of string
 
     /// Represents an identifier.
-    | IdentifierNode of string
+    | SetIdentifierNode of string
 
     /// Defines the intersection of a list of sets and features.
-    | SetIdentifierNode of Node list
+    | CompoundSetIdentifierNode of Node list
 
     /// Represents the presence of a set in a set identifier.
-    | SetIdentifierTermNode of name:string
+    | TermIdentifierNode of name:string
 
-    /// Represents the presenc or absence of a feature in a set identifier.
-    | FeatureIdentifierTermNode of isPresent:bool * name:string
+    /// Represents the presence or absence of a feature in a set identifier.
+    | FeatureIdentifierNode of isPresent:bool * name:string
 
     /// Represents an utterance.
     | UtteranceNode of string
@@ -54,12 +54,12 @@ type Node =
         | BoundaryNode -> "#"
         | CommentNode text -> sprintf "; %s" text
         | UtteranceNode value
-        | IdentifierNode value
-        | SetIdentifierTermNode value -> value
-        | FeatureIdentifierTermNode (isPresent, name) ->
+        | SetIdentifierNode value
+        | TermIdentifierNode value -> value
+        | FeatureIdentifierNode (isPresent, name) ->
             let sign = if isPresent then "+" else "-"
             sprintf "%s%s" sign name
-        | SetIdentifierNode terms ->
+        | CompoundSetIdentifierNode terms ->
             terms
             |> List.map string
             |> String.concat ""
@@ -136,16 +136,16 @@ module Node =
         match untag node with
         | UtteranceNode value
         | CommentNode value
-        | IdentifierNode value
-        | SetIdentifierTermNode value ->
+        | SetIdentifierNode value
+        | TermIdentifierNode value ->
             value
-        | FeatureIdentifierTermNode (_, name) ->
+        | FeatureIdentifierNode (_, name) ->
             name
         | SetDefinitionNode (name, _) 
         | FeatureDefinitionNode (name, _) ->
             name
         | _ ->
-            invalidArg "this" "Must be one of UtteranceNode, CommentNode, IdentifierNode, SetIdentifierTermNode"
+            invalidArg "this" "Must be one of UtteranceNode, CommentNode, SetIdentifierNode, TermIdentifierNode"
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
@@ -156,10 +156,17 @@ module Node =
         |> List.choose
             (fun x ->
                 match untag x with
-                | FeatureDefinitionNode (name, members) ->
-                    Some (name, FeatureDefinitionNode (name, members))
+                | FeatureDefinitionNode (name, _) as node ->
+                    Some (name, node)
                 | _ -> None)
         |> dict
+
+    let getMembers feature =
+        match feature with
+        | FeatureDefinitionNode (_, members) ->
+            members
+        | _ ->
+            invalidArg "feature" "Must be a FeatureDefinitionNode"
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are SetDefinitionNodes.
@@ -198,11 +205,23 @@ module Node =
                         let position, node = untagWithMetadata x
                         Exceptions.invalidSyntax position (sprintf "Unrecognized token '%s'" (string node))
                 inner xs (next :: out)
-        match feature with
-        | FeatureDefinitionNode (_, members) ->
-            inner members []
-        | _ ->
-            invalidArg "feature" "Must be a FeatureDefinitionNode"
+        inner (getMembers feature) []
+
+    let getTransformations feature =
+        feature
+        |> getMembers
+        |> List.choose (fun m ->
+            match m with
+            | TaggedNode (_, TransformationNode (target, result)) ->
+                let target = getStringValue target
+                let result = getStringValue result
+                Some [
+                    target, result
+                    result, target
+                ]
+            | _ -> None)
+        |> List.concat
+        |> Map.ofSeq
 
     /// <summary>
     /// Gets the members of the set.
@@ -216,8 +235,8 @@ module Node =
             invalidArg "setNode" "Must be a set"
 
     let getAlphabet features sets =
-        [ List.map (getFeatureMembers true) features;
-          List.map (getFeatureMembers false) features;
+        [ List.map (getFeatureMembers true) features
+          List.map (getFeatureMembers false) features
           List.map getSetMembers sets ]
         |> List.collect List.concat
         |> set

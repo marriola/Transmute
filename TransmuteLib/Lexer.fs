@@ -2,15 +2,12 @@
 
 open System.IO
 open TransmuteLib.StateMachine
-open TransmuteLib.Token
 
 module Lexer =
-    open System.Text
-
     type Result =
-        | OK of (Token list)
-        | SyntaxError of (string * int * int)
-        | FileError of (string)
+        | OK of Token list
+        | SyntaxError of string * int * int
+        | FileError of string
 
     type private State =
         | START
@@ -46,16 +43,15 @@ module Lexer =
     let private table =
         let identifierTransitions =
             onMany
-                [ seq { '0'..'9' };
-                  seq { 'A'..'Z' };
-                  seq { 'a'..'z' } ]
+                [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' } ]
                 Q_Identifier
 
         let utteranceTransitions =
             onMany
-                [ seq { 'a'..'z' };
-                  seq { '\u0250'..'\u0341' };
-                  "æðøçɸβθχ" :> char seq ]
+                [ seq { 'a'..'z' }
+                  seq { '\u0250'..'\u0341' }
+                  "æðøçɸβθχ" :> char seq
+                ]
                 Q_Utterance
 
         let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
@@ -107,50 +103,42 @@ module Lexer =
     /// Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
     /// </summary>
     let private stateTokenTypes =
-        (dict
-            [ (Q_WhitespaceFinal, Whitespace.Identity())
-              (Q_Separator, Separator.Identity())
-              (Q_LBrack, LBrack.Identity())
-              (Q_RBrack, RBrack.Identity())
-              (Q_LBrace, LBrace.Identity())
-              (Q_RBrace, RBrace.Identity())
-              (Q_LParen, LParen.Identity())
-              (Q_RParen, RParen.Identity())
-              (Q_Divider, Divider.Identity())
-              (Q_Placeholder, Placeholder.Identity())
-              (Q_Boundary, Boundary.Identity())
-              (Q_Plus, Plus.Identity())
-              (Q_Minus, Minus.Identity())
-              (Q_Pipe, Pipe.Identity())
-              (Q_Not, Not.Identity())
-              (Q_Gives, Gives.Identity())
-              (Q_IdentifierFinal, Id.Identity())
-              (Q_UtteranceFinal, Utterance.Identity())
-              (Q_CommentFinal, Comment.Then(trimComment))
-          ])
+        [ Q_WhitespaceFinal, Whitespace.Identity()
+          Q_Separator, Separator.Identity()
+          Q_LBrack, LBrack.Identity()
+          Q_RBrack, RBrack.Identity()
+          Q_LBrace, LBrace.Identity()
+          Q_RBrace, RBrace.Identity()
+          Q_LParen, LParen.Identity()
+          Q_RParen, RParen.Identity()
+          Q_Divider, Divider.Identity()
+          Q_Placeholder, Placeholder.Identity()
+          Q_Boundary, Boundary.Identity()
+          Q_Plus, Plus.Identity()
+          Q_Minus, Minus.Identity()
+          Q_Pipe, Pipe.Identity()
+          Q_Not, Not.Identity()
+          Q_Gives, Gives.Identity()
+          Q_IdentifierFinal, Id.Identity()
+          Q_UtteranceFinal, Utterance.Identity()
+          Q_CommentFinal, Comment.Then(trimComment)
+        ]
+        |> dict
 
-    let private incrRow pos =
-        let row, _ = pos
-        (row + 1, 1)
-
-    let private incrCol pos =
-        let row, col = pos
-        (row, col + 1)
-
-    let private isFinal state =
-        stateTokenTypes.ContainsKey state
+    type MismatchAction = Restart | Stop
 
     type LexerValue =
         { startPos: int * int
           pos: int * int
-          canRestart: bool
+          mismatchAction: MismatchAction
           builder: char list
           acc: Token list }
 
-    let builderToString (builder: char list) =
-        System.String.Concat(builder |> List.rev |> Array.ofList)
-
     let lex (filename: string) =
+        let isFinal state = stateTokenTypes.ContainsKey state
+        let accumulate (builder: char list) =
+            System.String.Concat(builder |> List.rev |> Array.ofList)
+
         try
             use stream = new StreamReader(filename, true)
             let content = stream.ReadToEnd()
@@ -161,25 +149,30 @@ module Lexer =
             |> withInitialValue
                 { startPos = 1, 1
                   pos = 1, 1
-                  canRestart = true
+                  mismatchAction = Restart
                   builder = []
                   acc = [] }
-            |> onError (fun currentState ({ canRestart = canRestart; builder = builder; pos = row, col } as currentValue) _ ->
-                if canRestart && isFinal currentState then
-                    Restart { currentValue with canRestart = false }
-                else
-                    (sprintf "Unrecognized token '%s'" ((builderToString builder).Trim()), row, col)
-                    |> SyntaxError |> Stop)
-            |> onTransition (fun isNextFinal isEpsilon inputSymbol currentState nextState value ->
+            |> onError (fun inputSymbol _ ({ pos = row, col } as value) _ ->
+                match value.mismatchAction with
+                | MismatchAction.Restart ->
+                    ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
+                | MismatchAction.Stop ->
+                    (sprintf "Unrecognized token '%s%c'" ((accumulate value.builder).Trim()) inputSymbol, row, col)
+                    |> SyntaxError
+                    |> ErrorAction.Stop)
+            |> onTransition (fun isEpsilonTransition inputSymbol currentState nextState value ->
+                let inline incrRow (row, _) = (row + 1, 1)
+                let inline incrCol (row, col) = (row, col + 1)
+                let isNextFinal = isFinal nextState
                 let nextPos =
-                    if isEpsilon then
+                    if isEpsilonTransition then
                         value.pos
                     else if inputSymbol = '\n' then
                         incrRow value.pos
                     else
                         incrCol value.pos
                 let builder =
-                    if not isEpsilon
+                    if not isEpsilonTransition
                         then inputSymbol :: value.builder
                         else value.builder
                 // Add token to output if on a final state
@@ -187,7 +180,7 @@ module Lexer =
                     if isNextFinal then
                         let (tokenType, modifyToken) = stateTokenTypes.[nextState]
                         let nextValue =
-                            let v = builderToString builder
+                            let v = accumulate builder
                             if currentState = Q_Whitespace
                                 then v
                                 else v.Trim()
@@ -196,21 +189,18 @@ module Lexer =
                         value.acc
                 let nextStartPos =
                     // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isNextFinal || (builder.Length = 0 && currentState <> Q_Whitespace && System.Char.IsWhiteSpace(inputSymbol)) then
-                        nextPos
-                    else
-                        value.startPos
-                let builder =
                     if isNextFinal
-                        then []
-                        else builder
+                        || (builder = []
+                            && currentState <> Q_Whitespace
+                            && System.Char.IsWhiteSpace(inputSymbol))
+                        then nextPos
+                        else value.startPos
                 { value with
                   startPos = nextStartPos
                   pos = nextPos
-                  canRestart = true
-                  builder = builder
+                  mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
+                  builder = if isNextFinal then [] else builder
                   acc = nextAcc })
-            |> onAccept (fun state -> isFinal state)
             |> onFinish (fun { acc = acc } ->  acc |> List.rev |> OK)
             |> runStateMachine content
         with

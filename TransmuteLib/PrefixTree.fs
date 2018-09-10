@@ -84,7 +84,7 @@ module PrefixTree =
                     |> raise
 
     /// <summary>
-    /// Computes the intersection of the sets and features named in the SetIdentifierNode.
+    /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.
     /// </summary>
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
@@ -102,12 +102,12 @@ module PrefixTree =
             | x::xs ->
                 let nextSet =
                     match Node.untag x with
-                    | SetIdentifierTermNode name
-                    | IdentifierNode name ->
+                    | TermIdentifierNode name
+                    | SetIdentifierNode name ->
                         tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
                         |> set
                         |> addToSet true
-                    | FeatureIdentifierTermNode (isPresent, name) ->
+                    | FeatureIdentifierNode (isPresent, name) ->
                         if features.ContainsKey(name) then
                             getFeatureMembers isPresent features.[name]
                             |> set
@@ -146,7 +146,7 @@ type PrefixTree with
     /// </summary>
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
-    /// <param name="setIdentifier">The SetIdentifierNode listing the sets and features to intersect.</param>
+    /// <param name="setIdentifier">The CompoundSetIdentifierNode listing the sets and features to intersect.</param>
     static member fromSetIntersection (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
         let getVal (kvp: KeyValuePair<'a, 'b>) = kvp.Value
         let alphabet =

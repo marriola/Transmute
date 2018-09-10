@@ -2,6 +2,7 @@
 open TransmuteLib
 open TransmuteLib.Lexer
 open TransmuteLib.Node
+open TransmuteLib.SoundChangeRule
 
 let validateOptions (options: Arguments.Options) =
     let mutable isValid = true
@@ -66,9 +67,9 @@ let main argv =
         |> String.concat "\n"
         |> Console.WriteLine
 
-        match SoundChangeRule.matchWord rule "snt" with
-        | SoundChangeRule.Result.Mismatch -> printf "no match\n"
-        | SoundChangeRule.Result.Match result -> printf "match: %s\n" result
+        match SoundChangeRule.test rule "lagʰ" with
+        | Result.Error _ -> printf "no match\n"
+        | Result.Ok result -> printf "match: %s\n" result
 
     (Console.ReadKey())
     0 // return an integer exit code

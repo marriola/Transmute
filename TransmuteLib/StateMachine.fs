@@ -138,9 +138,8 @@ module StateMachine =
           startState: unit -> 'TState
           errorState: unit -> 'TState
           initialValue: unit -> 'TValue
-          fError: unit -> ('TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
-          fTransition: unit -> (bool -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
-          fAccept: unit -> ('TState -> bool)
+          fError: unit -> (char -> 'TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
+          fTransition: unit -> (bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
           fFinish: unit -> ('TValue -> 'TResult)
         }
 
@@ -154,7 +153,6 @@ module StateMachine =
           initialValue = require "initial value"
           fError = require "error function"
           fTransition = require "transition function"
-          fAccept = require "accept function"
           fFinish = require "finish function" }
 
     let withTransitions table config =
@@ -175,9 +173,6 @@ module StateMachine =
     let onTransition fTransition config =
         { config with fTransition = provide fTransition }
 
-    let onAccept fAccept config =
-        { config with fAccept = provide fAccept }
-
     let onFinish fFinish config =
         { config with fFinish = provide fFinish }
 
@@ -188,7 +183,6 @@ module StateMachine =
           config.initialValue(),
           config.fError(),
           config.fTransition(),
-          config.fAccept(),
           config.fFinish() )
 
     /// <summary>
@@ -206,7 +200,6 @@ module StateMachine =
               initialValue,
               fError,
               fTransition,
-              fAccept,
               fFinish
             ) = completeConfig config
 
@@ -216,14 +209,12 @@ module StateMachine =
                 fFinish currentValue
             | nextSymbol::rest ->
                 let matchSymbol, nextState = step errorState transitionTable currentState nextSymbol
-                let nextInput = if matchSymbol = Epsilon then input else rest
-
-                let isNextFinal = fAccept nextState
-                let isEpsilon = matchSymbol = Epsilon
-                let getNextValue = fTransition isNextFinal isEpsilon nextSymbol currentState nextState
+                let isEpsilonTransition = matchSymbol = Epsilon
+                let nextInput = if isEpsilonTransition then input else rest
+                let getNextValue = fTransition isEpsilonTransition nextSymbol currentState nextState
 
                 if nextState = errorState then
-                    match fError currentState currentValue getNextValue with
+                    match fError nextSymbol currentState currentValue getNextValue with
                     | Restart value when currentState <> startState ->
                         inner value startState input
                     | Restart value when rest <> [] ->

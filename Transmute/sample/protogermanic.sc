@@ -42,7 +42,7 @@ $LARYNGEAL/ə/(#|$C)_(#|$C)
 
 ; Early PGmc
 
-j//_[$V-$high]#
+y//_[$V-$high]#
 w//_[$V-$high]#
 [$V-$high]//_#
 
@@ -88,7 +88,7 @@ m/n/_$DENTAL
 g/w/$VGLIDE_$VGLIDE
 
 ;e/i/!ˈ_
-ji/i/_
+yi/i/_
 ii/iː/_
 
 $VSHORT { ə ɑ a e i o u }
@@ -114,7 +114,7 @@ $V {
 $VGLIDE {
     ə ɑ a e i o u
     ɑː aː eː iː oː uː
-    w j
+    w y
 }
 
 $C {
@@ -123,14 +123,14 @@ $C {
     k kʲ kʷ p t
     g gʲ gʷ b d
     gʰ gʲʰ gʷʰ bʰ dʰ
-    m n l r w j
+    m n l r w y
     x xʷ ɸ θ ɣ β ð
 }
 
 $DENTAL { t d dʰ }
 $LABIAL { m p b bʰ }
 $VELAR { k kʷ g gʷ }
-$SONORANT { m n l r w j }
+$SONORANT { m n l r w y }
 $NASAL { m n }
 $LARYNGEAL { ʔ χ χʷ }
 

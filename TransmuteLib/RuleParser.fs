@@ -1,9 +1,7 @@
 ﻿namespace TransmuteLib
 
 open TransmuteLib.Exceptions
-open TransmuteLib.Node
 open TransmuteLib.Token
-open System
 
 type RuleParserResult =
     | OK of Node list
@@ -60,24 +58,24 @@ module RuleParser =
                     unexpectedToken targetTypes x
 
         /// <summary>
-        /// Matches a <see cref="FeatureIdentifierTermNode" />.
+        /// Matches a <see cref="FeatureIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchFeatureIdentifierTerm tokens =
             let tokens, presence = matchOneOf tokens [ Plus; Minus ]
             let tokens, identifier = matchToken tokens Id
-            tokens, Node.tag (FeatureIdentifierTermNode (presence.tokenType = Plus, identifier.value)) presence.position
+            tokens, Node.tag (FeatureIdentifierNode (presence.tokenType = Plus, identifier.value)) presence.position
 
         /// <summary>
-        /// Matches a <see cref="SetIdentifierTermNode" />.
+        /// Matches a <see cref="TermIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchSetIdentifierTerm tokens =
             let tokens, identifier = matchToken tokens Id
-            tokens, Node.tag (SetIdentifierTermNode identifier.value) identifier.position
+            tokens, Node.tag (TermIdentifierNode identifier.value) identifier.position
 
         /// <summary>
-        /// Matches either a <see cref="SetIdentifierTermNode" /> or a <see cref="FeatureIdentifierTermNode" />.
+        /// Matches either a <see cref="TermIdentifierNode" /> or a <see cref="FeatureIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchSetOrFeatureIdentifierTerm tokens =
@@ -93,7 +91,7 @@ module RuleParser =
                 unexpectedToken [ Id; Plus; Minus ] x
 
         /// <summary>
-        /// Matches a <see cref="SetIdentifierNode" />.
+        /// Matches a <see cref="CompoundSetIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchSetIdentifier tokens headPosition =
@@ -103,15 +101,15 @@ module RuleParser =
                     invalidSyntax _position "Expected ']', got end of file"
                     //raise (SyntaxException ("Expected ']', got end of file", _position))
                 | OfType RBrack _::xs ->
-                    xs, Node.tag (SetIdentifierNode (List.rev result)) headPosition
+                    xs, Node.tag (CompoundSetIdentifierNode (List.rev result)) headPosition
                 | _ ->
                     let tokens, term = matchSetOrFeatureIdentifierTerm tokens
                     matchSetIdentifierInternal tokens (term :: result)
             matchSetIdentifierInternal tokens []
 
         /// <summary>
-        /// Matches a rule segment, i.e. a list of <see cref="IdentifierNode" />, <see cref="UtteranceNode" />,
-        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="SetIdentifierNode" />,
+        /// Matches a rule segment, i.e. a list of <see cref="SetIdentifierNode" />, <see cref="UtteranceNode" />,
+        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="CompoundSetIdentifierNode" />,
         /// <see cref="OptionalNode" /> or <see cref="DisjunctNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
@@ -157,7 +155,7 @@ module RuleParser =
                 | OfType Separator _::xs ->
                     inner xs result
                 | OfType Id x::xs ->
-                    inner xs (Node.tag (IdentifierNode x.value) x.position :: result)
+                    inner xs (Node.tag (SetIdentifierNode x.value) x.position :: result)
                 | OfType Utterance x::xs ->
                     inner xs (Node.tag (UtteranceNode x.value) x.position :: result)
                 | OfType Placeholder x::xs ->
@@ -237,7 +235,7 @@ module RuleParser =
             | RuleNode (target, replacement, environment) ->
                 tokens, Node.tag
                     (RuleNode (
-                        Node.tag (IdentifierNode identifier.value) identifier.position :: target,
+                        Node.tag (SetIdentifierNode identifier.value) identifier.position :: target,
                         replacement,
                         environment))
                     identifier.position
@@ -293,23 +291,23 @@ module RuleParser =
                 invalidArg "rule" "Must be a RuleNode"
 
         /// <summary>
-        /// Prepends a node list to the initial SetIdentifierNode of the target segment of a RuleNode.
+        /// Prepends a node list to the initial CompoundSetIdentifierNode of the target segment of a RuleNode.
         /// </summary>
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
-        /// or when the first element of the target segment is not a <see cref="SetIdentifierNode" />.</exception>
+        /// or when the first element of the target segment is not a <see cref="CompoundSetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule headPosition nodes =
             match Node.untag rule with
             | RuleNode (target, _relacement, _environment) ->
                 match Node.untag target.Head with
-                | SetIdentifierNode identifiers ->
+                | CompoundSetIdentifierNode identifiers ->
                     Node.tag
                         (RuleNode
-                            (Node.tag (SetIdentifierNode (nodes @ identifiers)) headPosition :: target.Tail,
+                            (Node.tag (CompoundSetIdentifierNode (nodes @ identifiers)) headPosition :: target.Tail,
                             _relacement,
                             _environment))
                         headPosition
                 | _ ->
-                    invalidArg "rule" "First element of the target segment must be a SetIdentifierNode"
+                    invalidArg "rule" "First element of the target segment must be a CompoundSetIdentifierNode"
             | _ ->
                 invalidArg "rule" "Must be a RuleNode"
                     
@@ -324,7 +322,7 @@ module RuleParser =
 
 
         /// <summary>
-        /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="SetIdentifierNode" />
+        /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="CompoundSetIdentifierNode" />
         /// or a <see cref="RuleNode" />.
         /// </summary>
         /// <remarks>
@@ -346,7 +344,7 @@ module RuleParser =
                 identifier
                 |> optionalCata
                     // '[' Id [ '+' | '-' ] -> RuleNode (id :: target, replacement, environment)
-                    (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (IdentifierNode i.value) i.position ])
+                    (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (SetIdentifierNode i.value) i.position ])
                     // '[' [ '+' | '-' ] -> RuleNode (...)
                     (fun _ -> tokens, theSet)
             | OfType RBrack x::xs ->
@@ -363,8 +361,8 @@ module RuleParser =
                     (fun i ->
                         let tokens, ruleNode = matchRule tokens x.position
                         tokens, prependToRule ruleNode headPosition
-                            [ Node.tag (IdentifierNode i.value) i.position
-                              Node.tag (IdentifierNode x.value) x.position
+                            [ Node.tag (SetIdentifierNode i.value) i.position
+                              Node.tag (SetIdentifierNode x.value) x.position
                             ])
                     // Store first identifier and see what we get next
                     (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))

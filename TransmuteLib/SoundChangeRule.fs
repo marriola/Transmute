@@ -1,12 +1,11 @@
 ﻿namespace TransmuteLib
 
 open System
+open System.Collections.Generic
 open Node
 open StateMachine
 
 module SoundChangeRule =
-    open System.Text
-
     type private Special =
         static member START = '␂'
         static member END = '␃'
@@ -67,8 +66,11 @@ module SoundChangeRule =
                     then State.name this |> sprintf "(%s)"
                     else State.name this |> sprintf "%s"
 
+    type Transformation = Transition<State> * string
+    type TransformationTable = IDictionary<Transition<State>, string>
+
     type private RuleGeneratorState =
-        | HasNext of State seq * Transition<State> list * State
+        | HasNext of State seq * Node list * Transition<State> list * Transformation list * State
         | Done
 
     let private START = State.make "S"
@@ -88,15 +90,11 @@ module SoundChangeRule =
             then Some x
             else None
 
-    let private getFrom ((from, _), _) = from
+    let private getOrigin ((from, _), _) = from
     let private getInput ((_, on), _) = on
     let private getDest (_, ``to``) = ``to``
 
-    let private hasEpsilonTransitions transitions state =
-        transitions
-        |> List.exists (fun ((from, c), _) -> c = Epsilon && state <%> from)
-
-    let private transitionsFrom transitions state =
+    let private transitionsFrom state transitions =
         transitions
         |> List.choose (fun ((from, on), ``to``) ->
             match state with
@@ -104,61 +102,44 @@ module SoundChangeRule =
                 Some ((state, on), ``to``)
             | _ -> None)
 
-    let private replaceOrigin state ((from, on), ``to`` as t) =
-        if from <%> state
-            then (state, on), ``to``
-            else t
-        
-    let private replaceDest state ((from, on), ``to`` as t) =
-        if ``to`` <%> state
-            then (from, on), state
-            else t
-
-    let private hasTransition fInputSymbol transitions state =
+    let private hasTransition fCompare transitions state =
         transitions
-        |> List.exists (fun ((from, on), _) -> on |> fInputSymbol && from = state)
+        |> List.exists (fun ((origin, input), _) -> state = origin && fCompare input)
 
-    let private hasEpsilonTransition transitions state = hasTransition ((=) Epsilon) transitions state
-    let private hasNonEpsilonTransition transitions state = hasTransition ((<>) Epsilon) transitions state
-
-    let private computeFollowSet transitions state =
-        let rec inner states result =
-            match states with
-            | [] ->
-                List.rev result
-            | x::xs ->
-                // States to which we can ε transition from x
-                let followStates =
-                    transitions
-                    |> List.filter (function
-                        | (from, Epsilon), _ when from = x -> true
-                        | _ -> false)
-                    |> List.map (fun (_, ``to``) -> ``to``)
-                    |> set
-                // Non-ε transitions we can take from those states
-                let followTransitions =
-                    transitions
-                    |> List.filter (fun ((from, input), _) -> input <> Epsilon && (from <%> x || followStates.Contains(from)))
-                    |> List.map (fun ((_, input), ``to``) -> input, ``to``)
-                let nextStates =
-                    followStates
-                    |> Seq.filter (fun s ->
-                        transitions
-                        |> List.exists (function
-                            | (from, Epsilon), _ when from = s -> true
-                            | _ -> false))
-                    |> List.ofSeq
-                inner (nextStates @ xs) (followTransitions @ result)
-        inner [state] []
+    let private hasEpsilonTransition = hasTransition ((=) Epsilon)
+    let private hasNonEpsilonTransition = hasTransition ((<>) Epsilon)
 
     let private convertToDfa (table: Transition<State> list) =
-        let followTransitions origin transitions =
-            // For each transition, get the states that can be reached from its destination by
-            // non-epsilon transitions, and create transitions to them from the given state.
-            transitions
-            |> List.collect (getDest >> computeFollowSet table)
-            |> List.distinct
-            |> List.map (fun (input, dest) -> (origin, input), dest)
+        /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
+        let computeFollowSet transitions state =
+            let rec inner states result =
+                match states with
+                | [] ->
+                    List.rev result
+                | x::xs ->
+                    // States to which we can ε transition from x
+                    let followStates =
+                        transitions
+                        |> List.filter (function
+                            | (from, Epsilon), _ when from = x -> true
+                            | _ -> false)
+                        |> List.map (fun (_, ``to``) -> ``to``)
+                        |> set
+                    // Non-ε transitions we can take from those states
+                    let followTransitions =
+                        transitions
+                        |> List.filter (fun ((from, input), _) -> input <> Epsilon && (from <%> x || followStates.Contains(from)))
+                        |> List.map (fun ((_, input), ``to``) -> input, ``to``)
+                    let nextStates =
+                        followStates
+                        |> Seq.filter (fun s ->
+                            transitions
+                            |> List.exists (function
+                                | (from, Epsilon), _ when from = s -> true
+                                | _ -> false))
+                        |> List.ofSeq
+                    inner (nextStates @ xs) (followTransitions @ result)
+            inner [state] []
 
         /// Recursively follows the destination of each transition to a state that has non-epsilon
         /// transitions, eliminating any that have only epsilon transitions.
@@ -200,52 +181,64 @@ module SoundChangeRule =
 
             inner (Set.empty) transitions
 
+        let followTransitions origin transitions =
+            // For each transition, get the states that can be reached from its destination by
+            // non-epsilon transitions, and create transitions to them from the given state.
+            transitions
+            |> List.collect (getDest >> computeFollowSet table)
+            |> List.distinct
+            |> List.map (fun (input, dest) -> (origin, input), dest)
+
+        let removeNondeterminism current table = 
+            // Separate epsilon and non-epsilon transitions
+            let epsilonTransitions, nonEpsilonTransitions =
+                table
+                |> transitionsFrom current
+                |> List.partition (getInput >> (=) Epsilon)
+            // Follow epsilon transitions to the next state with non-epsilon transitions
+            let followedEpsilonTransitions = followTransitions current epsilonTransitions
+            // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
+            nonEpsilonTransitions @ followedEpsilonTransitions
+            |> followDestination
+
+        /// Groups all transitions by input symbol, and merges states that can be reached
+        /// by the same input symbol.
+        let groupTransitions current transitions =
+            let single, multiple =
+                transitions
+                |> List.distinct
+                |> List.groupBy getInput
+                |> List.partition (getDest >> List.length >> (=) 1)
+            let single = List.collect snd single
+            let merged =
+                multiple
+                |> List.where (fun (_, dests) -> List.length dests >= 2)
+                |> List.map (fun (on, dests) ->
+                    let mergedState =
+                        dests
+                        |> List.map getDest
+                        |> List.distinct
+                        |> State.merge
+                    (current, on), mergedState)
+            single @ merged
+
         let rec inner stack dfaTransitions =
             match stack with
-            | [] -> dfaTransitions |> List.ofSeq
+            | [] -> List.ofSeq dfaTransitions
             | current::stack ->
-                // Separate epsilon and non-epsilon transitions
-                let epsilonTransitions, nonEpsilonTransitions =
-                    transitionsFrom table current
-                    |> List.partition (fun ((_, c), _) -> c = Epsilon)
-                // Follow epsilon transitions to the next state with non-epsilon transitions
-                let followedEpsilonTransitions = followTransitions current epsilonTransitions
-                // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
                 let transitionsFromCurrent =
-                    nonEpsilonTransitions @ followedEpsilonTransitions |> followDestination
-                // Group all transitions by input symbol
-                let groupedTransitions =
-                    transitionsFromCurrent
-                    |> List.distinct
-                    |> List.groupBy getInput
-                // Merge states that can be reached by the same input symbol
-                let mergedTransitions =
-                    groupedTransitions
-                    |> List.where (fun (_, dests) -> List.length dests >= 2)
-                    |> List.map (fun (on, dests) ->
-                        let mergedState =
-                            dests
-                            |> List.map getDest
-                            |> List.distinct
-                            |> State.merge
-                        (current, on), mergedState)
-                // All other transitions
-                let singleTransitions =
-                    groupedTransitions
-                    |> List.where (getDest >> List.length >> (=) 1)
-                    |> List.collect snd
-                let allTransitions =
-                    mergedTransitions @ singleTransitions
-                    |> List.distinct
+                    table
+                    |> removeNondeterminism current
+                    |> groupTransitions current
                 // Follow transitions that don't go to the current state or a state already in the stack
                 let nextStack =
-                    allTransitions
+                    transitionsFromCurrent
                     |> List.map getDest
-                    |> List.where (fun s -> s <> current && not (List.contains s stack))
+                    |> List.where ((<>) current)
                     |> List.append stack
                     |> List.distinct
                 let nextTransitions =
-                    allTransitions
+                    transitionsFromCurrent
                     |> Set.ofList
                     |> Set.union dfaTransitions
                 inner nextStack nextTransitions
@@ -257,158 +250,208 @@ module SoundChangeRule =
         |> String.concat "\n"
         |> Console.WriteLine
 
-        inner [START] (Set.empty)
+        inner [START] Set.empty
 
-    let private buildStateMachine features sets target result environment =
+    let private buildStateMachine (features: IDictionary<string, Node>) sets target result environment =
+        /// Gives nothing from the result.
+        let inline giveNone result = None, result
         let takeState (states: State seq) =
             Seq.tail states, Seq.head states
+        let featureTransformations =
+            features
+            |> Seq.map (fun kvp -> kvp.Key, getTransformations kvp.Value)
+            |> Map.ofSeq
 
         /// <param name="states">An infinite sequence of functions that create states.</param>
         /// <param name="input">The list of input symbols (phonemes).</param>
         /// <param name="current">The last node added to the state machine being built.</param>
-        /// <param name="transitions">The list of key-value pairs that will create the transition table.</param>
+        /// <param name="transitions">Accumulates key-value pairs that will create the transition table.</param>
+        /// <param name="transformations">Accumulates transformations produced by transitions.</param>
+        /// <param name="fGive">Gives a node representing a single input symbol if inside the result section; otherwise, always gives None and the original result.</param>
         /// <param name="isAtBeginning">True if none of <c>input</c> has been processed yet; otherwise, false.</param>
         /// <param name="isSubtreeFinal">True if the last state in the subtree should be final.</param>
-        let rec inner states (input: Node list) current transitions isAtBeginning isSubtreeFinal =
+        let rec inner states (input: Node list) (result: Node list) current transitions transformations fGive isAtBeginning isSubtreeFinal =
+            /// <summary>Gives a node representing a single input symbol from the result.</summary>
+            /// <remarks>Utterance nodes are handled by returning an UtteranceNode containing the first character
+            /// in the utterance, and replacing the head result node with an UtteranceNode containing the remainder.
+            /// The only other nodes allowed in the result section, SetIdentifierNode and CompoundSetIdentifierNode,
+            /// are taken from the result unmodified.</remarks>
+            let inline giveFrom result =
+                match result with
+                | [] -> None, result
+                // TODO: this is a code smell. maybe TaggedNode should have been its own type after all...
+                | TaggedNode (_, node)::xs
+                | node::xs ->
+                    Some node, xs
             let inline giveTrue () = true
             let inline giveFalse () = false
 
-            let endCata fEnd fNotEnd =
-                if not isSubtreeFinal then
+            let endCata fEnd fNotEnd fNodeComplete =
+                if not (isSubtreeFinal && fNodeComplete()) then
                     fNotEnd()
                 else
-                    match input with
-                    | _::[] -> fEnd()
-                    | _ -> fNotEnd()
+                    fEnd()
 
-            let isInputAtEnd() = endCata giveTrue giveFalse
+            let isInputAtEnd input =
+                endCata
+                    giveTrue giveFalse
+                    (fun () ->
+                        match input with
+                        | _::[] -> true
+                        | _ -> false)
 
-            let getNextState states =
+            let getNextState states isNodeComplete =
                 let states, nextState = takeState states
                 let nextState =
                     endCata
                         (fun _ -> State.makeFinal nextState)
                         (fun _ -> nextState)
+                        (fun () -> isNodeComplete)
                 states, nextState
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
-                let states, target = getNextState states
+                let states, target = getNextState states true
                 let transitions = (on c current, target) :: transitions
-                states, transitions, target
+                states, result, transitions, transformations, target
+
+            let addTransformation transformations t maybeResult utterance =
+                match maybeResult with
+                | Some (UtteranceNode s) ->
+                    (t, s) :: transformations
+                | Some (CompoundSetIdentifierNode [TaggedNode (_, FeatureIdentifierNode (_, name))]) ->
+                    match Map.tryFind utterance featureTransformations.[name] with
+                    | Some result -> (t, result) :: transformations
+                    | None -> transformations
+                | _ -> transformations
 
             /// Creates a series of states and transitions that match each character of an utterance.
             let transformUtterance utterance =
-                let rec innerTransformUtterance utterance states transitions next =
-                    match utterance with
+                let rec innerTransformUtterance input result states transitions transformations next =
+                    match input with
                     | [] ->
-                        states, transitions, next
+                        let resultNode, result = fGive result
+                        let t = List.head transitions
+                        let transformations = addTransformation transformations t resultNode utterance
+                        states, result, transitions, transformations, next
                     | c::xs ->
-                        let states, target = getNextState states
-                        innerTransformUtterance xs states ((on c next, target) :: transitions) target
+                        let states, target = getNextState states (List.isEmpty xs)
+                        let transitions = (on c next, target) :: transitions
+                        innerTransformUtterance xs result states transitions transformations target
 
-                innerTransformUtterance (List.ofSeq utterance) states transitions current
+                innerTransformUtterance (List.ofSeq utterance) result states transitions transformations current
 
             /// Computes the intersection of a list of feature and set identifiers, and creates a
-            /// tree of states and transitions that match each member of the intersection.
+            /// tree of states and transitions that match each member of the resulting set.
             let transformSet setId =
-                let states, lastState = getNextState states
+                let states, lastState = getNextState states true
 
                 let rec innerTransformSet states transitions curState tree =
                     match tree with
                     | PrefixTree.Root children
                     | PrefixTree.Node (_, _, children) ->
                         // Create states for each child and transitions to them
-                        let states, transitions =
+                        let states, transitions, transformations =
                             children
                             |> List.fold
-                                (fun (states, transitions) n ->
+                                (fun (states, transitions, transformations) n ->
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = takeState states
                                         let transitions = ((curState, Match.Char c), nextState) :: transitions
-                                        let states, transitions, _ = innerTransformSet states transitions nextState n
-                                        states, transitions
+                                        let states, _, transitions, transformations, _ = innerTransformSet states transitions nextState n
+                                        states, transitions, transformations
                                     | PrefixTree.Leaf _ ->
                                         let transitions = ((curState, Epsilon), lastState) :: transitions
-                                        states, transitions
+                                        states, transitions, transformations
                                     | Root _ ->
                                         failwith "A Root should never have another Root as a descendant")
-                                (states, transitions)
-                        states, transitions, lastState
+                                (states, transitions, transformations)
+                        states, result, transitions, transformations, lastState
                     | PrefixTree.Leaf _ ->
-                        states, transitions, curState
+                        states, result, transitions, transformations, curState
 
                 PrefixTree.fromSetIntersection features sets setId
                 |> innerTransformSet states transitions current
 
             let transformOptional children =
-                let states, lastState = getNextState states
-                let states, transitions, subtreeLast = inner states children current transitions true false
+                let states, lastState = getNextState states (isInputAtEnd input)
+                let states, result, transitions, transformations, subtreeLast =
+                    inner states children result current transitions transformations fGive true false
                 let transitions =
                     [ (current, Epsilon), lastState
-                      (subtreeLast, Epsilon), lastState ] @
-                    transitions
-                states, transitions, lastState
+                      (subtreeLast, Epsilon), lastState ]
+                    @ transitions
+                states, result, transitions, transformations, lastState
 
             let transformDisjunct branches =
-                let states, lastState = getNextState states
+                // Create a common exit point for all subtrees
+                let states, lastState = getNextState states (isInputAtEnd input)
                 // Build subtree for each branch
                 let follows =
                     List.foldBack
-                        (fun branch ((states, transitions, _)::_ as acc) ->
-                            inner states branch current transitions true (isSubtreeFinal && isInputAtEnd()) :: acc)
+                        (fun branch ((states, result, transitions, transformations, _)::_ as acc) ->
+                            let isSubtreeFinal = isSubtreeFinal && isInputAtEnd input
+                            let subtree = inner states branch result current transitions transformations fGive true isSubtreeFinal
+                            subtree :: acc)
                         branches
-                        [ states, transitions, current ]
-                let states, transitions, _ = List.head follows
+                        [ states, result, transitions, transformations, current ]
+                // The state of our NFA generator - states, result, transitions, transformations - is propagated to each
+                // successive call to inner, and comes out here.
+                let states, result, transitions, transformations, _ = List.head follows
                 // Transition from last state of each subtree to lastState.
                 // Reverse the list and take the tail first so we don't epsilon from current to lastState.
                 let subtreeFinalToLastState =
                     follows
                     |> List.rev
                     |> List.tail
-                    |> List.map (fun (_, _, subtreeFinal) -> (subtreeFinal, Epsilon), lastState)
+                    |> List.map (fun (_, _, _, _, subtreeFinal) -> (subtreeFinal, Epsilon), lastState)
                 let transitions =
                     [ (current, Any), ERROR ] @ // Go to ERROR if we can't match anything
                     subtreeFinalToLastState @
                     transitions
-                states, transitions, lastState
+                states, result, transitions, transformations, lastState
 
             let generatorState =
                 match input with
                 | [] ->
                     Done
-                | TaggedNode (_, BoundaryNode)::_ ->
-                    let boundaryChar = if isAtBeginning then Special.START else Special.END
-                    HasNext (matchCharacter boundaryChar)
-                | TaggedNode (_, UtteranceNode utterance)::_ ->
-                    HasNext (transformUtterance utterance)
-                | TaggedNode (_, SetIdentifierNode setId)::_ ->
-                    HasNext (transformSet setId)
-                | TaggedNode (_, (IdentifierNode _ as id))::_ ->
-                    HasNext (transformSet [ id ])
-                | TaggedNode (_, PlaceholderNode)::_ ->
-                    HasNext (inner states target current transitions true (isInputAtEnd()))
-                | TaggedNode (_, OptionalNode children)::_ ->
-                    HasNext (transformOptional children)
-                | TaggedNode (_, DisjunctNode branches):: _ ->
-                    HasNext (transformDisjunct branches)
-                | _ ->
-                    failwithf "Unexpected '%s'" (string input.Head)
+                | TaggedNode (_, node)::_
+                | node::_ ->
+                    match node with
+                    | BoundaryNode ->
+                        let boundaryChar = if isAtBeginning then Special.START else Special.END
+                        HasNext (matchCharacter boundaryChar)
+                    | UtteranceNode utterance ->
+                        HasNext (transformUtterance utterance)
+                    | CompoundSetIdentifierNode setId ->
+                        HasNext (transformSet setId)
+                    | SetIdentifierNode _ as id ->
+                        HasNext (transformSet [ id ])
+                    | PlaceholderNode ->
+                        HasNext (inner states target result current transitions transformations giveFrom true (isInputAtEnd input))
+                    | OptionalNode children ->
+                        HasNext (transformOptional children)
+                    | DisjunctNode branches ->
+                        HasNext (transformDisjunct branches)
+                    | _ ->
+                        failwithf "Unexpected '%s'" (string input.Head)
 
             match generatorState with
             | Done ->
-                states, transitions, current
-            | HasNext (states, transitions, theNext) ->
-                inner states input.Tail theNext transitions false isSubtreeFinal
+                states, result, transitions, transformations, current
+            | HasNext (states, result, transitions, transformations, theNext) ->
+                inner states input.Tail result theNext transitions transformations fGive false isSubtreeFinal
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
-        let _, ts, _ = inner initialStates environment START List.empty true true
-        ts
-        |> List.rev
-        //|> groupTransitions
-        |> convertToDfa
-        |> dict
+        let _, _, transitions, transformations, _ = inner initialStates environment result START List.empty List.empty giveNone true true
+        let transitionTable =
+            transitions
+            |> List.rev
+            //|> groupTransitions
+            |> convertToDfa
+            |> dict
+        transitionTable
 
     let compile features sets rule =
         match untag rule with
@@ -417,19 +460,15 @@ module SoundChangeRule =
         | _ ->
             raise (ArgumentException("Must be a RuleNode", "rule"))
 
-    type Result =
-        | Match of result:string
-        | Mismatch
-
-    let matchWord rule word =
+    let test rule word =
         stateMachineConfig()
         |> withTransitions rule
         |> withStartState START
         |> withErrorState ERROR
         |> withInitialValue false
-        |> onError (fun _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
-        |> onTransition (fun isNextFinal _ _ _ _ value -> isNextFinal || value)
-        |> onAccept State.isFinal
-        |> onFinish (fun value -> value |> string |> Match)
+        |> onError (fun _ _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
+        |> onTransition (fun _ input _ nextState value ->
+            printfn "%s on %c" (string nextState) input
+            nextState |> State.isFinal || value)
+        |> onFinish (fun value -> value |> string |> Result.Ok)
         |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
-            
