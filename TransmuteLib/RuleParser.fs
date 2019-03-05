@@ -1,7 +1,7 @@
 ﻿namespace TransmuteLib
 
-open TransmuteLib.Exceptions
 open TransmuteLib.Token
+open TransmuteLib.Utils
 
 type RuleParserResult =
     | OK of Node list
@@ -81,7 +81,7 @@ module RuleParser =
         let matchSetOrFeatureIdentifierTerm tokens =
             match tokens with
             | [] ->
-                raise (SyntaxException ("Expected identifier, '+' or '-', got end of file", _position))
+                invalidSyntax "Expected identifier, '+' or '-', got end of file" _position
             | OfType Id _::_ ->
                 matchSetIdentifierTerm tokens
             | OfType Plus _::_
@@ -98,8 +98,7 @@ module RuleParser =
             let rec matchSetIdentifierInternal tokens result =
                 match tokens with
                 | [] ->
-                    invalidSyntax _position "Expected ']', got end of file"
-                    //raise (SyntaxException ("Expected ']', got end of file", _position))
+                    invalidSyntax "Expected ']', got end of file" _position
                 | OfType RBrack _::xs ->
                     xs, Node.tag (CompoundSetIdentifierNode (List.rev result)) headPosition
                 | _ ->
@@ -199,7 +198,7 @@ module RuleParser =
             let rec matchMemberListInternal tokens result =
                 match tokens with
                 | [] ->
-                    raise (SyntaxException ("Expected member list, got end of file", _position))
+                    invalidSyntax "Expected member list, got end of file" _position
                 | OfType Whitespace _::xs
                 | OfType Comment _::xs ->
                     matchMemberListInternal xs result
@@ -240,7 +239,7 @@ module RuleParser =
                         environment))
                     identifier.position
             | _ ->
-                raise (SyntaxException ("unexpected error", _position))
+                invalidSyntax "unexpected error" _position
 
         /// <summary>
         /// Matches either a set or a rule.
@@ -263,7 +262,7 @@ module RuleParser =
             | [] ->
                 failwith "No more input"
             | x::_ ->
-                raise (SyntaxException ("unexpected error", x.position))
+                invalidSyntax "unexpected error" x.position
 
         /// <summary>
         /// Matches a rule when a set identifier has already been matched.
@@ -276,7 +275,7 @@ module RuleParser =
             | RuleNode (target, replacement, environment) ->
                 tokens, Node.tag (RuleNode (setIdentifier :: target, replacement, environment)) headPosition
             | _ ->
-                raise (SyntaxException ("unexpected error", _position))
+                invalidSyntax "unexpected error" _position
 
         /// <summary>
         /// Prepends a node list to the target segment of a RuleNode.
@@ -330,33 +329,28 @@ module RuleParser =
         /// </remarks>
         /// <param name="tokens">The list of tokens.</param>
         let rec matchFeature_SetIdentifier_Rule tokens headPosition identifier =
-            let optionalCata fSome fNone id =
-                match id with
-                | Some i -> fSome i
-                | None -> fNone()
-
             match tokens with
             | [] ->
-                raise (SyntaxException(sprintf "Expected feature identifier term, identifier or ']'; got end of file", _position))
+                invalidSyntax "Expected feature identifier term, identifier or ']'; got end of file" _position
             | OfType Plus _::_
             | OfType Minus _::_ ->
                 let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
                 identifier
-                |> optionalCata
+                |> Cata.optional
                     // '[' Id [ '+' | '-' ] -> RuleNode (id :: target, replacement, environment)
                     (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (SetIdentifierNode i.value) i.position ])
                     // '[' [ '+' | '-' ] -> RuleNode (...)
                     (fun _ -> tokens, theSet)
             | OfType RBrack x::xs ->
                 identifier
-                |> optionalCata
+                |> Cata.optional
                     // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
                     (fun i -> matchFeature xs headPosition i)
                     // '[' ']' -> syntax error
                     (fun _ -> unexpectedToken [Id] x)
             | OfType Id x::xs ->
                 identifier
-                |> optionalCata
+                |> Cata.optional
                     // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: target.Tail, replacement, environment)
                     (fun i ->
                         let tokens, ruleNode = matchRule tokens x.position
@@ -392,8 +386,8 @@ module RuleParser =
                 | x::_ ->
                     NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
             with
-                | :? SyntaxException as ex ->
-                    NextResult.SyntaxError (ex.Message, ex.Position)
+                Exceptions.SyntaxError (message, row, col) ->
+                    NextResult.SyntaxError (message, (row, col))
    
         // Store result and update position before returning
         let result = (nextInternal tokens)
@@ -419,5 +413,5 @@ module RuleParser =
                 | NextResult.OK (nextTokens, node) ->
                     parseInternal nextTokens (node :: result)
                 | NextResult.SyntaxError (message, position) ->
-                    raise (SyntaxException (message, position))
+                    invalidSyntax message position
         parseInternal tokens []

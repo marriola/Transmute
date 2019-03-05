@@ -94,8 +94,6 @@ type Node =
 
 /// Provides functions on the Node type.
 module Node =
-    open System
-
     let tag node position =
         TaggedNode (position, node)
 
@@ -159,7 +157,7 @@ module Node =
                 | FeatureDefinitionNode (name, _) as node ->
                     Some (name, node)
                 | _ -> None)
-        |> dict
+        |> Map.ofSeq
 
     let getMembers feature =
         match feature with
@@ -180,7 +178,7 @@ module Node =
                 | SetDefinitionNode (name, members) ->
                     Some (name, SetDefinitionNode (name, members))
                 | _ -> None)
-        |> dict
+        |> Map.ofSeq
 
     /// <summary>
     /// Gets the members of the feature.
@@ -203,7 +201,7 @@ module Node =
                         | UtteranceNode value -> value
                     | x ->
                         let position, node = untagWithMetadata x
-                        Exceptions.invalidSyntax position (sprintf "Unrecognized token '%s'" (string node))
+                        invalidSyntax (sprintf "Unrecognized token '%O'" node) position
                 inner xs (next :: out)
         inner (getMembers feature) []
 

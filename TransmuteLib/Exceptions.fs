@@ -1,14 +1,19 @@
 ﻿namespace TransmuteLib
 
-open System
+open TransmuteLib.Exceptions
 
-/// The exception that is thrown when a syntax error has been encountered.
-type SyntaxException(message, pos) =
-    inherit ApplicationException(
-        let row, col = pos
-        sprintf "%s at line %d, column %d" message row col)
-    override this.Message = message
-    member this.Position = pos
+[<AutoOpen>]
+module ExceptionHelpers =
+    let invalidSyntax message (row, col) = raise (SyntaxError (message, row, col))
 
-module Exceptions =
-    let invalidSyntax position message = raise (SyntaxException(message, position))
+    /// <summary>
+    /// Raises a <see cref="SyntaxException"/> for an unexpected token.
+    /// </summary>
+    /// <param name="expected">The types of tokens that were expected.</param>
+    /// <param name="got">The unexpected token that was encountered.</param>
+    let unexpectedToken (expected: TokenType list) got =
+        let message =
+            sprintf "Expected one of %s, got '%s'"
+                (expected |> List.map string |> String.concat ",")
+                (string got.tokenType)
+        invalidSyntax message got.position

@@ -49,25 +49,6 @@ module PrefixTree =
         Root (inner set "")
 
     /// <summary>
-    /// Creates a syntax error from a tagged node.
-    /// </summary>
-    /// <param name="node"></param>
-    /// <param name="format"></param>
-    let private makeSyntaxError node format =
-        let position, innerNode = Node.untagWithMetadata node
-        raise (SyntaxException (format position innerNode, position))
-
-    /// <summary>
-    /// Creates a symbol undefined error message.
-    /// </summary>
-    /// <param name="kind">The kind of object that is undefined.</param>
-    /// <param name="name">The name of the undefined object.</param>
-    /// <param name="position">The position of the token that named the undefined object.</param>
-    /// <param name="node">The node that named the undefined object.</param>
-    let private undefinedSetOrFeature kind name position node =
-        sprintf "'%s' '%s' not defined" kind name
-
-    /// <summary>
     /// Tries to execute a function that retrieves a type of object (set, feature, etc.). If the function
     /// throws a KeyNotFoundException, throws a SyntaxException.
     /// </summary>
@@ -79,9 +60,10 @@ module PrefixTree =
         try fn()
         with
             | :? KeyNotFoundException ->
-                undefinedSetOrFeature kind name
-                    |> makeSyntaxError node
-                    |> raise
+                let msg = sprintf "'%s' '%s' not defined" kind name
+                match node with
+                | TaggedNode (pos, _) -> invalidSyntax msg pos
+                | _ -> invalidSyntax msg (1, 1)
 
     /// <summary>
     /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.
@@ -89,7 +71,7 @@ module PrefixTree =
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier"></param>
-    let internal setIntersection (alphabet: Set<string>) (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
+    let internal setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setIdentifier =
         let rec inner (terms: Node list) (result: Set<string>) =
             let addToSet isPresent s =
                 if isPresent
@@ -121,7 +103,7 @@ module PrefixTree =
                             failwithf "%s is not defined" name
                     | _ ->
                         let position, node = Node.untagWithMetadata x
-                        SyntaxException (sprintf "Unexpected token '%s'" (string node), position) |> raise
+                        invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs nextSet
         inner setIdentifier alphabet |> List.ofSeq
 
@@ -147,7 +129,7 @@ type PrefixTree with
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier">The CompoundSetIdentifierNode listing the sets and features to intersect.</param>
-    static member fromSetIntersection (features: IDictionary<string, Node>) (sets: IDictionary<string, Node>) setIdentifier =
+    static member fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setIdentifier =
         let getVal (kvp: KeyValuePair<'a, 'b>) = kvp.Value
         let alphabet =
             Node.getAlphabet

@@ -1,7 +1,7 @@
 ﻿namespace TransmuteLib
 
 module SyntaxAnalyzer =
-    open TransmuteLib
+    open TransmuteLib.Exceptions
 
     let private validateRuleNode target replacement environment =
         let rec onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) =
@@ -11,7 +11,7 @@ module SyntaxAnalyzer =
                 let position, node = Node.untagWithMetadata nodes.Head
                 match node with
                 | PlaceholderNode ->
-                    raise (SyntaxException (sprintf "%s segment cannot contain placeholder" kind, position))
+                    invalidSyntax (sprintf "%s segment cannot contain placeholder" kind) position
                 | _ ->
                     onlyEnvironmentMayContainPlaceholderNode kind nodes.Tail
 
@@ -22,7 +22,7 @@ module SyntaxAnalyzer =
                 let position, node = Node.untagWithMetadata nodes.Head
                 match node with
                 | BoundaryNode ->
-                    raise (SyntaxException (sprintf "%s segment cannot contain boundary" kind, position))
+                    invalidSyntax (sprintf "%s segment cannot contain boundary" kind) position
                 | _ ->
                     onlyEnvironmentMayContainBoundaryNode kind nodes.Tail
 
@@ -48,7 +48,7 @@ module SyntaxAnalyzer =
                     ()
                 // BoundaryNode in the middle is an error.
                 | _ ->
-                    raise (SyntaxException ("Boundary may only appear at beginning or end of the environment segment", position))
+                    invalidSyntax "Boundary may only appear at beginning or end of the environment segment" position
             | _::xs ->
                 boundaryMayOnlyAppearAtEnds xs
 
@@ -61,7 +61,7 @@ module SyntaxAnalyzer =
                     match node with
                     | PlaceholderNode ->
                         if found then
-                            raise (SyntaxException ("Placeholder may not occur more than once", position))
+                            invalidSyntax "Placeholder may not occur more than once" position
                         else
                             validateInternal nodes.Tail true
                     | _ ->
@@ -76,7 +76,7 @@ module SyntaxAnalyzer =
                     let position, node = Node.untagWithMetadata nodes.Head
                     match node with
                     | OptionalNode [] ->
-                        raise (SyntaxException ("Optional node may not be empty", position))
+                        invalidSyntax "Optional node may not be empty" position
                     | _ ->
                         validateInternal nodes.Tail
             validateInternal nodes
@@ -103,5 +103,5 @@ module SyntaxAnalyzer =
         try
             validateInternal nodes
         with
-            :? SyntaxException as ex ->
-                SyntaxError (ex.Message, ex.Position)
+            Exceptions.SyntaxError (message, row, col) ->
+                ValidateResult.SyntaxError (message, (row, col))

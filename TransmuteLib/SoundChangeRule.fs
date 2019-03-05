@@ -6,10 +6,12 @@ open Node
 open StateMachine
 
 module SoundChangeRule =
+    open System.Text
+
     type private Special =
         static member START = '␂'
         static member END = '␃'
-        static member JOINER = '\u200d'
+        static member JOINER = '\ufeff' //'\u200d'
 
     type State =
         | State of name:string * isTarget:bool * isFinal:bool
@@ -67,11 +69,23 @@ module SoundChangeRule =
                     else State.name this |> sprintf "%s"
 
     type Transformation = Transition<State> * string
-    type TransformationTable = IDictionary<Transition<State>, string>
+    type TransformationTable = Map<Transition<State>, string>
+
+    type InputPosition =
+        | InputInitial
+        | InputNoninitial
+
+    type SubtreePosition =
+        | SubtreeNonfinal
+        | SubtreeFinal
 
     type private RuleGeneratorState =
         | HasNext of State seq * Node list * Transition<State> list * Transformation list * State
         | Done
+
+    type private TransitionType<'TState> =
+        | MaybeDeterministic of Transition<'TState>
+        | Deterministic of Transition<'TState>
 
     let private START = State.make "S"
     let private ERROR = State.make "Error"
@@ -79,38 +93,54 @@ module SoundChangeRule =
     /// Returns true if both states are equal, or if one state is a merged state that contains the other.
     let inline private (<%>) x y =
         match x, y with
-        | (State _ as a), (State _ as b)
-        | (MergedState _ as a), (MergedState _ as b) when a = b -> true
+        | _ when x = y -> true
         | (State _ as s), MergedState children
         | MergedState children, (State _ as s) when List.contains s children -> true
         | _ -> false
 
+    /// Matches the state or a merged state containing it
     let private (|IsOrContains|_|) x y =
         if x <%> y
             then Some x
             else None
 
-    let private getOrigin ((from, _), _) = from
-    let private getInput ((_, on), _) = on
-    let private getDest (_, ``to``) = ``to``
-
     let private transitionsFrom state transitions =
         transitions
-        |> List.choose (fun ((from, on), ``to``) ->
+        |> List.choose (fun (From origin, input, To dest) ->
             match state with
-            | IsOrContains from _ ->
-                Some ((state, on), ``to``)
+            | IsOrContains origin _ ->
+                Some (From state, input, To dest)
             | _ -> None)
 
-    let private hasTransition fCompare transitions state =
-        transitions
-        |> List.exists (fun ((origin, input), _) -> state = origin && fCompare input)
+    let private convertToDfa
+        (table: Transition<State> list)
+        (transformations: ((Origin<State> * InputSymbol * Destination<State>) * string) list) =
+        let hasTransitionOn fCompare state =
+            table
+            |> List.exists (fun (From origin, input, _) -> state = origin && fCompare input)
+        
+        let hasEpsilonTransitionFrom state =
+            table
+            |> List.exists (fun (From origin, input, _ as t) -> input = OnEpsilon && origin <%> state)
 
-    let private hasEpsilonTransition = hasTransition ((=) Epsilon)
-    let private hasNonEpsilonTransition = hasTransition ((<>) Epsilon)
+        let replaceOrigin newOrigin (From _, input, To dest) = (newOrigin, input, dest)
 
-    let private convertToDfa (table: Transition<State> list) =
+        let hasEpsilonTransition = hasTransitionOn ((=) OnEpsilon)
+        let hasNonEpsilonTransition = hasTransitionOn ((<>) OnEpsilon)
+
+        let transformationsFrom =
+            transformations
+            |> Seq.map (fun (((From origin, input, _), _) as t) -> (origin, input), t)
+            |> Map.ofSeq
+        let transformationsTo =
+            transformations
+            |> Seq.map (fun (((_, input, To dest), _) as t) -> (input, dest), t)
+            |> Map.ofSeq
+
+        /// <summary>
         /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
+        /// </summary>
+        /// <returns>A set of input symbol and state tuples.</returns>
         let computeFollowSet transitions state =
             let rec inner states result =
                 match states with
@@ -121,82 +151,115 @@ module SoundChangeRule =
                     let followStates =
                         transitions
                         |> List.filter (function
-                            | (from, Epsilon), _ when from = x -> true
+                            | From from, OnEpsilon, _ when from = x -> true
                             | _ -> false)
-                        |> List.map (fun (_, ``to``) -> ``to``)
+                        |> List.map getDest
                         |> set
                     // Non-ε transitions we can take from those states
                     let followTransitions =
                         transitions
-                        |> List.filter (fun ((from, input), _) -> input <> Epsilon && (from <%> x || followStates.Contains(from)))
-                        |> List.map (fun ((_, input), ``to``) -> input, ``to``)
+                        |> List.filter (fun (From from, input, _) -> input <> OnEpsilon && (from <%> x || followStates.Contains(from)))
+                        |> List.map (fun (_, input, To ``to``) -> input, ``to``)
                     let nextStates =
                         followStates
                         |> Seq.filter (fun s ->
                             transitions
                             |> List.exists (function
-                                | (from, Epsilon), _ when from = s -> true
+                                | From from, OnEpsilon, _ when from = s -> true
                                 | _ -> false))
                         |> List.ofSeq
                     inner (nextStates @ xs) (followTransitions @ result)
             inner [state] []
 
+        /// <summary>
         /// Recursively follows the destination of each transition to a state that has non-epsilon
         /// transitions, eliminating any that have only epsilon transitions.
+        /// </summary>
+        /// <returns>A list of deterministic transitions.</returns>
         let followDestination transitions =
-            let rec inner acc transitions =
-                match transitions with
-                | [] -> acc |> List.ofSeq
+            //let rec inner2 transitions acc =
+            //    match transitions with
+            //    | [] -> List.ofSeq acc
+            //    | ((From origin, _, _) as t)::xs ->
+            //        let followTransitions =
+            //            table
+            //            |> List.filter ((<>) t)
+            //            |> List.filter (getOrigin >> (=) origin)
+            //        let epsilonTransitions, nonepsilonTransitions =
+            //            followTransitions
+            //            |> List.partition (getInput >> (=) OnEpsilon)
+            //        inner2 (epsilonTransitions @ xs) (nonepsilonTransitions @ acc)
+            //    inner2 transitions []
+
+            let rec inner acc search =
+                match search with
+                | [] -> List.ofSeq acc
                 | _ ->
-                    // Cross each transition with each state that can be reached from its destination by a non-epsilon transition.
-                    // Keep the original transition as well if its destination also has one or more non-epsilon transitions.
-                    let followTransitions =
-                        transitions
-                        |> List.collect (fun ((origin, input), dest as t) ->
-                            // Return all epsilon transitions from states that include the destination, plus the
-                            // original transition if the destination has non-epsilon transitions or is final.
-                            let originalTransition =
-                                if State.isFinal dest || hasNonEpsilonTransition table dest
-                                    then [t]
-                                    else []
+                    // Search for states that might have deterministic transitions from their destinations.
+                    let successors =
+                        search
+                        |> List.collect (fun (From o, input, To d as t) ->
+                            // For each transition T from O to D that is succeeded by a nondeterministic transition U,
+                            // move the destination of T forwards to skip it. If any of these lead to deterministic transitions,
+                            // they will be accumulated in the next iteration, along with final states.
                             let followedTransitions =
                                 table
                                 |> List.choose (function
-                                    | (from, Epsilon), follow when from <%> dest ->
-                                        Some ((origin, input), follow)
+                                    | From successor, OnEpsilon, To d2 as u
+                                        when successor <%> d && hasEpsilonTransition d2 ->
+                                        Some (MaybeDeterministic (From o, input, To d2))
                                     | _ -> None)
+                            // Keep the original transition T if D is final or has deterministic transitions
+                            let originalTransition =
+                                if State.isFinal d || input <> OnEpsilon || hasNonEpsilonTransition d
+                                    then [Deterministic t]
+                                    else []
                             originalTransition @ followedTransitions)
-                        |> List.distinct
-                    // Follow transitions to states with epsilon transitions that we haven't already been to
+                        //|> List.distinct
+                    // Follow transitions to states we haven't already been to that have non-deterministic transitions
                     let nextTransitions =
-                        followTransitions
-                        |> List.where (fun ((_, follow) as t) -> not <| List.contains t transitions && hasEpsilonTransition table follow)
-                    // Accumulate states 
+                        //|> Seq.where (fun ((_, _, To d) as t) ->
+                        //    not <| List.contains t search && hasEpsilonTransition d)
+                        successors
+                        |> Seq.choose (function
+                            | MaybeDeterministic u when not (List.contains u search) -> Some u
+                            | _ -> None)
+                        |> List.ofSeq
+                    // Accumulate transitions to states that are final or have deterministic transitions
                     let nextAcc =
-                        followTransitions
-                        |> List.where (fun (_, follow) -> State.isFinal follow || hasNonEpsilonTransition table follow)
-                        |> Set.ofList
+                        successors
+                        //|> Seq.where (fun (_, _, To d) -> State.isFinal d || hasNonEpsilonTransition d)
+                        |> Seq.choose (function
+                            | Deterministic t -> Some t
+                            | _ -> None)
+                        |> Set.ofSeq
                         |> Set.union acc
                     inner nextAcc nextTransitions
 
             inner (Set.empty) transitions
+            //inner2
 
-        let followTransitions origin transitions =
-            // For each transition, get the states that can be reached from its destination by
-            // non-epsilon transitions, and create transitions to them from the given state.
+        /// <summary>
+        /// For each transition, get the states that can be reached from its destination by
+        /// non-epsilon transitions, and create transitions to them from the given state.
+        /// </summary>
+        /// <returns>A list of deterministric transitions.</returns>
+        let followEpsilonTransitions origin transitions =
             transitions
             |> List.collect (getDest >> computeFollowSet table)
             |> List.distinct
-            |> List.map (fun (input, dest) -> (origin, input), dest)
+            |> List.map (fun (input, dest) -> From origin, input, To dest)
 
-        let removeNondeterminism current table = 
+        /// Replaces epsilon transitions originating from current with all possible deterministic transitions.
+        ///
+        /// Also replaces destination states that have epsilon transition with states that can be reached deterministically.
+        let removeNondeterminism current transitions = 
             // Separate epsilon and non-epsilon transitions
             let epsilonTransitions, nonEpsilonTransitions =
-                table
-                |> transitionsFrom current
-                |> List.partition (getInput >> (=) Epsilon)
+                transitions
+                |> List.partition (getInput >> (=) OnEpsilon)
             // Follow epsilon transitions to the next state with non-epsilon transitions
-            let followedEpsilonTransitions = followTransitions current epsilonTransitions
+            let followedEpsilonTransitions = followEpsilonTransitions current epsilonTransitions
             // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
             nonEpsilonTransitions @ followedEpsilonTransitions
             |> followDestination
@@ -208,26 +271,27 @@ module SoundChangeRule =
                 transitions
                 |> List.distinct
                 |> List.groupBy getInput
-                |> List.partition (getDest >> List.length >> (=) 1)
+                |> List.partition (snd >> List.length >> (=) 1)
             let single = List.collect snd single
             let merged =
                 multiple
-                |> List.where (fun (_, dests) -> List.length dests >= 2)
                 |> List.map (fun (on, dests) ->
                     let mergedState =
                         dests
                         |> List.map getDest
                         |> List.distinct
                         |> State.merge
-                    (current, on), mergedState)
+                    From current, on, To mergedState)
             single @ merged
 
         let rec inner stack dfaTransitions =
             match stack with
             | [] -> List.ofSeq dfaTransitions
             | current::stack ->
+                // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
                     table
+                    |> transitionsFrom current
                     |> removeNondeterminism current
                     |> groupTransitions current
                 // Follow transitions that don't go to the current state or a state already in the stack
@@ -246,13 +310,15 @@ module SoundChangeRule =
         printf "NFA:\n\n"
         table
         |> List.indexed
-        |> List.map (fun (i, ((fromState, m), toState)) -> sprintf "%d.\t(%s, %s)\t-> %s" i (string fromState) (string m) (string toState))
+        |> List.map (fun (i, (From origin, input, To dest)) ->
+            let t = sprintf "(%O, %O)" origin input
+            sprintf "%d.\t%-35s-> %O" i t dest)
         |> String.concat "\n"
         |> Console.WriteLine
 
-        inner [START] Set.empty
+        (inner [START] Set.empty), []
 
-    let private buildStateMachine (features: IDictionary<string, Node>) sets target result environment =
+    let private buildStateMachine (features: Map<string, Node>) sets target result environment =
         /// Gives nothing from the result.
         let inline giveNone result = None, result
         let takeState (states: State seq) =
@@ -267,10 +333,10 @@ module SoundChangeRule =
         /// <param name="current">The last node added to the state machine being built.</param>
         /// <param name="transitions">Accumulates key-value pairs that will create the transition table.</param>
         /// <param name="transformations">Accumulates transformations produced by transitions.</param>
-        /// <param name="fGive">Gives a node representing a single input symbol if inside the result section; otherwise, always gives None and the original result.</param>
+        /// <param name="fGiveInput">Gives a node representing a single input symbol if inside the result section; otherwise, always gives None and the original result.</param>
         /// <param name="isAtBeginning">True if none of <c>input</c> has been processed yet; otherwise, false.</param>
         /// <param name="isSubtreeFinal">True if the last state in the subtree should be final.</param>
-        let rec inner states (input: Node list) (result: Node list) current transitions transformations fGive isAtBeginning isSubtreeFinal =
+        let rec inner states (input: Node list) (result: Node list) current transitions transformations fGiveInput inputPosition subtreePosition =
             /// <summary>Gives a node representing a single input symbol from the result.</summary>
             /// <remarks>Utterance nodes are handled by returning an UtteranceNode containing the first character
             /// in the utterance, and replacing the head result node with an UtteranceNode containing the remainder.
@@ -287,7 +353,7 @@ module SoundChangeRule =
             let inline giveFalse () = false
 
             let endCata fEnd fNotEnd fNodeComplete =
-                if not (isSubtreeFinal && fNodeComplete()) then
+                if not (subtreePosition = SubtreeFinal && fNodeComplete()) then
                     fNotEnd()
                 else
                     fEnd()
@@ -311,14 +377,17 @@ module SoundChangeRule =
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
-                let states, target = getNextState states true
-                let transitions = (on c current, target) :: transitions
+                let states, target = getNextState states (isInputAtEnd input) //true
+                let transitions = (From current, OnChar c, To target) :: transitions
                 states, result, transitions, transformations, target
 
+            /// If possible, adds a transformation for an utterance.
             let addTransformation transformations t maybeResult utterance =
                 match maybeResult with
+                // replace with another utterance
                 | Some (UtteranceNode s) ->
                     (t, s) :: transformations
+                // transform by flipping one feature
                 | Some (CompoundSetIdentifierNode [TaggedNode (_, FeatureIdentifierNode (_, name))]) ->
                     match Map.tryFind utterance featureTransformations.[name] with
                     | Some result -> (t, result) :: transformations
@@ -330,13 +399,12 @@ module SoundChangeRule =
                 let rec innerTransformUtterance input result states transitions transformations next =
                     match input with
                     | [] ->
-                        let resultNode, result = fGive result
-                        let t = List.head transitions
-                        let transformations = addTransformation transformations t resultNode utterance
+                        let resultNode, result = fGiveInput result
+                        let transformations = addTransformation transformations (List.head transitions) resultNode utterance
                         states, result, transitions, transformations, next
                     | c::xs ->
                         let states, target = getNextState states (List.isEmpty xs)
-                        let transitions = (on c next, target) :: transitions
+                        let transitions = (From next, OnChar c, To target) :: transitions
                         innerTransformUtterance xs result states transitions transformations target
 
                 innerTransformUtterance (List.ofSeq utterance) result states transitions transformations current
@@ -358,13 +426,13 @@ module SoundChangeRule =
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         let states, nextState = takeState states
-                                        let transitions = ((curState, Match.Char c), nextState) :: transitions
+                                        let transitions = (From curState, OnChar c, To nextState) :: transitions
                                         let states, _, transitions, transformations, _ = innerTransformSet states transitions nextState n
                                         states, transitions, transformations
                                     | PrefixTree.Leaf _ ->
-                                        let transitions = ((curState, Epsilon), lastState) :: transitions
+                                        let transitions = (From curState, OnEpsilon, To lastState) :: transitions
                                         states, transitions, transformations
-                                    | Root _ ->
+                                    | PrefixTree.Root _ ->
                                         failwith "A Root should never have another Root as a descendant")
                                 (states, transitions, transformations)
                         states, result, transitions, transformations, lastState
@@ -377,10 +445,10 @@ module SoundChangeRule =
             let transformOptional children =
                 let states, lastState = getNextState states (isInputAtEnd input)
                 let states, result, transitions, transformations, subtreeLast =
-                    inner states children result current transitions transformations fGive true false
+                    inner states children result current transitions transformations fGiveInput InputNoninitial SubtreeNonfinal
                 let transitions =
-                    [ (current, Epsilon), lastState
-                      (subtreeLast, Epsilon), lastState ]
+                    [ From current, OnEpsilon, To lastState
+                      From subtreeLast, OnEpsilon, To lastState ]
                     @ transitions
                 states, result, transitions, transformations, lastState
 
@@ -391,8 +459,12 @@ module SoundChangeRule =
                 let follows =
                     List.foldBack
                         (fun branch ((states, result, transitions, transformations, _)::_ as acc) ->
-                            let isSubtreeFinal = isSubtreeFinal && isInputAtEnd input
-                            let subtree = inner states branch result current transitions transformations fGive true isSubtreeFinal
+                            //let isSubtreeFinal = subtreePosition = SubtreeFinal && isInputAtEnd input
+                            let innerSubtreePosition =
+                                if subtreePosition = SubtreeFinal && isInputAtEnd input
+                                    then SubtreeFinal
+                                    else SubtreeNonfinal
+                            let subtree = inner states branch result current transitions transformations fGiveInput InputNoninitial innerSubtreePosition //subtreePosition
                             subtree :: acc)
                         branches
                         [ states, result, transitions, transformations, current ]
@@ -405,9 +477,9 @@ module SoundChangeRule =
                     follows
                     |> List.rev
                     |> List.tail
-                    |> List.map (fun (_, _, _, _, subtreeFinal) -> (subtreeFinal, Epsilon), lastState)
+                    |> List.map (fun (_, _, _, _, subtreeFinal) -> From subtreeFinal, OnEpsilon, To lastState)
                 let transitions =
-                    [ (current, Any), ERROR ] @ // Go to ERROR if we can't match anything
+                    [ From current, OnAny, To ERROR ] @ // Go to ERROR if we can't match anything
                     subtreeFinalToLastState @
                     transitions
                 states, result, transitions, transformations, lastState
@@ -420,7 +492,10 @@ module SoundChangeRule =
                 | node::_ ->
                     match node with
                     | BoundaryNode ->
-                        let boundaryChar = if isAtBeginning then Special.START else Special.END
+                        let boundaryChar =
+                            match inputPosition with
+                            | InputInitial -> Special.START
+                            | InputNoninitial -> Special.END
                         HasNext (matchCharacter boundaryChar)
                     | UtteranceNode utterance ->
                         HasNext (transformUtterance utterance)
@@ -429,7 +504,11 @@ module SoundChangeRule =
                     | SetIdentifierNode _ as id ->
                         HasNext (transformSet [ id ])
                     | PlaceholderNode ->
-                        HasNext (inner states target result current transitions transformations giveFrom true (isInputAtEnd input))
+                        let subtreePosition =
+                            match isInputAtEnd input with
+                            | true -> SubtreeFinal
+                            | false -> SubtreeNonfinal
+                        HasNext (inner states target result current transitions transformations giveFrom InputNoninitial subtreePosition)
                     | OptionalNode children ->
                         HasNext (transformOptional children)
                     | DisjunctNode branches ->
@@ -441,24 +520,27 @@ module SoundChangeRule =
             | Done ->
                 states, result, transitions, transformations, current
             | HasNext (states, result, transitions, transformations, theNext) ->
-                inner states input.Tail result theNext transitions transformations fGive false isSubtreeFinal
+                inner states input.Tail result theNext transitions transformations fGiveInput InputInitial subtreePosition
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
-        let _, _, transitions, transformations, _ = inner initialStates environment result START List.empty List.empty giveNone true true
+        let _, _, transitions, transformations, _ = inner initialStates environment result START List.empty List.empty giveNone InputNoninitial SubtreeFinal
+        let transitions, transformations =
+            (List.rev transitions, transformations)
+            //|> groupTransitions
+            ||> convertToDfa
+
         let transitionTable =
             transitions
-            |> List.rev
-            //|> groupTransitions
-            |> convertToDfa
-            |> dict
-        transitionTable
+            |> Seq.map (fun (From origin, input, To dest) -> (origin, input), dest)
+            |> Map.ofSeq
+        (Map.ofSeq transformations), transitionTable
 
     let compile features sets rule =
         match untag rule with
         | RuleNode (target, result, environment) ->
             buildStateMachine features sets target result environment
         | _ ->
-            raise (ArgumentException("Must be a RuleNode", "rule"))
+            invalidArg "rule" "Must be a RuleNode"
 
     let test rule word =
         stateMachineConfig()
@@ -467,8 +549,44 @@ module SoundChangeRule =
         |> withErrorState ERROR
         |> withInitialValue false
         |> onError (fun _ _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
-        |> onTransition (fun _ input _ nextState value ->
-            printfn "%s on %c" (string nextState) input
-            nextState |> State.isFinal || value)
+        |> onTransition (fun _ _ input _ nextState value ->
+            printfn "%O on %c" nextState input
+            value || State.isFinal nextState)
         |> onFinish (fun value -> value |> string |> Result.Ok)
+        |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
+
+    type RuleMachineState = {
+        transformationTable: Map<Transition<State>, string>
+        /// The output so far
+        output: string list
+        /// The output so far of the current transformation
+        buffer: string list
+        /// The untransformed output that would be produced if the transformation fails
+        undoBuffer: string list
+    }
+
+    let transform transformations transitions word =
+        stateMachineConfig()
+        |> withTransitions transitions
+        |> withStartState START
+        |> withErrorState ERROR
+        |> withInitialValue { transformationTable = transformations; output = []; buffer = []; undoBuffer = [] }
+        |> onError (fun input _ currentValue getNextValue ->
+            Restart {
+                currentValue with
+                    output = string input :: currentValue.undoBuffer @ currentValue.output
+                    buffer = []
+                    undoBuffer = []
+            })
+        |> onTransition (fun transition _ input _ nextState value ->
+            printfn "%O on %c" nextState input
+            { value with
+                undoBuffer = (string input) :: value.undoBuffer
+                buffer =
+                    match Map.tryFind transition value.transformationTable with
+                    | Some transformation -> transformation :: value.buffer
+                    | None -> value.buffer
+            })
+        |> onFinish (fun value ->
+            value |> string |> Result.Ok)
         |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)

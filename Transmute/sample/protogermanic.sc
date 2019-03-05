@@ -1,6 +1,4 @@
-﻿gʷ/b/#_
-
-; TODO implement NOT nodes
+﻿; TODO implement NOT nodes
 ;   $SONORANT/u$SONORANT/$V_!$V
 ;   $SONORANT/u$SONORANT/!$V_$V
 

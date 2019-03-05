@@ -1,0 +1,41 @@
+1. transitions produce output on a match
+    a. not every transition must produce output
+    b. after each transition, the state machine appends the input symbol to the input buffer
+2. when a final state is reached...
+    a. the word in its current form is saved as the last successful transformation
+    b. the input buffer is cleared
+3. a mismatch will...
+    a. move to the START state
+    b. then, if the current state is a final state, transition on the mismatched symbol
+    c. otherwise
+        I. revert to the last successful transformation
+        II. append the input buffer to the output
+        III. clear the input buffer
+4. when the end of the rule is reached, return the last successful transformation plus the input buffer
+    a. if the input is shorter than the rule, a mismatch will occur on ETX and return the last successful transformation
+    
+[$V+$long]/[-$long]/C_CC
+
+ke:rp -> kerp
+
+input   rule    buffer  output
+------------------------------
+ke:rp#  C_CC
+^       ^
+
+ke:rp#  e:      k
+ ^      ^
+
+ke:rp#  e:      ke
+  ^      ^
+  
+ke:rp#  C_CC    ke:
+   ^      ^
+   
+ke:rp#  C_CC    ke:r
+    ^      ^
+ 
+ke:rpe -> kerpe
+ke:p -> ke:p
+ke:pra -> kepra
+ke:pa -> ke:pa

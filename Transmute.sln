@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2024
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Transmute", "Transmute\Transmute.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute", "Transmute\Transmute.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TransmuteLib", "TransmuteLib\TransmuteLib.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib", "TransmuteLib\TransmuteLib.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

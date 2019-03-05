@@ -56,18 +56,20 @@ let main argv =
 
         printf "? "
         let selection = Console.ReadLine() |> int
-        let rule = SoundChangeRule.compile features sets rules.[selection]
+        let transformations, rule = SoundChangeRule.compile features sets rules.[selection]
 
         printf "\nDFA:\n\n"
 
         rule
         |> Seq.map (fun pair -> pair.Key, pair.Value)
         |> Seq.indexed
-        |> Seq.map (fun (i, ((fromState, m), toState)) -> sprintf "%d.\t(%s, %s)\t-> %s" i (string fromState) (string m) (string toState))
+        |> Seq.map (fun (i, ((fromState, m), toState)) ->
+            let t = sprintf "(%s, %s)" (string fromState) (string m)
+            sprintf "%d.\t%-35s-> %s" i t (string toState))
         |> String.concat "\n"
         |> Console.WriteLine
 
-        match SoundChangeRule.test rule "lagʰ" with
+        match SoundChangeRule.transform transformations rule "knda" with
         | Result.Error _ -> printf "no match\n"
         | Result.Ok result -> printf "match: %s\n" result
 
