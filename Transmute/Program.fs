@@ -56,11 +56,12 @@ let main argv =
 
         printf "? "
         let selection = Console.ReadLine() |> int
-        let transformations, rule = SoundChangeRule.compile features sets rules.[selection]
+        let rule = SoundChangeRule.compile features sets rules.[selection]
+        let transitions, transformations = rule
 
         printf "\nDFA:\n\n"
 
-        rule
+        transitions
         |> Seq.map (fun pair -> pair.Key, pair.Value)
         |> Seq.indexed
         |> Seq.map (fun (i, ((fromState, m), toState)) ->
@@ -69,7 +70,14 @@ let main argv =
         |> String.concat "\n"
         |> Console.WriteLine
 
-        match SoundChangeRule.transform transformations rule "knda" with
+        printfn "transformations:"
+        transformations
+        |> Seq.iteri (fun i kvp ->
+            let (From origin, input, To dest) = kvp.Key
+            let result = kvp.Value
+            printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
+
+        match SoundChangeRule.transform rule "snt" with
         | Result.Error _ -> printf "no match\n"
         | Result.Ok result -> printf "match: %s\n" result
 

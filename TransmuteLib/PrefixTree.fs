@@ -18,7 +18,7 @@ module PrefixTree =
     //    +--------+----+--+--+--+
     //    |        |    |  |  |  |
     //    k        g    p  b  t  d
-    // w / \ Ø  w / \ Ø
+    // w / \ λ  w / \ λ
     //  kw  k    gw  g
 
     let NUL = '\u2400'
