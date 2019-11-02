@@ -101,8 +101,7 @@ module PrefixTree =
                                 else Set.difference result setMembers
                         else
                             failwithf "%s is not defined" name
-                    | _ ->
-                        let position, node = Node.untagWithMetadata x
+                    | Untag (node, position) ->
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs nextSet
         inner setIdentifier alphabet |> List.ofSeq

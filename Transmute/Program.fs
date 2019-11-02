@@ -14,6 +14,7 @@ let validateOptions (options: Arguments.Options) =
         isValid <- false
     isValid
 
+let trim (s: string) = s.Trim()
 
 [<EntryPoint>]
 let main argv =
@@ -31,15 +32,18 @@ let main argv =
     | SyntaxError (msg, row, col) ->
         printfn "Syntax error at row %d column %d: %s" row col msg
     | OK tokens ->
-        let nodes = RuleParser.parse tokens
+        let nodes =
+            match RuleParser.parse tokens with
+            | Ok nodes -> nodes
+            | Result.Error message -> failwith message
         let features = getFeatures nodes
         let sets = getSets nodes
 
         match SyntaxAnalyzer.validate nodes with
-        | ValidateResult.OK ->
+        | Ok () ->
             printfn "Passed validation!"
-        | ValidateResult.SyntaxError (message, (row, col)) ->
-            printfn "Syntax error at row %d column %d: %s" row col message
+        | Result.Error message ->
+            failwith message
 
         let rules =
             nodes
@@ -50,36 +54,49 @@ let main argv =
 
         rules
         |> List.indexed
-        |> List.map (fun (i, r) -> sprintf "%d. %s" i (string r))
+        |> List.map (fun (i, r) -> sprintf "%d. %O" (i + 1) r)
         |> String.concat "\n"
         |> printfn "%s"
 
         printf "? "
-        let selection = Console.ReadLine() |> int
-        let rule = SoundChangeRule.compile features sets rules.[selection]
-        let transitions, transformations = rule
+        let selections =
+            Console.ReadLine().Split(',')
+            |> Array.map (trim >> int >> (+) -1)
+            |> Array.toList
 
-        printf "\nDFA:\n\n"
+        let mutable word = "kmtom"
 
-        transitions
-        |> Seq.map (fun pair -> pair.Key, pair.Value)
-        |> Seq.indexed
-        |> Seq.map (fun (i, ((fromState, m), toState)) ->
-            let t = sprintf "(%s, %s)" (string fromState) (string m)
-            sprintf "%d.\t%-35s-> %s" i t (string toState))
-        |> String.concat "\n"
-        |> Console.WriteLine
+        for selection in selections do
+            let rule = rules.[selection]
 
-        printfn "transformations:"
-        transformations
-        |> Seq.iteri (fun i kvp ->
-            let (From origin, input, To dest) = kvp.Key
-            let result = kvp.Value
-            printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
+            printfn "Rule %d: %O" (selection + 1) rule
 
-        match SoundChangeRule.transform rule "snt" with
-        | Result.Error _ -> printf "no match\n"
-        | Result.Ok result -> printf "match: %s\n" result
+            let rule = SoundChangeRule.compile features sets rule
+            let transitions, transformations = rule
+
+            printf "\nDFA:\n\n"
+
+            transitions
+            |> Seq.map (fun pair -> pair.Key, pair.Value)
+            |> Seq.indexed
+            |> Seq.map (fun (i, ((fromState, m), toState)) ->
+                let t = sprintf "(%s, %s)" (string fromState) (string m)
+                sprintf "%d.\t%-35s-> %s" i t (string toState))
+            |> String.concat "\n"
+            |> Console.WriteLine
+
+            printfn "transformations:"
+            transformations
+            |> Seq.iteri (fun i kvp ->
+                let (From origin, input, To dest) = kvp.Key
+                let result = kvp.Value
+                printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
+
+            match SoundChangeRule.transform rule word with
+            | Result.Error _ -> printf "no match\n"
+            | Result.Ok result ->
+                word <- result
+                printf "result: %s\n" result
 
     (Console.ReadKey())
     0 // return an integer exit code

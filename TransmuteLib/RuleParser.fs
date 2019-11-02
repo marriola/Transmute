@@ -3,25 +3,13 @@
 open TransmuteLib.Token
 open TransmuteLib.Utils
 
-type RuleParserResult =
-    | OK of Node list
-    | SyntaxError of string * (int * int)
-
-type NextResult =
-    | OK of Token list * Node
-    | SyntaxError of string * (int * int)
-
-type ValidateResult =
-    | OK
-    | SyntaxError of string * (int * int)
-
 module RuleParser =
 
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
     /// <param name="tokens">The list of tokens.</param>
-    let next tokens =
+    let private next tokens =
         let mutable _position = (1, 1)
 
         /// <summary>
@@ -372,28 +360,28 @@ module RuleParser =
             try
                 match tokens with
                 | [] ->
-                    NextResult.SyntaxError ("End of file", _position)
+                    Result.Error (syntaxErrorMessage "End of file" _position)
                 | OfType Whitespace _::xs ->
                     nextInternal xs
                 | OfType Comment x::xs ->
-                    NextResult.OK (xs, Node.tag (CommentNode x.value) x.position)
+                    Ok (xs, Node.tag (CommentNode x.value) x.position)
                 | OfType Utterance x::xs ->
-                    NextResult.OK (matchRule tokens x.position)
+                    Ok (matchRule tokens x.position)
                 | OfType Id x::xs ->
-                    NextResult.OK (matchSet_Rule xs x)
+                    Ok (matchSet_Rule xs x)
                 | OfType LBrack x::xs ->
-                    NextResult.OK (matchFeature_SetIdentifier_Rule xs x.position None)
+                    Ok (matchFeature_SetIdentifier_Rule xs x.position None)
                 | x::_ ->
-                    NextResult.SyntaxError (sprintf "Unexpected token '%s'" x.value, x.position)
+                    Result.Error (syntaxErrorMessage (sprintf "Unexpected token '%s'" x.value)  _position)
             with
                 Exceptions.SyntaxError (message, row, col) ->
-                    NextResult.SyntaxError (message, (row, col))
+                    Result.Error (syntaxErrorMessage message (row, col))
    
         // Store result and update position before returning
         let result = (nextInternal tokens)
 
         match result with
-        | NextResult.OK (nextTokens, node) ->
+        | Ok (nextTokens, node) ->
             if [] <> nextTokens then
                 _position <- nextTokens.Head.position
             result
@@ -407,11 +395,11 @@ module RuleParser =
         let rec parseInternal tokens result =
             match tokens with
             | [] ->
-                List.rev result
+                Ok (List.rev result)
             | _ ->
                 match next tokens with
-                | NextResult.OK (nextTokens, node) ->
+                | Ok (nextTokens, node) ->
                     parseInternal nextTokens (node :: result)
-                | NextResult.SyntaxError (message, position) ->
-                    invalidSyntax message position
+                | Result.Error message ->
+                    Result.Error message
         parseInternal tokens []

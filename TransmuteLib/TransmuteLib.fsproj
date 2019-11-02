@@ -9,7 +9,6 @@
     <Compile Include="Utils\Cata.fs" />
     <Compile Include="BoundedList.fs" />
     <Compile Include="SyntaxError.fs" />
-    <Compile Include="Charset.fs" />
     <Compile Include="Token.fs" />
     <Compile Include="Exceptions.fs" />
     <Compile Include="Node.fs" />

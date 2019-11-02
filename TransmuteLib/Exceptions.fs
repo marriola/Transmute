@@ -4,6 +4,9 @@ open TransmuteLib.Exceptions
 
 [<AutoOpen>]
 module ExceptionHelpers =
+    let syntaxErrorMessage message (line, col) =
+        sprintf "Syntax error at line %d, column %d: %s" line col message
+
     let invalidSyntax message (row, col) = raise (SyntaxError (message, row, col))
 
     /// <summary>

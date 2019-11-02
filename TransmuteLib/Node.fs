@@ -105,13 +105,10 @@ module Node =
         | x ->
             x
 
-    /// Retrieves the metadata and inner node of a tagged node.
-    let inline untagWithMetadata taggedNode =
-        match taggedNode with
-        | TaggedNode (position, node) ->
-            position, node
-        | x ->
-            (0, 0), x
+    let (|Untag|_|) node =
+        match node with
+        | TaggedNode (position, inner) -> Some (inner, position)
+        | _ -> Some (node, (0, 0))
 
     /// Gets the left string value of a TransformationNode.
     let getLeft node =
@@ -199,8 +196,7 @@ module Node =
                         let utterance = if isPresent then result else target
                         match untag utterance with
                         | UtteranceNode value -> value
-                    | x ->
-                        let position, node = untagWithMetadata x
+                    | Untag (node, position) ->
                         invalidSyntax (sprintf "Unrecognized token '%O'" node) position
                 inner xs (next :: out)
         inner (getMembers feature) []
