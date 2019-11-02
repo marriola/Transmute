@@ -25,6 +25,15 @@ module SoundChangeRule =
                 | MergedState _ as state ->
                     failwithf "%s is a merged state; it cannot be made final" (string state)
 
+            static member makeTarget = function
+                | State (name, _, isFinal) ->
+                    State (name, true, isFinal)
+                | MergedState states ->
+                    let states =
+                        states
+                        |> List.map (fun (State (name, _, isFinal)) -> State (name, true, isFinal))
+                    MergedState states
+
             static member merge states =
                 let statesToMerge =
                     states
@@ -134,6 +143,14 @@ module SoundChangeRule =
             then Some x
             else None
 
+    let private (|IsTarget|_|) state =
+        match state with
+        | State (_, true, _)
+        | MergedState ((State (_, true, _))::_) ->
+            Some state
+        | _ ->
+            None
+
     let private transitionsFrom state transitions =
         transitions
         |> List.choose (fun (((From origin, _, _), _) as t) ->
@@ -144,10 +161,12 @@ module SoundChangeRule =
 
     let private convertToDfa (table: Transition<State> list) (transformations: Transformation list) =
         let table = augment table transformations
+
         let hasTransitionOn fCompare state =
             List.exists
                 (fun ((From origin, input, _), _) -> state = origin && fCompare input)
                 table
+
         let hasEpsilonTransition = hasTransitionOn ((=) OnEpsilon)
         let hasNonEpsilonTransition = hasTransitionOn ((<>) OnEpsilon)
 
@@ -213,7 +232,7 @@ module SoundChangeRule =
                                 table
                                 |> List.choose (function
                                     | (From successor, OnEpsilon, To d2), _ as u
-                                        when successor <%> d && hasEpsilonTransition d2 ->
+                                        when successor <%> d -> // && hasEpsilonTransition d2 ->
                                         Some (MaybeDeterministic ((From o, input, To d2), result))
                                     | _ -> None)
                             // Keep the original transition T if D is final or has deterministic transitions
@@ -391,6 +410,10 @@ module SoundChangeRule =
                         (fun _ -> State.makeFinal nextState)
                         (fun _ -> nextState)
                         (fun () -> isNodeComplete)
+                let nextState =
+                    match inputNode with
+                    | Environment -> State.makeTarget nextState
+                    | _ -> nextState
                 states, nextState
 
             /// Creates a transition to a new state that matches an input symbol.
@@ -576,8 +599,8 @@ module SoundChangeRule =
         |> withStartState START
         |> withErrorState ERROR
         |> withInitialValue false
-        |> onError (fun _ _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
-        |> onTransition (fun _ _ input _ nextState value ->
+        |> onError (fun _ _ _ currentValue getNextValue -> currentValue |> getNextValue |> Restart)
+        |> onTransition (fun _ _ _ input _ nextState value ->
             printfn "%O on %c" nextState input
             value || State.isFinal nextState)
         |> onFinish (fun value -> value |> string |> Result.Ok)
@@ -586,10 +609,15 @@ module SoundChangeRule =
     type RuleMachineState = {
         /// The output so far
         output: string list
+        
         /// The output so far of the current transformation
         buffer: string list
+        
         /// The untransformed output that would be produced if the transformation fails
         undoBuffer: string list
+
+        /// The position of the last input that generated output.
+        lastOutputOn: int option
     }
 
     let transform (transitions, transformations) word =
@@ -597,33 +625,53 @@ module SoundChangeRule =
         |> withTransitions transitions
         |> withStartState START
         |> withErrorState ERROR
-        |> withInitialValue { output = []; buffer = []; undoBuffer = [] }
-        |> onError (fun input _ currentValue getNextValue ->
-            printfn "Error on %c" input
+        |> withInitialValue { output = []; buffer = []; undoBuffer = []; lastOutputOn = None }
+        |> onError (fun position input current currentValue getNextValue ->
+            let nextOutput, lastOutputOn =
+                let temp = currentValue.undoBuffer @ currentValue.output
+                if Some position <> currentValue.lastOutputOn
+                    && input <> Special.START
+                    && input <> Special.END
+                    then (string input :: temp), Some position
+                    else temp, currentValue.lastOutputOn
+            printfn "x %d %O" position currentValue.lastOutputOn
+            printfn "x Error at %O on %c %A" current input nextOutput
             Restart {
                 currentValue with
-                    output = string input :: currentValue.undoBuffer @ currentValue.output
+                    output = nextOutput
                     buffer = []
                     undoBuffer = []
+                    lastOutputOn = lastOutputOn
             })
-        |> onTransition (fun transition _ input _ nextState value ->
-            printfn "%O on %c => %A | %A" nextState input value.buffer value.output
+        |> onTransition (fun position transition _ input current nextState value ->
+            printfn "√ %d %O" position value.lastOutputOn
+            printfn "√ %O -> %O on %c => %A | %A" current nextState input value.buffer value.output
             let nextBuffer =
-                match Map.tryFind transition transformations with
-                | Some transformation -> transformation :: value.buffer
-                | None -> value.buffer
-            let nextBuffer, nextUndoBuffer, nextOutput =
+                match nextState, Map.tryFind transition transformations with
+                | _, Some transformation ->
+                    transformation :: value.buffer
+                | IsTarget _, None ->
+                    string input :: value.buffer
+                | _ ->
+                    value.buffer
+            let nextBuffer, nextUndoBuffer, nextOutput, lastOutputOn =
                 if State.isFinal nextState
-                    then [], [], (nextBuffer @ value.output)
+                    then [], [], (nextBuffer @ value.output), value.lastOutputOn
                     else
                         nextBuffer,
                         (string input) :: value.undoBuffer,
-                        value.output
+                        value.output,
+                        Some position
             { value with
                 undoBuffer = nextUndoBuffer
                 buffer = nextBuffer
                 output = nextOutput
+                lastOutputOn = lastOutputOn
             })
         |> onFinish (fun value ->
-            value |> string |> Result.Ok)
-        |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
+            value.output
+            |> List.rev
+            |> String.concat ""
+            |> Result.Ok)
+        |> runStateMachine (string Special.START + word + string Special.END)
+        

@@ -153,7 +153,7 @@ module Lexer =
                   mismatchAction = Restart
                   builder = []
                   acc = [] }
-            |> onError (fun inputSymbol _ ({ pos = row, col } as value) _ ->
+            |> onError (fun _ inputSymbol _ ({ pos = row, col } as value) _ ->
                 match value.mismatchAction with
                 | MismatchAction.Restart ->
                     ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
@@ -161,7 +161,7 @@ module Lexer =
                     (sprintf "Unrecognized token '%s%c'" ((accumulate value.builder).Trim()) inputSymbol, row, col)
                     |> SyntaxError
                     |> ErrorAction.Stop)
-            |> onTransition (fun _ isEpsilonTransition inputSymbol currentState nextState value ->
+            |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->
                 let inline incrRow (row, _) = (row + 1, 1)
                 let inline incrCol (row, col) = (row, col + 1)
                 let isNextFinal = isFinal nextState

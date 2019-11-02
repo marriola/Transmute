@@ -107,8 +107,8 @@ module StateMachine =
           startState: unit -> 'TState
           errorState: unit -> 'TState
           initialValue: unit -> 'TValue
-          fError: unit -> (char -> 'TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
-          fTransition: unit -> (Transition<'TState> -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
+          fError: unit -> (int -> char -> 'TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
+          fTransition: unit -> (int -> Transition<'TState> -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
           fFinish: unit -> ('TValue -> 'TResult)
         }
 
@@ -172,7 +172,7 @@ module StateMachine =
               fFinish
             ) = completeConfig config
 
-        let rec inner currentValue currentState input =
+        let rec inner currentValue currentState position input =
             match input with
             | [] ->
                 fFinish currentValue
@@ -180,21 +180,21 @@ module StateMachine =
                 let (_, matchSymbol, To nextState) as transition = step errorState transitionTable currentState nextSymbol
                 let isEpsilonTransition = matchSymbol = OnEpsilon
                 let nextInput = if isEpsilonTransition then input else rest
-                let getNextValue = fTransition transition isEpsilonTransition nextSymbol currentState nextState
+                let getNextValue = fTransition position transition isEpsilonTransition nextSymbol currentState nextState
 
                 if nextState = errorState then
-                    match fError nextSymbol currentState currentValue getNextValue with
+                    match fError position nextSymbol currentState currentValue getNextValue with
                     | Restart value when currentState <> startState ->
-                        inner value startState input
+                        inner value startState position input
                     | Restart value when rest <> [] ->
-                        inner value startState nextInput
+                        inner value startState (position + 1) nextInput
                     | Restart value ->
                         fFinish value
                     | Stop result ->
                         result
                 else
-                    inner (getNextValue currentValue) nextState nextInput
+                    inner (getNextValue currentValue) nextState (position + 1) nextInput
 
         input
         |> List.ofSeq
-        |> inner initialValue startState
+        |> inner initialValue startState 0

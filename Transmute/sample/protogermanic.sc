@@ -150,6 +150,14 @@ $STOP {
     i u
 }
 
+[$nasalized] {
+    a => ã
+    e => ẽ
+    i => ĩ
+    o => õ
+    u => ũ
+}
+
 [$voiced] {
     k => g
     gʰ
