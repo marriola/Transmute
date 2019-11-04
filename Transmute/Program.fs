@@ -64,7 +64,11 @@ let main argv =
             |> Array.map (trim >> int >> (+) -1)
             |> Array.toList
 
-        let mutable word = "dʰugχter"
+        let mutable word = "kmtˈom"
+
+        // TODO:
+        //  - figure out why transformation to xʷ is being lost after converting to DFA
+        //  - add Verner's law to protogermanic.sc and test
 
         for selection in selections do
             let rule = rules.[selection]

@@ -446,8 +446,10 @@ module SoundChangeRule =
                 | Some (UtteranceNode s) ->
                     (t, s) :: transformations
                 // transform by flipping one feature
-                | Some (CompoundSetIdentifierNode [TaggedNode (_, FeatureIdentifierNode (_, name))]) ->
-                    match Map.tryFind utterance featureTransformations.[name] with
+                | Some (CompoundSetIdentifierNode [TaggedNode (_, FeatureIdentifierNode (isPresent, name))]) ->
+                    let additions, removals = featureTransformations.[name]
+                    let searchMap = if isPresent then additions else removals
+                    match Map.tryFind utterance searchMap with
                     | Some result -> (t, result) :: transformations
                     | None -> transformations
                 | _ -> transformations
@@ -468,14 +470,20 @@ module SoundChangeRule =
 
                 innerTransformUtterance (List.ofSeq utterance) result states transitions transformations current
 
-            let addSetTransformation transition transformations result =
+            let addSetTransformation value transition transformations result =
                 let resultNode, result = giveResult result
                 let transformations =
                     match resultNode with
                     | Some (UtteranceNode utterance) ->
                         (transition, utterance) :: transformations
-                    | Some (CompoundSetIdentifierNode features) ->
-                        failwith "Not implemented yet!"
+                    | Some (CompoundSetIdentifierNode (Node.Untag (FeatureIdentifierNode (isPresent, name), _)::[])) ->
+                        let additions, removals = featureTransformations.[name]
+                        let searchMap = if isPresent then additions else removals
+                        match Map.tryFind value searchMap with
+                        | Some result -> (transition, result) :: transformations
+                        | None -> transformations
+                    | Some (CompoundSetIdentifierNode _) ->
+                        failwith "Only one feature may be transformed at a time"
                     | _ ->
                         transformations
                 transformations, result
@@ -500,11 +508,11 @@ module SoundChangeRule =
                                         let transitions = (From curState, OnChar c, To nextState) :: transitions
                                         let states, _, transitions, transformations, _ = innerTransformSet states transitions transformations nextState n
                                         states, result, transitions, transformations
-                                    | PrefixTree.Leaf _ ->
+                                    | PrefixTree.Leaf value ->
                                         // No more input symbols. Create a transition to the terminator state.
                                         let t = From curState, OnEpsilon, To terminator
                                         let transitions = t :: transitions
-                                        let transformations, result = addSetTransformation t transformations result
+                                        let transformations, result = addSetTransformation value t transformations result
                                         states, result, transitions, transformations
                                     | PrefixTree.Root _ ->
                                         failwith "A Root should never be the descendant of another node")
@@ -540,7 +548,7 @@ module SoundChangeRule =
                                     then SubtreeFinal
                                     else SubtreeNonfinal
                             let subtree =
-                                buildStateMachine' states branch result transitions transformations inputNode InputNoninitial innerSubtreePosition current //subtreePosition
+                                buildStateMachine' states branch result transitions transformations inputNode inputPosition innerSubtreePosition current //subtreePosition
                             subtree :: acc)
                         branches
                         [ states, result, transitions, transformations, current ]
@@ -652,6 +660,11 @@ module SoundChangeRule =
     }
 
     let transform (transitions, transformations) word =
+        let (|ValidInput|_|) input =
+            if input = Special.START || input = Special.END
+                then None
+                else Some (string input)
+
         stateMachineConfig()
         |> withTransitions transitions
         |> withStartState START
@@ -660,13 +673,13 @@ module SoundChangeRule =
         |> onError (fun position input current currentValue getNextValue ->
             let nextOutput, lastOutputOn =
                 let temp = currentValue.undoBuffer @ currentValue.output
-                if Some position <> currentValue.lastOutputOn
-                    && input <> Special.START
-                    && input <> Special.END
-                    then (string input :: temp), Some position
-                    else temp, currentValue.lastOutputOn
-            printfn "x %d %O" position currentValue.lastOutputOn
-            printfn "x Error at %O on %c %A" current input nextOutput
+                match input with
+                | ValidInput s when Some position <> currentValue.lastOutputOn ->
+                    (s :: temp), Some position
+                | _ ->
+                    temp, currentValue.lastOutputOn
+            printf "x %d %O:\t" position currentValue.lastOutputOn
+            printfn "Error at %O on %c | out: %A" current input nextOutput
             Restart {
                 currentValue with
                     output = nextOutput
@@ -675,24 +688,24 @@ module SoundChangeRule =
                     lastOutputOn = lastOutputOn
             })
         |> onTransition (fun position transition _ input current nextState value ->
-            printfn "√ %d %O" position value.lastOutputOn
-            printfn "√ %O -> %O on %c => %A | %A" current nextState input value.buffer value.output
+            printf "√ %d %O:\t" position value.lastOutputOn
             let nextBuffer =
-                match nextState, Map.tryFind transition transformations with
-                | _, Some transformation ->
+                match input, nextState, Map.tryFind transition transformations with
+                | _, _, Some transformation ->
                     transformation :: value.buffer
-                | IsTarget _, None when input <> Special.START && input <> Special.END ->
-                    string input :: value.buffer
+                | ValidInput s, IsTarget _, None when Some position <> value.lastOutputOn ->
+                    s :: value.buffer
                 | _ ->
                     value.buffer
+            let nextUndoBuffer =
+                match input with
+                | ValidInput s when Some position <> value.lastOutputOn -> s :: value.undoBuffer
+                | _ -> value.undoBuffer
             let nextBuffer, nextUndoBuffer, nextOutput, lastOutputOn =
                 if State.isFinal nextState
                     then [], [], (nextBuffer @ value.output), value.lastOutputOn
-                    else
-                        nextBuffer,
-                        (string input) :: value.undoBuffer,
-                        value.output,
-                        Some position
+                    else nextBuffer, nextUndoBuffer, value.output, Some position
+            printfn "%O -> %O on %c | undo: %A | buf: %A | out: %A" current nextState input nextUndoBuffer nextBuffer nextOutput
             { value with
                 undoBuffer = nextUndoBuffer
                 buffer = nextBuffer

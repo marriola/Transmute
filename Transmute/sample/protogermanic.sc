@@ -92,7 +92,8 @@ ii/iː/_
 $VSHORT { ə ɑ a e i o u }
 $VLONG { ɑː aː eː iː oː uː }
 $V {
-    ə ɑ a e i o u
+    ə
+    ɑ  a  e  i  o  u
     ɑː aː eː iː oː uː
 }
 
@@ -110,19 +111,20 @@ $V {
 ;   produces aː eː iː oː uː
 
 $VGLIDE {
-    ə ɑ a e i o u
+    ə
+    ɑ  a  e  i  o  u
     ɑː aː eː iː oː uː
-    w y
+    w  y
 }
 
 $C {
     s
-    ʔ χ χʷ
-    k kʲ kʷ p t
-    g gʲ gʷ b d
+    ʔ  χ   χʷ
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
-    m n l r w y
-    x xʷ ɸ θ ɣ β ð
+    m  n   l   r  w  y
+    x  xʷ  ɸ   θ  ɣ  β  ð
 }
 
 $DENTAL { t d dʰ }
@@ -133,8 +135,8 @@ $NASAL { m n }
 $LARYNGEAL { ʔ χ χʷ }
 
 $STOP {
-    k kʲ kʷ p t
-    g gʲ gʷ b d
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
 }
 
