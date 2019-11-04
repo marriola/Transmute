@@ -64,7 +64,7 @@ let main argv =
             |> Array.map (trim >> int >> (+) -1)
             |> Array.toList
 
-        let mutable word = "kmtom"
+        let mutable word = "dʰugχter"
 
         for selection in selections do
             let rule = rules.[selection]

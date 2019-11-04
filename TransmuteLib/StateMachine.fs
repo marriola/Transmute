@@ -102,14 +102,20 @@ module StateMachine =
 
     type TransformationTable<'TState when 'TState : comparison> = Map<'TState * string * 'TState, string>
 
+    type OnError<'TState, 'TValue, 'TResult> = int -> char -> 'TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>
+
+    type OnTransition<'TState, 'TValue> = int -> Transition<'TState> -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue
+
+    type OnFinish<'TValue, 'TResult> = 'TValue -> 'TResult
+
     type Config<'TState, 'TValue, 'TResult when 'TState : equality and 'TState : comparison> =
         { transitionTable: unit -> TransitionTable<'TState>
           startState: unit -> 'TState
           errorState: unit -> 'TState
           initialValue: unit -> 'TValue
-          fError: unit -> (int -> char -> 'TState -> 'TValue -> ('TValue -> 'TValue ) -> ErrorAction<'TValue, 'TResult>)
-          fTransition: unit -> (int -> Transition<'TState> -> bool -> char -> 'TState -> 'TState -> 'TValue -> 'TValue)
-          fFinish: unit -> ('TValue -> 'TResult)
+          fError: unit -> OnError<'TState, 'TValue, 'TResult>
+          fTransition: unit -> OnTransition<'TState, 'TValue>
+          fFinish: unit -> OnFinish<'TValue, 'TResult>
         }
 
     let private require msg = (fun () -> failwithf "%s required" msg)

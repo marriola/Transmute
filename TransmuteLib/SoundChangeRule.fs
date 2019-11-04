@@ -170,6 +170,13 @@ module SoundChangeRule =
         let hasEpsilonTransition = hasTransitionOn ((=) OnEpsilon)
         let hasNonEpsilonTransition = hasTransitionOn ((<>) OnEpsilon)
 
+        let allTransitionsDeterministic origin =
+            table
+            |> Seq.filter (function
+                | (From o, OnEpsilon, _), _ when o = origin -> true
+                | _ -> false)
+            |> Seq.isEmpty
+
         let inline getDest (transition, _) = StateMachine.getDest transition
         let inline getInput (transition, _) = StateMachine.getInput transition
 
@@ -231,19 +238,29 @@ module SoundChangeRule =
                             let followedTransitions =
                                 table
                                 |> List.choose (function
-                                    | (From successor, OnEpsilon, To d2), _ as u
+                                    | (From successor, OnEpsilon, To d2), uResult as u
                                         when successor <%> d -> // && hasEpsilonTransition d2 ->
+                                        let result =
+                                            match result, uResult with
+                                            | (Produces _ as r), NoOutput
+                                            | NoOutput, (Produces _ as r) ->
+                                                r
+                                            | NoOutput, NoOutput ->
+                                                NoOutput
+                                            | Produces _, Produces _ ->
+                                                failwith "Both transitions have transformation!"
                                         Some (MaybeDeterministic ((From o, input, To d2), result))
                                     | _ -> None)
                             // Keep the original transition T if D is final or has deterministic transitions
                             let originalTransition =
-                                if State.isFinal d
-                                    || input <> OnEpsilon
-                                    || hasNonEpsilonTransition d
+                                if allTransitionsDeterministic d
+                                    && (State.isFinal d
+                                        || input <> OnEpsilon)
                                     then [Deterministic t]
                                     else []
                             originalTransition @ followedTransitions)
                         //|> List.distinct
+                    //printfn ">>> %A" successors
                     // Follow transitions to states we haven't already been to that have non-deterministic transitions
                     let nextTransitions =
                         //|> Seq.where (fun ((_, _, To d) as t) ->
@@ -423,7 +440,7 @@ module SoundChangeRule =
                 states, result, transitions, transformations, target
 
             /// If possible, adds a transformation for an utterance.
-            let addTransformation transformations t maybeResult utterance =
+            let addUtteranceTransformation transformations t maybeResult utterance =
                 match maybeResult with
                 // replace with another utterance
                 | Some (UtteranceNode s) ->
@@ -442,7 +459,7 @@ module SoundChangeRule =
                     match input with
                     | [] ->
                         let resultNode, result = giveResult result
-                        let transformations = addTransformation transformations (List.head transitions) resultNode utterance
+                        let transformations = addUtteranceTransformation transformations (List.head transitions) resultNode utterance
                         states, result, transitions, transformations, next
                     | c::xs ->
                         let states, target = getNextState states (List.isEmpty xs)
@@ -451,40 +468,54 @@ module SoundChangeRule =
 
                 innerTransformUtterance (List.ofSeq utterance) result states transitions transformations current
 
+            let addSetTransformation transition transformations result =
+                let resultNode, result = giveResult result
+                let transformations =
+                    match resultNode with
+                    | Some (UtteranceNode utterance) ->
+                        (transition, utterance) :: transformations
+                    | Some (CompoundSetIdentifierNode features) ->
+                        failwith "Not implemented yet!"
+                    | _ ->
+                        transformations
+                transformations, result
+
             /// Computes the intersection of a list of feature and set identifiers, and creates a
             /// tree of states and transitions that match each member of the resulting set.
             let transformSet setDesc =
                 let states, terminator = getNextState states true
 
-                let rec innerTransformSet states transitions curState tree =
+                let rec innerTransformSet states transitions transformations curState tree =
                     match tree with
                     | PrefixTree.Root children
                     | PrefixTree.Node (_, _, children) ->
                         // Create states for each child and transitions to them
-                        let states, transitions, transformations =
+                        let states, result, transitions, transformations =
                             List.fold
-                                (fun (states, transitions, transformations) n ->
+                                (fun (states, result, transitions, transformations) n ->
                                     match n with
                                     | PrefixTree.Node (_, c, _) ->
                                         // Create a node for this input symbol and a transition to it, and visit the children.
                                         let states, nextState = takeState states
                                         let transitions = (From curState, OnChar c, To nextState) :: transitions
-                                        let states, _, transitions, transformations, _ = innerTransformSet states transitions nextState n
-                                        states, transitions, transformations
+                                        let states, _, transitions, transformations, _ = innerTransformSet states transitions transformations nextState n
+                                        states, result, transitions, transformations
                                     | PrefixTree.Leaf _ ->
                                         // No more input symbols. Create a transition to the terminator state.
-                                        let transitions = (From curState, OnEpsilon, To terminator) :: transitions
-                                        states, transitions, transformations
+                                        let t = From curState, OnEpsilon, To terminator
+                                        let transitions = t :: transitions
+                                        let transformations, result = addSetTransformation t transformations result
+                                        states, result, transitions, transformations
                                     | PrefixTree.Root _ ->
                                         failwith "A Root should never be the descendant of another node")
-                                (states, transitions, transformations)
+                                (states, result, transitions, transformations)
                                 children
                         states, result, transitions, transformations, terminator
                     | PrefixTree.Leaf _ ->
                         states, result, transitions, transformations, curState
 
                 PrefixTree.fromSetIntersection features sets setDesc
-                |> innerTransformSet states transitions current
+                |> innerTransformSet states transitions transformations current
 
             let transformOptional children =
                 let states, lastState = getNextState states (isInputAtEnd input)
@@ -565,11 +596,11 @@ module SoundChangeRule =
             | Done ->
                 states, result, transitions, transformations, current
             | HasNext (states, result, transitions, transformations, theNext) ->
-                buildStateMachine' states input.Tail result transitions transformations inputNode InputInitial subtreePosition theNext
+                buildStateMachine' states input.Tail result transitions transformations inputNode InputNoninitial subtreePosition theNext
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
         let _, _, transitions, transformations, _ =
-            buildStateMachine' initialStates environment result List.empty List.empty Environment InputNoninitial SubtreeFinal START
+            buildStateMachine' initialStates environment result List.empty List.empty Environment InputInitial SubtreeFinal START
 
         let dfa = convertToDfa (List.rev transitions) transformations
 
@@ -650,7 +681,7 @@ module SoundChangeRule =
                 match nextState, Map.tryFind transition transformations with
                 | _, Some transformation ->
                     transformation :: value.buffer
-                | IsTarget _, None ->
+                | IsTarget _, None when input <> Special.START && input <> Special.END ->
                     string input :: value.buffer
                 | _ ->
                     value.buffer
@@ -671,7 +702,7 @@ module SoundChangeRule =
         |> onFinish (fun value ->
             value.output
             |> List.rev
-            |> String.concat ""
+            |> String.concat String.Empty
             |> Result.Ok)
         |> runStateMachine (string Special.START + word + string Special.END)
         
