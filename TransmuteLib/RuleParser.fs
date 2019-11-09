@@ -112,6 +112,8 @@ module RuleParser =
                     matchDisjunct xs startToken result
                 | OfType RParen _::xs ->
                     xs, Node.tag (DisjunctNode (List.rev result)) startToken.position
+                | OfType Pipe _::xs ->
+                    matchDisjunct xs startToken result
                 | _ ->
                     let tokens, ruleSegment = matchRuleSegment tokens in
                     ruleSegment :: result
