@@ -1,4 +1,6 @@
-﻿; TODO implement NOT nodes
+﻿; From https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic
+
+; TODO implement NOT nodes
 ;   $SONORANT/u$SONORANT/$V_!$V
 ;   $SONORANT/u$SONORANT/!$V_$V
 
@@ -14,15 +16,16 @@ r/ur/(#|$C)_(#|$C)
 ; TODO implement transformation of Ø, i.e. insertion
 ; /u/#_$SONORANT$C
 
-kʲ/k/_
-gʲ/g/_
-gʲʰ/gʰ/_
+; kʲ/k/_
+; gʲ/g/_
+; gʲʰ/gʰ/_
 
-k/kʷ/_w
-g/gʷ/_w
-gʰ/gʷʰ/_w
+; k/kʷ/_w
+; g/gʷ/_w
+; gʰ/gʷʰ/_w
 
 [+$palatalized]/[-$palatalized]/_
+[+$labialized]/[-$labialized]/_
 
 $LARYNGEAL//#_[$C-$LARYNGEAL]
 ʔ//_$V
@@ -49,9 +52,11 @@ w//_[$V-$high]#
 [$STOP+$LABIAL]/ɸ/_t
 [$STOP+$VELAR]/x/_t
 
-[$STOP-$voiced]/[+$fricative]/(#|$VGLIDE)_
-[$STOP+$voiced]/[-$voiced]/(#|$VGLIDE)_
-[$STOP+$aspirated]/[-$aspirated]/(#|$VGLIDE)_
+; Grimm's law
+
+[$STOP-$voiced]/[+$fricative]/(#|$VGLIDE|$NASAL)_
+[$STOP+$voiced]/[-$voiced]/(#|$VGLIDE|$NASAL)_
+[$STOP+$aspirated]/[-$aspirated]/(#|$VGLIDE|$NASAL)_
 
 ;[$STOP-$voiced]/[+$fricative]/$VGLIDE_
 ;[$STOP+$voiced]/[-$voiced]/$VGLIDE_
@@ -59,26 +64,21 @@ w//_[$V-$high]#
 
 ; Verner's law
 
-[+$fricative]/[+$voiced]/(#|$C)[-$stressed]_
-;[+$fricative]/[+$voiced]/$C[-$stressed]_
+[+$fricative]/[+$voiced]/(#|$C)[-$stressed]($C)_
 
-;;;;[+$fricative+$voiced]/[-$voiced]/[$V-$stressed]_
-
-; Stress moves to initial syllable
-[-$stressed]/[+$stressed]/#($C)($C)_
+; Stress moves to initial syllable. Let's just stop marking it.
+[+$stressed]/[-$stressed]/_
 
 gʷ/b/#_
 
-o/a/_
+o/ɑ/_
 a/ɑ/_
 
 ; Late PGmc
 m/n/_#
-
-ɑ/ɑ̃/_$NASAL#
-$NASAL//_#
-
 m/n/_$DENTAL
+
+ɑ$NASAL/ɑ̃/_
 
 ˈə/ˈɑ/$C_$C
 ə//$C_$C
@@ -90,7 +90,9 @@ yi/i/_
 ii/iː/_
 
 $VSHORT { ə ɑ a e i o u }
+
 $VLONG { ɑː aː eː iː oː uː }
+
 $V {
     ə
     ɑ  a  e  i  o  u
@@ -127,9 +129,9 @@ $C {
     x  xʷ  ɸ   θ  ɣ  β  ð
 }
 
-$DENTAL { t d dʰ }
-$LABIAL { m p b bʰ }
-$VELAR { k kʷ g gʷ }
+$DENTAL { t d dʰ θ ð }
+$LABIAL { m p b bʰ ɸ β }
+$VELAR { k kʷ g gʷ x ɣ }
 $SONORANT { m n l r w y }
 $NASAL { m n }
 $LARYNGEAL { ʔ χ χʷ }
@@ -140,17 +142,9 @@ $STOP {
     gʰ gʲʰ gʷʰ bʰ dʰ
 }
 
-[$mid] {
-    e o
-}
-
-[$round] {
-    o u
-}
-
-[$high] {
-    i u
-}
+[$mid] { e o }
+[$round] { o u }
+[$high] { i u }
 
 [$nasalized] {
     a => ã
@@ -170,7 +164,7 @@ $STOP {
     gʷʰ
     p => b
     bʰ
-    f => β
+    ɸ => β
     t => d
     s => z
     dʰ
@@ -181,6 +175,12 @@ $STOP {
     k => kʲ
     g => gʲ
     gʰ => gʲʰ
+}
+
+[$labialized] {
+	k => kʷ
+	g => gʷ
+	gʰ => gʷʰ
 }
 
 [$aspirated] {

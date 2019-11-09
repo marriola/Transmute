@@ -3,6 +3,7 @@ open TransmuteLib
 open TransmuteLib.Lexer
 open TransmuteLib.Node
 open TransmuteLib.SoundChangeRule
+open System.Diagnostics
 
 let validateOptions (options: Arguments.Options) =
     let mutable isValid = true
@@ -64,21 +65,25 @@ let main argv =
             |> Array.map (trim >> int >> (+) -1)
             |> Array.toList
 
-        let mutable word = "kmtˈom"
+        let mutable word = "kʲmtˈom"
+        let sw = new Stopwatch()
 
-        // TODO:
-        //  - figure out why transformation to xʷ is being lost after converting to DFA
-        //  - add Verner's law to protogermanic.sc and test
+        // TODO: Figure out how to correctly apply transformations that are followed by non-producing transitions
 
         for selection in selections do
             let rule = rules.[selection]
 
-            printfn "Rule %d: %O" (selection + 1) rule
+            printfn "\nRule %d: %O" (selection + 1) rule
+
+            sw.Restart()
 
             let rule = SoundChangeRule.compile features sets rule
             let transitions, transformations = rule
 
-            printf "\nDFA:\n\n"
+            sw.Stop()
+            printfn "Compiled in %d ms" sw.ElapsedMilliseconds
+
+            printfn "\nDFA:\n"
 
             transitions
             |> Seq.map (fun pair -> pair.Key, pair.Value)
@@ -89,18 +94,23 @@ let main argv =
             |> String.concat "\n"
             |> Console.WriteLine
 
-            printfn "transformations:"
+            printfn "\ntransformations:"
             transformations
             |> Seq.iteri (fun i kvp ->
                 let (From origin, input, To dest) = kvp.Key
                 let result = kvp.Value
                 printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
 
-            match SoundChangeRule.transform rule word with
-            | Result.Error _ -> printf "no match\n"
-            | Result.Ok result ->
-                word <- result
-                printf "result: %s\n" result
+            printfn ""
 
-    (Console.ReadKey())
+            sw.Restart()
+
+            match SoundChangeRule.transform rule word with
+            | Result.Error _ ->
+                printf "[%d ms] no match\n" sw.ElapsedMilliseconds
+            | Result.Ok result ->
+                sw.Stop()
+                word <- result
+                printf "[%d ms] result: %s\n" sw.ElapsedMilliseconds result
+
     0 // return an integer exit code

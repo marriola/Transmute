@@ -223,7 +223,7 @@ module SoundChangeRule =
         /// transitions, eliminating any that have only epsilon transitions.
         /// </summary>
         /// <returns>A list of deterministic transitions.</returns>
-        let followDestination transitions =
+        let followDestination current transitions =
             let rec inner acc search =
                 match search with
                 | [] -> List.ofSeq acc
@@ -239,7 +239,8 @@ module SoundChangeRule =
                                 table
                                 |> List.choose (function
                                     | (From successor, OnEpsilon, To d2), uResult as u
-                                        when successor <%> d -> // && hasEpsilonTransition d2 ->
+                                        //when successor <%> d && hasEpsilonTransition d2 ->
+                                        when successor <%> d ->
                                         let result =
                                             match result, uResult with
                                             | (Produces _ as r), NoOutput
@@ -249,22 +250,17 @@ module SoundChangeRule =
                                                 NoOutput
                                             | Produces _, Produces _ ->
                                                 failwith "Both transitions have transformation!"
-                                        Some (MaybeDeterministic ((From o, input, To d2), result))
+                                        Some (MaybeDeterministic ((From current, input, To d2), result))
                                     | _ -> None)
                             // Keep the original transition T if D is final or has deterministic transitions
                             let originalTransition =
-                                if allTransitionsDeterministic d
-                                    && (State.isFinal d
-                                        || input <> OnEpsilon)
+                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d)
+                                    && (State.isFinal d || input <> OnEpsilon)
                                     then [Deterministic t]
                                     else []
                             originalTransition @ followedTransitions)
-                        //|> List.distinct
-                    //printfn ">>> %A" successors
                     // Follow transitions to states we haven't already been to that have non-deterministic transitions
                     let nextTransitions =
-                        //|> Seq.where (fun ((_, _, To d) as t) ->
-                        //    not <| List.contains t search && hasEpsilonTransition d)
                         successors
                         |> Seq.choose (function
                             | MaybeDeterministic u when not (List.contains u search) -> Some u
@@ -273,7 +269,6 @@ module SoundChangeRule =
                     // Accumulate transitions to states that are final or have deterministic transitions
                     let nextAcc =
                         successors
-                        //|> Seq.where (fun (_, _, To d) -> State.isFinal d || hasNonEpsilonTransition d)
                         |> Seq.choose (function
                             | Deterministic t -> Some t
                             | _ -> None)
@@ -307,7 +302,7 @@ module SoundChangeRule =
             // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
             let transitions =
                 nonEpsilonTransitions @ followedEpsilonTransitions
-                |> followDestination
+                |> followDestination current
             transitions
 
         /// Groups all transitions by input symbol, and merges states that can be reached
@@ -321,22 +316,28 @@ module SoundChangeRule =
             let single = List.collect snd single
             let merged =
                 multiple
-                |> List.collect (fun (on, dests) ->
-                    // Group again by transition result
-                    dests
-                    |> List.groupBy snd
-                    |> List.map (fun (result, ts) ->
-                        // Merge states that go to the same destination and produce the same result
-                        let mergedState =
-                            ts
-                            |> List.map getDest
-                            |> State.merge
-                        (From current, on, To mergedState), result))
+                |> List.map (fun (on, dests) ->
+                    let mergedDest =
+                        dests
+                        |> List.map getDest
+                        |> State.merge
+                    let production =
+                        (NoOutput, dests)
+                        ||> List.fold (fun out (_, result) ->
+                            match out, result with
+                            | Produces a, Produces b when a <> b ->
+                                failwithf "Merged state %O has multiple productions! (%O, %O)" mergedDest out result
+                            | NoOutput, (Produces _ as result) ->
+                                result
+                            | _ ->
+                                out)
+                    (From current, on, To mergedDest), production)
             single @ merged
 
         let rec convertToDfa' stack dfaTransitions =
             match stack with
             | [] -> List.ofSeq dfaTransitions
+            | x::stack when x = ERROR -> convertToDfa' stack dfaTransitions
             | current::stack ->
                 // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
@@ -359,10 +360,11 @@ module SoundChangeRule =
 
         printf "NFA:\n\n"
         table
+        |> List.sortBy (fun ((From origin, input, dest), result) -> (State.ord origin, input, dest), result)
         |> List.indexed
         |> List.map (fun (i, ((From origin, input, To dest), result)) ->
             let t = sprintf "(%O, %O)" origin input
-            sprintf "%d.\t%-35s-> %O, %O" i t dest result)
+            sprintf "%d.\t%-25s-> %O, %O" i t dest result)
         |> String.concat "\n"
         |> Console.WriteLine
 
@@ -604,11 +606,24 @@ module SoundChangeRule =
             | Done ->
                 states, result, transitions, transformations, current
             | HasNext (states, result, transitions, transformations, theNext) ->
-                buildStateMachine' states input.Tail result transitions transformations inputNode InputNoninitial subtreePosition theNext
+                let input, subtreePosition =
+                    // We're consuming the top symbol, so the next one we consume will produce final transitions.
+                    match input with
+                    | [_; x] ->
+                        [x], SubtreeFinal
+                    | _::xs ->
+                        xs, SubtreeNonfinal
+                buildStateMachine' states input result transitions transformations inputNode InputNoninitial subtreePosition theNext
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
+
+        let initialSubtreePosition =
+            match environment with
+            | [_] -> SubtreeFinal
+            | _ -> SubtreeNonfinal
+
         let _, _, transitions, transformations, _ =
-            buildStateMachine' initialStates environment result List.empty List.empty Environment InputInitial SubtreeFinal START
+            buildStateMachine' initialStates environment result List.empty List.empty Environment InputInitial initialSubtreePosition START
 
         let dfa = convertToDfa (List.rev transitions) transformations
 
@@ -657,6 +672,8 @@ module SoundChangeRule =
 
         /// The position of the last input that generated output.
         lastOutputOn: int option
+
+        wasLastFinal: bool
     }
 
     let transform (transitions, transformations) word =
@@ -669,7 +686,7 @@ module SoundChangeRule =
         |> withTransitions transitions
         |> withStartState START
         |> withErrorState ERROR
-        |> withInitialValue { output = []; buffer = []; undoBuffer = []; lastOutputOn = None }
+        |> withInitialValue { output = []; buffer = []; undoBuffer = []; lastOutputOn = None; wasLastFinal = false }
         |> onError (fun position input current currentValue getNextValue ->
             let nextOutput, lastOutputOn =
                 let temp = currentValue.undoBuffer @ currentValue.output
@@ -699,18 +716,27 @@ module SoundChangeRule =
                     value.buffer
             let nextUndoBuffer =
                 match input with
-                | ValidInput s when Some position <> value.lastOutputOn -> s :: value.undoBuffer
+                | ValidInput s when Some position <> value.lastOutputOn ->
+                    s :: value.undoBuffer
                 | _ -> value.undoBuffer
             let nextBuffer, nextUndoBuffer, nextOutput, lastOutputOn =
-                if State.isFinal nextState
-                    then [], [], (nextBuffer @ value.output), value.lastOutputOn
-                    else nextBuffer, nextUndoBuffer, value.output, Some position
+                match value.wasLastFinal, State.isFinal nextState with
+                | false, true ->
+                    [], [], (nextBuffer @ value.output), value.lastOutputOn
+                | true, true when List.isEmpty nextBuffer ->
+                    [], [], value.output, value.lastOutputOn
+                | true, true ->
+                    // Replace last transformation if we're applying another one
+                    [], [], (nextBuffer @ List.tail value.output), value.lastOutputOn
+                | _, false ->
+                    nextBuffer, nextUndoBuffer, value.output, Some position
             printfn "%O -> %O on %c | undo: %A | buf: %A | out: %A" current nextState input nextUndoBuffer nextBuffer nextOutput
             { value with
                 undoBuffer = nextUndoBuffer
                 buffer = nextBuffer
                 output = nextOutput
                 lastOutputOn = lastOutputOn
+                wasLastFinal = State.isFinal nextState
             })
         |> onFinish (fun value ->
             value.output

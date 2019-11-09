@@ -190,17 +190,17 @@ module Node =
             | [] ->
                 List.rev out
             | x::xs ->
-                let next = 
-                    match untag x with
-                    | UtteranceNode value ->
-                        value
-                    | TransformationNode (target, result) ->
+                let nextOut = 
+                    match x with
+                    | Untag (UtteranceNode value, _) when isPresent ->
+                        value :: out
+                    | Untag (TransformationNode (target, result), _) ->
                         let utterance = if isPresent then result else target
-                        match untag utterance with
-                        | UtteranceNode value -> value
-                    | Untag (node, position) ->
-                        invalidSyntax (sprintf "Unrecognized token '%O'" node) position
-                inner xs (next :: out)
+                        match utterance with
+                        | Untag (UtteranceNode value, _) -> value :: out
+                    | _ ->
+                        out
+                inner xs nextOut
         inner (getMembers feature) []
 
     type private Transformation =
@@ -291,13 +291,13 @@ module Node =
                 result
             | x::xs ->
                 let nextSet =
-                    match untag x with
-                    | TermIdentifierNode name
-                    | SetIdentifierNode name ->
+                    match x with
+                    | Untag (TermIdentifierNode name, _)
+                    | Untag (SetIdentifierNode name, _) ->
                         tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
                         |> set
                         |> addToSet true
-                    | FeatureIdentifierNode (isPresent, name) ->
+                    | Untag (FeatureIdentifierNode (isPresent, name), _) ->
                         if features.ContainsKey(name) then
                             getFeatureMembers isPresent features.[name]
                             |> set
