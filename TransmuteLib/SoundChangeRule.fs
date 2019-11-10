@@ -13,25 +13,28 @@ module SoundChangeRule =
         static member END = '␃'
         static member JOINER = '\ufeff' //'\u200d'
 
+    type StateType = Final | NonFinal
+    type Segment = EnvironmentSegment | TargetSegment
+
     type State =
-        | State of name:string * isTarget:bool * isFinal:bool
+        | State of name: string * segment: Segment * stateType: StateType
         | MergedState of State list
         with
-            static member make name = State (name, isTarget=false, isFinal=false)
+            static member make name = State (name, TargetSegment, NonFinal)
         
             static member makeFinal = function
                 | State (name, isTarget, _) ->
-                    State (name, isTarget, isFinal=true)
+                    State (name, isTarget, Final)
                 | MergedState _ as state ->
                     failwithf "%s is a merged state; it cannot be made final" (string state)
 
-            static member makeTarget = function
+            static member makeEnvironment = function
                 | State (name, _, isFinal) ->
-                    State (name, true, isFinal)
+                    State (name, EnvironmentSegment, isFinal)
                 | MergedState states ->
                     let states =
                         states
-                        |> List.map (fun (State (name, _, isFinal)) -> State (name, true, isFinal))
+                        |> List.map (fun (State (name, _, isFinal)) -> State (name, EnvironmentSegment, isFinal))
                     MergedState states
 
             static member merge states =
@@ -48,14 +51,16 @@ module SoundChangeRule =
                 | _ -> MergedState statesToMerge
 
             static member isFinal = function
-                | State (_, _, isFinal) -> isFinal
+                | State (_, _, Final) -> true
+                | State (_, _, NonFinal) -> false
                 | MergedState states ->
                     List.exists State.isFinal states
 
-            static member isTarget = function
-                | State (_, isTarget, _) -> isTarget
+            static member isEnvironment = function
+                | State (_, EnvironmentSegment, _) -> true
+                | State (_, TargetSegment, _) -> false
                 | MergedState states ->
-                    List.exists State.isTarget states
+                    List.exists State.isEnvironment states
 
             static member name = function
                 | State (name, _, _) -> name
@@ -123,7 +128,9 @@ module SoundChangeRule =
         | Done
 
     type private TransitionType<'TState> =
+        /// A transition with a destination state that needs to be checked for deterministic transitions.
         | MaybeDeterministic of (Transition<'TState> * TransitionResult)
+        /// A transition with a destination state that either has deterministic transitions or just doesn't have any nondeterministic ones.
         | Deterministic of (Transition<'TState> * TransitionResult)
 
     let private START = State.make "S"
@@ -143,10 +150,10 @@ module SoundChangeRule =
             then Some x
             else None
 
-    let private (|IsTarget|_|) state =
+    let private (|IsEnvironment|_|) state =
         match state with
-        | State (_, true, _)
-        | MergedState ((State (_, true, _))::_) ->
+        | State (_, EnvironmentSegment, _)
+        | MergedState ((State (_, EnvironmentSegment, _))::_) ->
             Some state
         | _ ->
             None
@@ -431,7 +438,7 @@ module SoundChangeRule =
                         (fun () -> isNodeComplete)
                 let nextState =
                     match inputNode with
-                    | Environment -> State.makeTarget nextState
+                    | Environment -> State.makeEnvironment nextState
                     | _ -> nextState
                 states, nextState
 
@@ -660,19 +667,49 @@ module SoundChangeRule =
         |> onFinish (fun value -> value |> string |> Result.Ok)
         |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
 
+    type Buffer = int option * (string * int) option * string list * string list
+
+    module Buffer =
+        /// If an input symbol has been consumed, returns the result of f. Otherwise, returns the original buffer.
+        let private ifSymbolConsumedCata last position originalBuffer fNext =
+            if Some position = last
+                then originalBuffer
+                else fNext()
+
+        /// Clears the last production and applies the undo buffer.
+        let undo ((last, _, undo, output): Buffer): Buffer =
+            last, None, [], undo @ output
+
+        /// If the state being visited is final, the production is applied to the output. Otherwise, the original buffer is returned.
+        let commit isFinal (last, production, undo, output): Buffer =
+            match isFinal, production with
+            | false, _ -> last, production, undo, output
+            | true, None -> last, None, [], output
+            | true, Some (p, l) -> Some l, None, [], p :: output
+
+        /// Sets the next production
+        let produce p position ((last, production, undo, output) as buffer): Buffer =
+            ifSymbolConsumedCata
+                last position buffer
+                (fun () -> last, Some (p, position), undo, output)
+    
+        /// Pushes an input symbol to the undo buffer
+        let pushUndo s position ((last, production, undo, output) as buffer): Buffer =
+            ifSymbolConsumedCata
+                last position buffer
+                (fun () -> Some position, production, s :: undo, output)
+    
+        /// Pushes an input symbol to the output.
+        let push s position ((last, production, undo, output) as buffer): Buffer =
+            ifSymbolConsumedCata
+                last position buffer
+                (fun () -> Some position, production, undo, s :: output)
+
     type RuleMachineState = {
-        /// The output so far
-        output: string list
-        
-        /// The output so far of the current transformation
-        buffer: string list
-        
-        /// The untransformed output that would be produced if the transformation fails
-        undoBuffer: string list
+        /// The output so far of the current transformation.
+        buffer: Buffer
 
-        /// The position of the last input that generated output.
-        lastOutputOn: int option
-
+        /// Indicates whether the last state visited was a final state.
         wasLastFinal: bool
     }
 
@@ -686,60 +723,58 @@ module SoundChangeRule =
         |> withTransitions transitions
         |> withStartState START
         |> withErrorState ERROR
-        |> withInitialValue { output = []; buffer = []; undoBuffer = []; lastOutputOn = None; wasLastFinal = false }
-        |> onError (fun position input current currentValue getNextValue ->
-            let nextOutput, lastOutputOn =
-                let temp = currentValue.undoBuffer @ currentValue.output
+        |> withInitialValue { buffer = None, None, [], []; wasLastFinal = false }
+        |> onError (fun position input current value _ ->
+            let nextBuffer = Buffer.commit value.wasLastFinal value.buffer
+            let (lastOutputOn, _, _, _) = value.buffer
+            let nextBuffer =
                 match input with
-                | ValidInput s when Some position <> currentValue.lastOutputOn ->
-                    (s :: temp), Some position
+                | ValidInput s ->
+                    (nextBuffer |> Buffer.undo |> Buffer.push s position)
                 | _ ->
-                    temp, currentValue.lastOutputOn
-            printf "x %d %O:\t" position currentValue.lastOutputOn
-            printfn "Error at %O on %c | out: %A" current input nextOutput
+                    Buffer.undo nextBuffer
+            printf "x %d %O:\t" position lastOutputOn
+            printfn "Error at %O on %c | out: %A" current input nextBuffer
             Restart {
-                currentValue with
-                    output = nextOutput
-                    buffer = []
-                    undoBuffer = []
-                    lastOutputOn = lastOutputOn
+                value with buffer = nextBuffer
             })
         |> onTransition (fun position transition _ input current nextState value ->
-            printf "√ %d %O:\t" position value.lastOutputOn
+            let (lastOutputOn, _, _, _) = value.buffer
+            printf "√ %d %O:\t" position lastOutputOn
+            let isNextFinal = State.isFinal nextState
+            let nextBuffer =
+                if isNextFinal
+                    then Buffer.commit value.wasLastFinal value.buffer
+                    else value.buffer
             let nextBuffer =
                 match input, nextState, Map.tryFind transition transformations with
                 | _, _, Some transformation ->
-                    transformation :: value.buffer
-                | ValidInput s, IsTarget _, None when Some position <> value.lastOutputOn ->
-                    s :: value.buffer
+                    Buffer.produce transformation position nextBuffer
+                | ValidInput s, IsEnvironment _, None ->
+                    nextBuffer
+                    |> Buffer.commit isNextFinal
+                    |> Buffer.push s position
                 | _ ->
-                    value.buffer
-            let nextUndoBuffer =
+                    nextBuffer
+            let nextBuffer =
                 match input with
-                | ValidInput s when Some position <> value.lastOutputOn ->
-                    s :: value.undoBuffer
-                | _ -> value.undoBuffer
-            let nextBuffer, nextUndoBuffer, nextOutput, lastOutputOn =
-                match value.wasLastFinal, State.isFinal nextState with
-                | false, true ->
-                    [], [], (nextBuffer @ value.output), value.lastOutputOn
-                | true, true when List.isEmpty nextBuffer ->
-                    [], [], value.output, value.lastOutputOn
-                | true, true ->
-                    // Replace last transformation if we're applying another one
-                    [], [], (nextBuffer @ List.tail value.output), value.lastOutputOn
-                | _, false ->
-                    nextBuffer, nextUndoBuffer, value.output, Some position
-            printfn "%O -> %O on %c | undo: %A | buf: %A | out: %A" current nextState input nextUndoBuffer nextBuffer nextOutput
+                | ValidInput s ->
+                    Buffer.pushUndo s position nextBuffer
+                | _ ->
+                    nextBuffer
+            let nextBuffer =
+                let (_, production, undo, output) = nextBuffer
+                if isNextFinal
+                    then lastOutputOn, production, undo, output
+                    else Some position, production, undo, output
+            printfn "%O -> %O on %c | %A" current nextState input nextBuffer
             { value with
-                undoBuffer = nextUndoBuffer
                 buffer = nextBuffer
-                output = nextOutput
-                lastOutputOn = lastOutputOn
                 wasLastFinal = State.isFinal nextState
             })
         |> onFinish (fun value ->
-            value.output
+            let (_, _, _, output) = value.buffer
+            output
             |> List.rev
             |> String.concat String.Empty
             |> Result.Ok)
