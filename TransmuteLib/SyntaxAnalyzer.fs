@@ -1,107 +1,94 @@
 ﻿namespace TransmuteLib
 
 module SyntaxAnalyzer =
-    open TransmuteLib
+    let inline (?|>) x f =
+        match x with
+        | Ok _ -> f ()
+        | Result.Error _ -> x
 
-    let private validateRuleNode target replacement environment =
-        let rec onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) =
-            if nodes.IsEmpty then
-                ()
-            else
-                let position, node = Node.untagWithMetadata nodes.Head
-                match node with
-                | PlaceholderNode ->
-                    raise (SyntaxException (sprintf "%s segment cannot contain placeholder" kind, position))
+    let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) () =
+        match nodes with
+        | [] -> Ok ()
+        | Node.Untag (PlaceholderNode, position)::_ ->
+            Result.Error (syntaxErrorMessage (sprintf "%s segment cannot contain placeholder" kind) position)
+        | _::xs ->
+            onlyEnvironmentMayContainPlaceholderNode kind xs ()
+
+    let rec private onlyEnvironmentMayContainBoundaryNode kind (nodes: Node List) () =
+        match nodes with
+        | [] -> Ok ()
+        | Node.Untag (BoundaryNode, position)::_ ->
+            Result.Error (syntaxErrorMessage (sprintf "%s segment cannot contain boundary" kind) position)
+        | _::xs ->
+            onlyEnvironmentMayContainBoundaryNode kind xs ()
+
+    let rec private boundaryMayOnlyAppearAtEnds nodes () =
+        match nodes with
+        | [] ->
+            Ok ()
+        | Begin::(xsHead::xsRest as xs) ->
+            let rest =
+                match xsHead with
+                // BoundaryNode at beginning is OK.
+                // Skip over it because we already know about it.
+                | Item (TaggedNode (_, BoundaryNode)) ->
+                    xsRest
+                // Everything else is OK.
                 | _ ->
-                    onlyEnvironmentMayContainPlaceholderNode kind nodes.Tail
+                    xs
+            boundaryMayOnlyAppearAtEnds rest ()
+        | Item (TaggedNode (position, BoundaryNode))::xsHead::_ ->
+            match xsHead with
+            // BoundaryNode at end is OK.
+            | End ->
+                Ok ()
+            // BoundaryNode in the middle is an error.
+            | _ ->
+                Result.Error (syntaxErrorMessage "Boundary may only appear at beginning or end of the environment segment" position)
+        | _::xs ->
+            boundaryMayOnlyAppearAtEnds xs ()
 
-        let rec onlyEnvironmentMayContainBoundaryNode kind (nodes: Node List) =
-            if nodes.IsEmpty then
-                ()
-            else
-                let position, node = Node.untagWithMetadata nodes.Head
-                match node with
-                | BoundaryNode ->
-                    raise (SyntaxException (sprintf "%s segment cannot contain boundary" kind, position))
-                | _ ->
-                    onlyEnvironmentMayContainBoundaryNode kind nodes.Tail
-
-        let rec boundaryMayOnlyAppearAtEnds nodes =
+    let private onlyOnePlaceholderNodeIsAllowed nodes () =
+        let rec validateInternal (nodes: Node List) found =
             match nodes with
-            | [] ->
-                ()
-            | Begin::xs ->
-                let rest =
-                    match xs.Head with
-                    // BoundaryNode at beginning is OK.
-                    // Skip over it because we already know about it.
-                    | Item (TaggedNode (_, BoundaryNode)) ->
-                        xs.Tail
-                    // Everything else is OK.
-                    | _ ->
-                        xs
-                boundaryMayOnlyAppearAtEnds rest
-            | Item (TaggedNode (position, BoundaryNode))::xs ->
-                match xs.Head with
-                // BoundaryNode at end is OK.
-                | End ->
-                    ()
-                // BoundaryNode in the middle is an error.
-                | _ ->
-                    raise (SyntaxException ("Boundary may only appear at beginning or end of the environment segment", position))
+            | [] -> Ok ()
+            | Node.Untag (PlaceholderNode, position)::_ ->
+                if found then
+                    Result.Error (syntaxErrorMessage "Placeholder may not occur more than once" position)
+                else
+                    validateInternal nodes.Tail true
             | _::xs ->
-                boundaryMayOnlyAppearAtEnds xs
+                validateInternal xs found
+        validateInternal nodes false
 
-        let onlyOnePlaceholderNodeIsAllowed nodes =
-            let rec validateInternal (nodes: Node List) found =
-                if nodes.IsEmpty then
-                    ()
-                else
-                    let position, node = Node.untagWithMetadata nodes.Head
-                    match node with
-                    | PlaceholderNode ->
-                        if found then
-                            raise (SyntaxException ("Placeholder may not occur more than once", position))
-                        else
-                            validateInternal nodes.Tail true
-                    | _ ->
-                        validateInternal nodes.Tail found
-            validateInternal nodes false
-
-        let optionalNodeMayNotBeEmpty nodes =
-            let rec validateInternal (nodes: Node list) =
-                if nodes.IsEmpty then
-                    ()
-                else
-                    let position, node = Node.untagWithMetadata nodes.Head
-                    match node with
-                    | OptionalNode [] ->
-                        raise (SyntaxException ("Optional node may not be empty", position))
-                    | _ ->
-                        validateInternal nodes.Tail
-            validateInternal nodes
-                
-        onlyEnvironmentMayContainBoundaryNode "Target" target
-        onlyEnvironmentMayContainBoundaryNode "Replacement" replacement
-        onlyEnvironmentMayContainPlaceholderNode "Target" target
-        onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
-        onlyOnePlaceholderNodeIsAllowed environment
-        boundaryMayOnlyAppearAtEnds (BoundedList.fromList environment)
-        optionalNodeMayNotBeEmpty environment
-
-    let validate (nodes: Node list) =
+    let private optionalNodeMayNotBeEmpty nodes () =
         let rec validateInternal (nodes: Node list) =
-            if nodes.IsEmpty then
-                OK
-            else
-                match nodes with
-                | TaggedNode (_, RuleNode (target, replacement, environment))::_ ->
-                    validateRuleNode target replacement environment
-                    validateInternal nodes.Tail
-                | _ ->
-                    validateInternal nodes.Tail
-        try
-            validateInternal nodes
-        with
-            :? SyntaxException as ex ->
-                SyntaxError (ex.Message, ex.Position)
+            match nodes with
+            | [] -> Ok ()
+            | Node.Untag (OptionalNode [], position)::_ ->
+                Result.Error (syntaxErrorMessage "Optional node may not be empty" position)
+            | _ ->
+                validateInternal nodes.Tail
+        validateInternal nodes
+
+    let private validateRuleNode target replacement environment =                
+        Ok ()
+        ?|> onlyEnvironmentMayContainBoundaryNode "Target" target
+        ?|> onlyEnvironmentMayContainBoundaryNode "Replacement" replacement
+        ?|> onlyEnvironmentMayContainPlaceholderNode "Target" target
+        ?|> onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
+        ?|> onlyOnePlaceholderNodeIsAllowed environment
+        ?|> boundaryMayOnlyAppearAtEnds (BoundedList.fromList environment)
+        ?|> optionalNodeMayNotBeEmpty environment
+
+    let validate nodes =
+        let rec validateInternal nodes =
+            match nodes with
+            | [] -> Ok ()
+            | TaggedNode (_, RuleNode (target, replacement, environment))::xs ->
+                validateRuleNode target replacement environment
+                validateInternal xs
+            | _::xs ->
+                validateInternal xs
+
+        validateInternal nodes

@@ -1,5 +1,7 @@
 ﻿namespace TransmuteLib
 
+open System.Collections.Generic
+
 type Node =
     /// Represents a comment.
     | CommentNode of string
@@ -40,7 +42,7 @@ type Node =
     /// Defines a list of nodes that may be optionally matched.
     | OptionalNode of Node list
 
-    /// Defines a set of lists of nodes, only one of which may be matched.
+    /// Defines a set of lists of nodes, of which only one may be matched.
     | DisjunctNode of Node list list
 
     /// Represents a node tagged with metadata.
@@ -83,7 +85,7 @@ type Node =
             |> sprintf "(%s)"
         | DisjunctNode branches ->
             branches
-            |> List.collect (List.map string)
+            |> List.map (List.map string >> String.concat "")
             |> String.concat "|"
             |> sprintf "(%s)"
         | RuleNode (target, replacement, environment) ->
@@ -94,8 +96,6 @@ type Node =
 
 /// Provides functions on the Node type.
 module Node =
-    open System
-
     let tag node position =
         TaggedNode (position, node)
 
@@ -107,13 +107,10 @@ module Node =
         | x ->
             x
 
-    /// Retrieves the metadata and inner node of a tagged node.
-    let inline untagWithMetadata taggedNode =
-        match taggedNode with
-        | TaggedNode (position, node) ->
-            position, node
-        | x ->
-            (0, 0), x
+    let (|Untag|_|) node =
+        match node with
+        | TaggedNode (position, inner) -> Some (inner, position)
+        | _ -> Some (node, (0, 0))
 
     /// Gets the left string value of a TransformationNode.
     let getLeft node =
@@ -159,7 +156,7 @@ module Node =
                 | FeatureDefinitionNode (name, _) as node ->
                     Some (name, node)
                 | _ -> None)
-        |> dict
+        |> Map.ofSeq
 
     let getMembers feature =
         match feature with
@@ -180,7 +177,7 @@ module Node =
                 | SetDefinitionNode (name, members) ->
                     Some (name, SetDefinitionNode (name, members))
                 | _ -> None)
-        |> dict
+        |> Map.ofSeq
 
     /// <summary>
     /// Gets the members of the feature.
@@ -193,35 +190,53 @@ module Node =
             | [] ->
                 List.rev out
             | x::xs ->
-                let next = 
-                    match untag x with
-                    | UtteranceNode value ->
-                        value
-                    | TransformationNode (target, result) ->
+                let nextOut = 
+                    match x with
+                    | Untag (UtteranceNode value, _) when isPresent ->
+                        value :: out
+                    | Untag (TransformationNode (target, result), _) ->
                         let utterance = if isPresent then result else target
-                        match untag utterance with
-                        | UtteranceNode value -> value
-                    | x ->
-                        let position, node = untagWithMetadata x
-                        Exceptions.invalidSyntax position (sprintf "Unrecognized token '%s'" (string node))
-                inner xs (next :: out)
+                        match utterance with
+                        | Untag (UtteranceNode value, _) -> value :: out
+                    | _ ->
+                        out
+                inner xs nextOut
         inner (getMembers feature) []
 
+    type private Transformation =
+        | Add of target: string * result: string
+        | Remove of target: string * result: string
+
+    /// Returns a map of phonemes that can be transformed to add the feature, and
+    /// a map of phonemes that can be transformed to remove the feature.
     let getTransformations feature =
-        feature
-        |> getMembers
-        |> List.choose (fun m ->
-            match m with
-            | TaggedNode (_, TransformationNode (target, result)) ->
-                let target = getStringValue target
-                let result = getStringValue result
-                Some [
-                    target, result
-                    result, target
-                ]
-            | _ -> None)
-        |> List.concat
-        |> Map.ofSeq
+        let transformations =
+            feature
+            |> getMembers
+            |> List.choose (fun m ->
+                match m with
+                | TaggedNode (_, TransformationNode (target, result)) ->
+                    let target = getStringValue target
+                    let result = getStringValue result
+                    Some [
+                        Add (target, result)
+                        Remove (result, target)
+                    ]
+                | _ -> None)
+            |> List.concat
+        let additions =
+            transformations
+            |> List.choose (function
+                | Add (target, result) -> Some (target, result)
+                | Remove _ -> None)
+            |> Map.ofSeq
+        let removals =
+            transformations
+            |> List.choose (function
+                | Remove (target, result) -> Some (target, result)
+                | Add _ -> None)
+            |> Map.ofSeq
+        additions, removals
 
     /// <summary>
     /// Gets the members of the set.
@@ -241,3 +256,60 @@ module Node =
         |> List.collect List.concat
         |> set
 
+    /// <summary>
+    /// Tries to execute a function that retrieves a type of object (set, feature, etc.). If the function
+    /// throws a KeyNotFoundException, throws a SyntaxException.
+    /// </summary>
+    /// <param name="fn">The function to try.</param>
+    /// <param name="kind">The kind of object being retrieved.</param>
+    /// <param name="node">The node naming the object to retrieve.</param>
+    /// <param name="name">The name of the object being retireved.</param>
+    let private tryFindSetOrFeature fn kind node name =
+        try fn()
+        with
+            | :? KeyNotFoundException ->
+                let msg = sprintf "'%s' '%s' not defined" kind name
+                match node with
+                | TaggedNode (pos, _) -> invalidSyntax msg pos
+                | _ -> invalidSyntax msg (1, 1)
+
+    /// <summary>
+    /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.
+    /// </summary>
+    /// <param name="sets">The available sets.</param>
+    /// <param name="features">The available features.</param>
+    /// <param name="setIdentifier"></param>
+    let setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setIdentifier =
+        let rec inner (terms: Node list) (result: Set<string>) =
+            let addToSet isPresent s =
+                if isPresent
+                    then Set.intersect result s
+                    else Set.difference result s
+
+            match terms with
+            | [] ->
+                result
+            | x::xs ->
+                let nextSet =
+                    match x with
+                    | Untag (TermIdentifierNode name, _)
+                    | Untag (SetIdentifierNode name, _) ->
+                        tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
+                        |> set
+                        |> addToSet true
+                    | Untag (FeatureIdentifierNode (isPresent, name), _) ->
+                        if features.ContainsKey(name) then
+                            getFeatureMembers isPresent features.[name]
+                            |> set
+                            |> Set.intersect result
+                        elif sets.ContainsKey(name) then
+                            let setMembers = getSetMembers sets.[name] |> set
+                            if isPresent
+                                then Set.intersect result setMembers
+                                else Set.difference result setMembers
+                        else
+                            failwithf "%s is not defined" name
+                    | Untag (node, position) ->
+                        invalidSyntax (sprintf "Unexpected token '%O'" node) position
+                inner xs nextSet
+        inner setIdentifier alphabet |> List.ofSeq

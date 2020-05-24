@@ -68,7 +68,6 @@ type Token =
     }
 
 type Token with
-    static member identity token = token
     static member make tokenType position value =
         { tokenType = tokenType;
           position = position;
@@ -77,16 +76,18 @@ type Token with
 
 type TokenType with
     /// <summary>
-    /// Returns the token created with this type unmodified.
+    /// Creates the matched token and returns it unmodified.
     /// </summary>
-    member this.Identity () =
-        (this, Token.identity)
+    member this.id position value =
+        { tokenType = this; position = position; value = value }
+
+
     /// <summary>
-    /// Applies the function to modify the matched token.
+    /// Creates the matched token and applies a function to it.
     /// </summary>
     /// <param name="fn"></param>
-    member this.Then (fn: Token -> Token) =
-        (this, fn)
+    member this.apply (fn: (Token -> Token)) position value =
+        fn { tokenType = this; position = position; value = value }
 
 module Token =
     /// Matches a token on its type.
