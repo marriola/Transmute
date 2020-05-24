@@ -1,13 +1,12 @@
-﻿namespace TransmuteLib
+﻿// TODO: cleanup (make nested functions module-level and private)
 
-open System
-open System.Collections.Generic
+namespace TransmuteLib
+
 open Node
 open StateMachine
+open System
 
 module SoundChangeRule =
-    open System.Text
-
     type private Special =
         static member START = '␂'
         static member END = '␃'
@@ -20,14 +19,36 @@ module SoundChangeRule =
         | State of name: string * segment: Segment * stateType: StateType
         | MergedState of State list
         with
+            /// Returns the state's name.
+            static member name = function
+                | State (name, _, _) -> name
+                | MergedState states ->
+                    states
+                    |> Seq.map State.name
+                    |> String.concat (string Special.JOINER)
+
+            /// Returns the ordinal part of a state's name (e.g. "q5" -> 5), -1 if the state name contains no ordinal part,
+            /// or throws an exception if given a merged state.
+            static member ord = function
+                | State (name, _, _) ->
+                    match name.[1..] with
+                    | "" -> -1
+                    | x -> int x
+                | MergedState _ ->
+                    failwith "Merged states have no ordinal"
+
+            /// Creates a non-final state marked as matching input in the target segment.
             static member make name = State (name, TargetSegment, NonFinal)
         
+            /// Marks a state as being final.
             static member makeFinal = function
                 | State (name, isTarget, _) ->
                     State (name, isTarget, Final)
                 | MergedState _ as state ->
                     failwithf "%s is a merged state; it cannot be made final" (string state)
 
+
+            /// Marks a state as corresponding to input matched in the environment segment.
             static member makeEnvironment = function
                 | State (name, _, isFinal) ->
                     State (name, EnvironmentSegment, isFinal)
@@ -37,6 +58,7 @@ module SoundChangeRule =
                         |> List.map (fun (State (name, _, isFinal)) -> State (name, EnvironmentSegment, isFinal))
                     MergedState states
 
+            /// Merges a list of states into one merged state.
             static member merge states =
                 let statesToMerge =
                     states
@@ -50,32 +72,19 @@ module SoundChangeRule =
                 | [state] -> state
                 | _ -> MergedState statesToMerge
 
+            /// Returns a boolean indicating whether the state is final.
             static member isFinal = function
                 | State (_, _, Final) -> true
                 | State (_, _, NonFinal) -> false
                 | MergedState states ->
                     List.exists State.isFinal states
 
+            /// Returns a boolean indicating whether the state corresponds to input matched in the environment segment.
             static member isEnvironment = function
                 | State (_, EnvironmentSegment, _) -> true
                 | State (_, TargetSegment, _) -> false
                 | MergedState states ->
                     List.exists State.isEnvironment states
-
-            static member name = function
-                | State (name, _, _) -> name
-                | MergedState states ->
-                    states
-                    |> Seq.map State.name
-                    |> String.concat (string Special.JOINER)
-
-            static member ord = function
-                | State (name, _, _) ->
-                    match name.[1..] with
-                    | "" -> -1
-                    | x -> int x
-                | MergedState _ ->
-                    failwith "Merged states have no ordinal"
 
             override this.ToString() =
                 if State.isFinal this
@@ -150,6 +159,14 @@ module SoundChangeRule =
             then Some x
             else None
 
+    let private (|IsTarget|_|) state =
+        match state with
+        | State (_, TargetSegment, _)
+        | MergedState ((State (_, TargetSegment, _))::_) ->
+            Some state
+        | _ ->
+            None
+
     let private (|IsEnvironment|_|) state =
         match state with
         | State (_, EnvironmentSegment, _)
@@ -166,6 +183,7 @@ module SoundChangeRule =
                 Some t
             | _ -> None)
 
+    // TODO: pull this out into its own module in another file
     let private convertToDfa (table: Transition<State> list) (transformations: Transformation list) =
         let table = augment table transformations
 
@@ -225,6 +243,7 @@ module SoundChangeRule =
                     inner transitions (nextStates @ xs) (followTransitions @ result)
             inner transitions [state] []
 
+        // TODO: refactor this 8 level indented beast
         /// <summary>
         /// Recursively follows the destination of each transition to a state that has non-epsilon
         /// transitions, eliminating any that have only epsilon transitions.
@@ -343,8 +362,11 @@ module SoundChangeRule =
 
         let rec convertToDfa' stack dfaTransitions =
             match stack with
-            | [] -> List.ofSeq dfaTransitions
-            | x::stack when x = ERROR -> convertToDfa' stack dfaTransitions
+            | [] -> 
+                dfaTransitions
+                |> List.ofSeq
+            | x::stack when x = ERROR ->
+                convertToDfa' stack dfaTransitions
             | current::stack ->
                 // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
@@ -365,15 +387,15 @@ module SoundChangeRule =
                     |> Set.union dfaTransitions
                 convertToDfa' nextStack nextTransitions
 
-        printf "NFA:\n\n"
-        table
-        |> List.sortBy (fun ((From origin, input, dest), result) -> (State.ord origin, input, dest), result)
-        |> List.indexed
-        |> List.map (fun (i, ((From origin, input, To dest), result)) ->
-            let t = sprintf "(%O, %O)" origin input
-            sprintf "%d.\t%-25s-> %O, %O" i t dest result)
-        |> String.concat "\n"
-        |> Console.WriteLine
+        //printf "NFA:\n\n"
+        //table
+        //|> List.sortBy (fun ((From origin, input, dest), result) -> (State.ord origin, input, dest), result)
+        //|> List.indexed
+        //|> List.map (fun (i, ((From origin, input, To dest), result)) ->
+        //    let t = sprintf "(%O, %O)" origin input
+        //    sprintf "%d.\t%-25s-> %O, %O" i t dest result)
+        //|> String.concat "\n"
+        //|> Console.WriteLine
 
         convertToDfa' [START] Set.empty
 
@@ -393,24 +415,24 @@ module SoundChangeRule =
         /// <param name="fGiveInput">Gives a node representing a single input symbol if inside the result section; otherwise, always gives None and the original result.</param>
         /// <param name="isAtBeginning">True if none of <c>input</c> has been processed yet; otherwise, false.</param>
         /// <param name="isSubtreeFinal">True if the last state in the subtree should be final.</param>
-        let rec buildStateMachine' states (input: Node list) (result: Node list) transitions transformations inputNode inputPosition subtreePosition current =
+        let rec buildStateMachine' states (input: Node list) (result: Node list) transitions transformations inputNode inputPosition subtreePosition parentPosition current =
             /// <summary>
-            /// When visiting result nodes, consumes and gives a node representing a single input symbol from the result.
+            /// When visiting result nodes, consumes a single input symbol and returns a node representing it.
             /// When visiting environment nodes or when there is no result left to give, consumes nothing and gives nothing.
             /// </summary>
             /// <remarks>
-            /// Utterance nodes are handled by returning an UtteranceNode containing the first character
-            /// in the utterance, and replacing the head result node with an UtteranceNode containing the remainder.
-            /// The only other nodes allowed in the result section, SetIdentifierNode and CompoundSetIdentifierNode,
-            /// are taken from the result unmodified.
+            /// Utterance nodes are consumed one symbol at a time by returning an UtteranceNode containing the first
+            /// character in the utterance, and replacing the head result node with an UtteranceNode containing the
+            /// remainder. The only other nodes allowed in the result section, SetIdentifierNode and
+            /// CompoundSetIdentifierNode, are taken from the result unmodified.
             /// </remarks>
             let giveResult result =
                 match inputNode, result with
                 | Environment, _
                 | Placeholder, [] ->
                     None, result
-                | Placeholder, TaggedNode (_, node)::xs
-                | Placeholder, node::xs ->
+                | Placeholder, TaggedNode (_, node)::xs ->
+                //| Placeholder, node::xs
                     Some node, xs
             let inline giveTrue () = true
             let inline giveFalse () = false
@@ -464,7 +486,7 @@ module SoundChangeRule =
                 | _ -> transformations
 
             /// Creates a series of states and transitions that match each character of an utterance.
-            let transformUtterance utterance =
+            let transformUtterance utterance isSegmentComplete =
                 // TODO: make sure that input gets added to buffer when outside placeholder node
                 let rec innerTransformUtterance input result states transitions transformations next =
                     match input with
@@ -473,7 +495,7 @@ module SoundChangeRule =
                         let transformations = addUtteranceTransformation transformations (List.head transitions) resultNode utterance
                         states, result, transitions, transformations, next
                     | c::xs ->
-                        let states, target = getNextState states (List.isEmpty xs)
+                        let states, target = getNextState states (isSegmentComplete && List.isEmpty xs)
                         let transitions = (From next, OnChar c, To target) :: transitions
                         innerTransformUtterance xs result states transitions transformations target
 
@@ -499,8 +521,8 @@ module SoundChangeRule =
 
             /// Computes the intersection of a list of feature and set identifiers, and creates a
             /// tree of states and transitions that match each member of the resulting set.
-            let transformSet setDesc =
-                let states, terminator = getNextState states true
+            let transformSet setDesc isEndOfSubtree =
+                let states, terminator = getNextState states isEndOfSubtree
 
                 let rec innerTransformSet states transitions transformations curState tree =
                     match tree with
@@ -520,9 +542,13 @@ module SoundChangeRule =
                                     | PrefixTree.Leaf value ->
                                         // No more input symbols. Create a transition to the terminator state.
                                         let t = From curState, OnEpsilon, To terminator
-                                        let transitions = t :: transitions
-                                        let transformations, result = addSetTransformation value t transformations result
-                                        states, result, transitions, transformations
+                                        let nextTransformations, nextResult = addSetTransformation value t transformations result
+                                        let nextTransitions = t :: transitions
+                                        states, nextResult, nextTransitions, nextTransformations
+                                        //if nextTransformations = transformations then
+                                        //    states, result, nextTransitions, transformations
+                                        //else
+                                        //    states, nextResult, nextTransitions, nextTransformations
                                     | PrefixTree.Root _ ->
                                         failwith "A Root should never be the descendant of another node")
                                 (states, result, transitions, transformations)
@@ -531,13 +557,14 @@ module SoundChangeRule =
                     | PrefixTree.Leaf _ ->
                         states, result, transitions, transformations, curState
 
-                PrefixTree.fromSetIntersection features sets setDesc
+                setDesc
+                |> PrefixTree.fromSetIntersection features sets
                 |> innerTransformSet states transitions transformations current
 
             let transformOptional children =
                 let states, lastState = getNextState states (isInputAtEnd input)
                 let states, result, transitions, transformations, subtreeLast =
-                    buildStateMachine' states children result transitions transformations inputNode InputNoninitial SubtreeNonfinal current
+                    buildStateMachine' states children result transitions transformations inputNode InputNoninitial SubtreeNonfinal subtreePosition current
                 let transitions =
                     [ From current, OnEpsilon, To lastState
                       From subtreeLast, OnEpsilon, To lastState ]
@@ -557,7 +584,7 @@ module SoundChangeRule =
                                     then SubtreeFinal
                                     else SubtreeNonfinal
                             let subtree =
-                                buildStateMachine' states branch result transitions transformations inputNode inputPosition innerSubtreePosition current //subtreePosition
+                                buildStateMachine' states branch result transitions transformations inputNode inputPosition innerSubtreePosition subtreePosition current //subtreePosition
                             subtree :: acc)
                         branches
                         [ states, result, transitions, transformations, current ]
@@ -581,8 +608,11 @@ module SoundChangeRule =
                 match input with
                 | [] ->
                     Done
-                | TaggedNode (_, node)::_
-                | node::_ ->
+                | TaggedNode (_, node)::xs ->
+                    let isEndOfSubtree =
+                        SubtreeFinal = parentPosition
+                        && SubtreeFinal = subtreePosition
+                        && List.isEmpty xs
                     match node with
                     | BoundaryNode ->
                         let boundaryChar =
@@ -591,17 +621,17 @@ module SoundChangeRule =
                             | InputNoninitial -> Special.END
                         HasNext (matchCharacter boundaryChar)
                     | UtteranceNode utterance ->
-                        HasNext (transformUtterance utterance)
+                        HasNext (transformUtterance utterance isEndOfSubtree)
                     | CompoundSetIdentifierNode setDesc ->
-                        HasNext (transformSet setDesc)
+                        HasNext (transformSet setDesc isEndOfSubtree)
                     | SetIdentifierNode _ as id ->
-                        HasNext (transformSet [ id ])
+                        HasNext (transformSet [ id ] isEndOfSubtree)
                     | PlaceholderNode ->
-                        let subtreePosition =
+                        let subsubtreePosition =
                             match isInputAtEnd input with
                             | true -> SubtreeFinal
                             | false -> SubtreeNonfinal
-                        HasNext (buildStateMachine' states target result transitions transformations Placeholder InputNoninitial subtreePosition current)
+                        HasNext (buildStateMachine' states target result transitions transformations Placeholder InputNoninitial subsubtreePosition subtreePosition current)
                     | OptionalNode children ->
                         HasNext (transformOptional children)
                     | DisjunctNode branches ->
@@ -616,11 +646,11 @@ module SoundChangeRule =
                 let input, subtreePosition =
                     // We're consuming the top symbol, so the next one we consume will produce final transitions.
                     match input with
-                    | [_; x] ->
+                    | [_; x] when parentPosition = SubtreeFinal ->
                         [x], SubtreeFinal
                     | _::xs ->
                         xs, SubtreeNonfinal
-                buildStateMachine' states input result transitions transformations inputNode InputNoninitial subtreePosition theNext
+                buildStateMachine' states input result transitions transformations inputNode InputNoninitial subtreePosition parentPosition theNext
 
         let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
 
@@ -630,7 +660,7 @@ module SoundChangeRule =
             | _ -> SubtreeNonfinal
 
         let _, _, transitions, transformations, _ =
-            buildStateMachine' initialStates environment result List.empty List.empty Environment InputInitial initialSubtreePosition START
+            buildStateMachine' initialStates environment result List.empty List.empty Environment InputInitial initialSubtreePosition SubtreeFinal START
 
         let dfa = convertToDfa (List.rev transitions) transformations
 
@@ -667,116 +697,202 @@ module SoundChangeRule =
         |> onFinish (fun value -> value |> string |> Result.Ok)
         |> runStateMachine (sprintf "%c%s%c" Special.START word Special.END)
 
-    type Buffer = int option * (string * int) option * string list * string list
+    /// Returns the original value if input is the special begin or end symbol.
+    /// Otherwise, returns the result of fTransform.
+    let private specialSymbolCata input value fTransform =
+        match input with
+        | x when x = Special.START || x = Special.END ->
+            value
+        | _ ->
+            fTransform()
 
-    module Buffer =
-        /// If an input symbol has been consumed, returns the result of f. Otherwise, returns the original buffer.
-        let private ifSymbolConsumedCata last position originalBuffer fNext =
-            if Some position = last
-                then originalBuffer
-                else fNext()
+    /// An input symbol tagged with the segment it came from and its position.
+    type EnvironmentString =
+        | FromTarget of input: string * position: int
+        | FromEnvironment of input: string * position: int
+        with
+            /// Gets the input symbol.
+            static member get = function
+                | FromEnvironment (s, _)
+                | FromTarget (s, _) -> s
 
-        /// Clears the last production and applies the undo buffer.
-        let undo ((last, _, undo, output): Buffer): Buffer =
-            last, None, [], undo @ output
+            /// Adds the input symbol c to xs.
+            static member add c xs =
+                specialSymbolCata
+                    c xs
+                    (fun () -> string c :: xs)
 
-        /// If the state being visited is final, the production is applied to the output. Otherwise, the original buffer is returned.
-        let commit isFinal (last, production, undo, output): Buffer =
-            match isFinal, production with
-            | false, _ -> last, production, undo, output
-            | true, None -> last, None, [], output
-            | true, Some (p, l) -> Some l, None, [], p :: output
+            /// Tags the input symbol c with its position and adds it to xs.
+            static member addWithPosition c position xs =
+                specialSymbolCata
+                    c xs
+                    (fun () -> (string c, position) :: xs)
 
-        /// Sets the next production
-        let produce p position ((last, production, undo, output) as buffer): Buffer =
-            ifSymbolConsumedCata
-                last position buffer
-                (fun () -> last, Some (p, position), undo, output)
-    
-        /// Pushes an input symbol to the undo buffer
-        let pushUndo s position ((last, production, undo, output) as buffer): Buffer =
-            ifSymbolConsumedCata
-                last position buffer
-                (fun () -> Some position, production, s :: undo, output)
-    
-        /// Pushes an input symbol to the output.
-        let push s position ((last, production, undo, output) as buffer): Buffer =
-            ifSymbolConsumedCata
-                last position buffer
-                (fun () -> Some position, production, undo, s :: output)
+            /// Tags the input symbol as originating from the target segment and adds it to xs.
+            static member addTarget position c xs =
+                specialSymbolCata
+                    c xs
+                    (fun () -> (FromTarget (string c, position)) :: xs)
+
+            /// Tags the input symbol as originating from the environment segment and adds it to xs.
+            static member addEnvironment position c xs =
+                specialSymbolCata
+                    c xs
+                    (fun () -> (FromEnvironment (string c, position)) :: xs)
+
+            /// Concatenates all inputs in s to xs.
+            static member concatAll inputs xs =
+                List.map EnvironmentString.get inputs @ xs
+
+            /// Concatenates all environment segment inputs in s to xs.
+            static member concatEnvironment s xs =
+                let environmentInputs =
+                    s
+                    |> List.choose (function
+                        | FromEnvironment (s', _) ->
+                            Some s'
+                        | _ ->
+                            None)
+                environmentInputs @ xs
+
+            /// Concatenates all position-tagged environment segment inputs to xs and sorts by position.
+            static member concatEnvironmentWithPosition s xs =
+                let environmentInputs =
+                    s
+                    |> List.choose (function
+                        | FromEnvironment (s', p) ->
+                            Some (s', p)
+                        | _ ->
+                            None)
+                environmentInputs @ xs
+                |> List.sortByDescending snd
 
     type RuleMachineState = {
-        /// The output so far of the current transformation.
-        buffer: Buffer
+        /// Indicates whether the rule has begun to match to the input.
+        isPartialMatch: bool
 
         /// Indicates whether the last state visited was a final state.
         wasLastFinal: bool
+
+        /// The last input position visited.
+        lastOutputOn: int option
+
+        /// The current production.
+        production: (string * int) list
+
+        /// The undo buffer.
+        undo: EnvironmentString list
+
+        /// The output buffer.
+        output: string list
     }
 
-    let transform (transitions, transformations) word =
-        let (|ValidInput|_|) input =
-            if input = Special.START || input = Special.END
-                then None
-                else Some (string input)
-
+    let transform verbose (transitions, transformations) word =
         stateMachineConfig()
         |> withTransitions transitions
         |> withStartState START
         |> withErrorState ERROR
-        |> withInitialValue { buffer = None, None, [], []; wasLastFinal = false }
+        |> withInitialValue {
+            isPartialMatch = false
+            wasLastFinal = false
+            lastOutputOn = None
+            production = []
+            undo = []
+            output = []
+        }
         |> onError (fun position input current value _ ->
-            let nextBuffer = Buffer.commit value.wasLastFinal value.buffer
-            let (lastOutputOn, _, _, _) = value.buffer
-            let nextBuffer =
-                match input with
-                | ValidInput s ->
-                    (nextBuffer |> Buffer.undo |> Buffer.push s position)
-                | _ ->
-                    Buffer.undo nextBuffer
-            printf "x %d %O:\t" position lastOutputOn
-            printfn "Error at %O on %c | out: %A" current input nextBuffer
+            let nextOutput =
+                match value.isPartialMatch, value.wasLastFinal with
+                // The rule failed to match
+                | true, false ->
+                    EnvironmentString.concatAll value.undo value.output
+                // The rule failed to match completely, but what did match was enough to commit the production.
+                | true, true ->
+                    // undo and production will never be populated at the same time
+                    (List.map fst value.production) @ EnvironmentString.concatAll value.undo value.output
+                // The rule has not yet begun to match.
+                | false, _ ->
+                    EnvironmentString.add input value.output
+            if verbose then
+                printf "x %2d %c %8O: " position input value.lastOutputOn
+                printfn "%-20s | %O %A %A %A"
+                    (sprintf "Error at %O" current)
+                    position
+                    []
+                    []
+                    nextOutput
             Restart {
-                value with buffer = nextBuffer
+                value with
+                    isPartialMatch = false
+                    lastOutputOn = Some position
+                    production = []
+                    undo = []
+                    output = nextOutput
             })
         |> onTransition (fun position transition _ input current nextState value ->
-            let (lastOutputOn, _, _, _) = value.buffer
-            printf "√ %d %O:\t" position lastOutputOn
+            let { lastOutputOn = lastOutputOn; production = production; undo = undo; output = output } = value
+            if verbose then
+                printf "√ %2d %c %8O: " position input lastOutputOn
             let isNextFinal = State.isFinal nextState
-            let nextBuffer =
-                if isNextFinal
-                    then Buffer.commit value.wasLastFinal value.buffer
-                    else value.buffer
-            let nextBuffer =
-                match input, nextState, Map.tryFind transition transformations with
-                | _, _, Some transformation ->
-                    Buffer.produce transformation position nextBuffer
-                | ValidInput s, IsEnvironment _, None ->
-                    nextBuffer
-                    |> Buffer.commit isNextFinal
-                    |> Buffer.push s position
+            let tf = Map.tryFind transition transformations
+            let nextUndo, nextProduction, nextOutput =
+                match isNextFinal, nextState, tf with
+                // Completed match in environment segment with no transformation.
+                // Commit the input symbol and combine the undo and production buffers.
+                | true, IsEnvironment _, None ->
+                    let nextProduction =
+                        production
+                        |> EnvironmentString.addWithPosition input position
+                        |> EnvironmentString.concatEnvironmentWithPosition undo
+                    [], nextProduction, output
+                // Completed match with a transformation.
+                // Set production to the output of the transformation and add undo to output.
+                | true, IsEnvironment _, Some tf'
+                | true, IsTarget _, Some tf' ->
+                    let nextProduction = [tf', position]
+                    [], nextProduction, EnvironmentString.concatEnvironment undo output
+                // Partial match in environment segment.
+                // Add input to undo.
+                | false, IsEnvironment _, _ ->
+                    let nextUndo = EnvironmentString.addEnvironment position input undo
+                    nextUndo, production, output
+                // Partial match in target segment with a transformation.
+                // Set production to the output of the transformation and add input to undo.
+                | false, IsTarget _, Some tf' ->
+                    let nextProduction = [tf', position]
+                    let nextUndo = EnvironmentString.addTarget position input undo
+                    nextUndo, nextProduction, output
+                // Partial match in target segment with no transformation.
+                // Add input to undo.
+                | false, IsTarget _, None ->
+                    let nextUndo = EnvironmentString.addTarget position input undo
+                    nextUndo, production, output
                 | _ ->
-                    nextBuffer
-            let nextBuffer =
-                match input with
-                | ValidInput s ->
-                    Buffer.pushUndo s position nextBuffer
-                | _ ->
-                    nextBuffer
-            let nextBuffer =
-                let (_, production, undo, output) = nextBuffer
-                if isNextFinal
-                    then lastOutputOn, production, undo, output
-                    else Some position, production, undo, output
-            printfn "%O -> %O on %c | %A" current nextState input nextBuffer
+                    undo, production, output
+            //let nextBuffer = Buffer (Some position, nextProduction, nextUndo, nextOutput)
+            if verbose then
+                printfn "%-20s | %O %A %A %A"
+                    (sprintf "%O -> %O" current nextState)
+                    position
+                    nextProduction
+                    nextUndo
+                    nextOutput
             { value with
-                buffer = nextBuffer
-                wasLastFinal = State.isFinal nextState
+                isPartialMatch = true
+                wasLastFinal = isNextFinal
+                lastOutputOn = Some position
+                production = nextProduction
+                undo = nextUndo
+                output = nextOutput
             })
         |> onFinish (fun value ->
-            let (_, _, _, output) = value.buffer
-            output
+            // Flush last production
+            let nextOutput =
+                match value.wasLastFinal, value.production with
+                | false, _ -> value.output
+                | true, [] -> (List.map EnvironmentString.get value.undo) @ value.output
+                | true, _ -> (List.map fst value.production) @ value.output
+            nextOutput
             |> List.rev
-            |> String.concat String.Empty
-            |> Result.Ok)
+            |> String.concat String.Empty)
         |> runStateMachine (string Special.START + word + string Special.END)
-        

@@ -42,7 +42,7 @@ type Node =
     /// Defines a list of nodes that may be optionally matched.
     | OptionalNode of Node list
 
-    /// Defines a set of lists of nodes, only one of which may be matched.
+    /// Defines a set of lists of nodes, of which only one may be matched.
     | DisjunctNode of Node list list
 
     /// Represents a node tagged with metadata.
@@ -85,7 +85,7 @@ type Node =
             |> sprintf "(%s)"
         | DisjunctNode branches ->
             branches
-            |> List.collect (List.map string)
+            |> List.map (List.map string >> String.concat "")
             |> String.concat "|"
             |> sprintf "(%s)"
         | RuleNode (target, replacement, environment) ->

@@ -79,23 +79,20 @@ module StateMachine =
     /// <param name="inputSymbol">The input symbol to transition on.</param>
     /// <param name="errorState">The error state to transition to if no other transition can be taken.</param>
     let step errorState (transitionTable: TransitionTable<'a>) currentState inputSymbol =
-        let transition = currentState, OnChar inputSymbol
-        let transitionOnEpsilon = currentState, OnEpsilon
-        let transitionOnAny = currentState, OnAny
-        let inputSymbol, dest = 
-            if transitionTable.ContainsKey(transition) then
-                OnChar inputSymbol, transitionTable.[transition]
-            else if transitionTable.ContainsKey(transitionOnEpsilon) then
-                OnEpsilon, transitionTable.[transitionOnEpsilon]
-            else if transitionTable.ContainsKey(transitionOnAny) then
-                OnAny, transitionTable.[transitionOnAny]
-            else
-                OnChar inputSymbol, errorState
+        let transition = Map.tryFind (currentState, OnChar inputSymbol) transitionTable
+        let transitionOnEpsilon = Map.tryFind (currentState, OnEpsilon) transitionTable
+        let transitionOnAny = Map.tryFind (currentState, OnAny) transitionTable
+        let inputSymbol, dest =
+            match transition, transitionOnEpsilon, transitionOnAny with
+            | Some t, _, _ -> OnChar inputSymbol, t
+            | _, Some t, _ -> OnEpsilon, t
+            | _, _, Some t -> OnAny, t
+            | _ -> OnChar inputSymbol, errorState
         From currentState, inputSymbol, To dest
 
     /// Represents the action to take after transitioning to the error state
     type ErrorAction<'TValue, 'TResult> =
-        /// Continue processing input from the start state
+        /// Reprocess the same input from the start state
         | Restart of 'TValue
         /// Stop processing input
         | Stop of 'TResult
@@ -191,10 +188,13 @@ module StateMachine =
                 if nextState = errorState then
                     match fError position nextSymbol currentState currentValue getNextValue with
                     | Restart value when currentState <> startState ->
+                        // Reprocess the same input unless we're on the start state
                         inner value startState position input
                     | Restart value when rest <> [] ->
+                        // Process the next input if there is one
                         inner value startState (position + 1) nextInput
                     | Restart value ->
+                        // Nothing left, just finish
                         fFinish value
                     | Stop result ->
                         result

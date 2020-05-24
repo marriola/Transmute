@@ -4,39 +4,54 @@ type Options =
     { lexiconFile: string;
       rulesFile: string
       testRules: int list option
+      testWords: int list option
+      verbose: bool
+      showTransformations: bool
     }
 
 let defaultOptions =
     { lexiconFile = null
       rulesFile = null
       testRules = None
+      testWords = None
+      verbose = false
+      showTransformations = false
     }
 
-let rec parseInternal (args: string list) (options: Options) =
-    match args with
-    | [] ->
-        options
-    | "--lexicon"::filename::xs ->
-        let nextOptions = { options with lexiconFile = filename }
-        parseInternal xs nextOptions
-    | "--rules"::filename::xs ->
-        let nextOptions = { options with rulesFile = filename }
-        parseInternal xs nextOptions
-    | "--test"::ruleNumbers::xs ->
-        let nextOptions =
-            { options with
-                testRules =
-                    ruleNumbers.Split(',')
-                    |> Array.map (fun s -> s.Trim())
-                    |> Array.map int
-                    |> List.ofArray
-                    |> Some
-            }
-        parseInternal xs nextOptions
-    | x::xs ->
-        eprintfn "Option '%s' is unrecognized" x
-        parseInternal xs options
-
-
 let parse (argv: string[]) =
-    parseInternal (Array.toList argv) defaultOptions
+    let rec parse' args options =
+        match args with
+        | [] ->
+            options
+        | "--lexicon"::filename::xs ->
+            parse' xs { options with lexiconFile = filename }
+        | "--rules"::filename::xs ->
+            parse' xs { options with rulesFile = filename }
+        | "--test-rules"::ruleNumbers::xs ->
+            let nextOptions =
+                { options with
+                    testRules =
+                        ruleNumbers.Split(',')
+                        |> Array.map (fun s -> s.Trim() |> int)
+                        |> List.ofArray
+                        |> Some
+                }
+            parse' xs nextOptions
+        | "--test-words"::wordNumbers::xs ->
+            let nextOptions =
+                { options with
+                    testWords =
+                        wordNumbers.Split(',')
+                        |> Array.map (fun s -> s.Trim() |> int)
+                        |> List.ofArray
+                        |> Some
+                }
+            parse' xs nextOptions
+        | "--verbose"::xs ->
+            parse' xs { options with verbose = true }
+        | "--show-transformations"::xs ->
+            parse' xs { options with showTransformations = true }
+        | x::xs ->
+            eprintfn "Option '%s' is unrecognized" x
+            parse' xs options
+    parse' (Array.toList argv) defaultOptions

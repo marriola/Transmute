@@ -55,15 +55,19 @@ let compileRules options tokens =
 
     fprintf stderr "."
 
-    selectedNodes
-    |> List.map (fun (_, x) ->
-        sw.Restart()
-        let rule = SoundChangeRule.compile features sets x
-        sw.Stop()
-        fprintf stderr "."
-        x, rule, sw.ElapsedMilliseconds)
+    let result =
+        selectedNodes
+        |> List.map (fun (_, x) ->
+            sw.Restart()
+            let rule = SoundChangeRule.compile features sets x
+            sw.Stop()
+            fprintf stderr "."
+            x, rule, sw.ElapsedMilliseconds)
 
-let transform rules word =
+    printfn ""
+    result
+
+let transform options rules word =
     let sw = new Stopwatch()
 
     let rec inner word totalTime rules =
@@ -71,40 +75,36 @@ let transform rules word =
         | [] ->
             word, totalTime
         | (i, (ruleDesc, rule, _))::xs ->
-            let transitions, transformations = rule
+            if options.verbose then
+                let transitions, transformations = rule
+                printfn "\nRule %d: %O" i ruleDesc
+                printfn "\nDFA:\n"
 
-            printfn "\nRule %d: %O" i ruleDesc
-            printfn "\nDFA:\n"
+                transitions
+                |> Seq.map (fun (pair: KeyValuePair<State * InputSymbol, State>) -> pair.Key, pair.Value)
+                |> Seq.indexed
+                |> Seq.map (fun (i, ((fromState, m), toState)) ->
+                    let t = sprintf "(%O, %O)" fromState m
+                    sprintf "%d.\t%-35s-> %O" (i + 1) t toState)
+                |> String.concat "\n"
+                |> printfn "%s"
 
-            transitions
-            |> Seq.map (fun (pair: KeyValuePair<State * InputSymbol, State>) -> pair.Key, pair.Value)
-            |> Seq.indexed
-            |> Seq.map (fun (i, ((fromState, m), toState)) ->
-                let t = sprintf "(%s, %s)" (string fromState) (string m)
-                sprintf "%d.\t%-35s-> %s" i t (string toState))
-            |> String.concat "\n"
-            |> printfn "%s"
-
-            printfn "\ntransformations:"
-            transformations
-            |> Seq.iteri (fun i (pair: KeyValuePair<Transition<State>, string>) ->
-                let (From origin, input, To dest) = pair.Key
-                let result = pair.Value
-                printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
-
-            printfn ""
+                printfn "\ntransformations:"
+                transformations
+                |> Seq.iteri (fun i (pair: KeyValuePair<Transition<State>, string>) ->
+                    let (From origin, input, To dest) = pair.Key
+                    let result = pair.Value
+                    printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
 
             sw.Restart()
+            if options.verbose then
+                printfn "%50s" word
 
-            match SoundChangeRule.transform rule word with
-            | Result.Error _ ->
-                printfn "\n[%d ms] no match" sw.ElapsedMilliseconds
-                inner word (totalTime + sw.ElapsedMilliseconds) xs
-            | Result.Ok result ->
-                sw.Stop()
-                printfn "\n[%d ms] result: %s" sw.ElapsedMilliseconds result
-                if result <> word then fprintfn stderr "%50O %s" ruleDesc result
-                inner result (totalTime + sw.ElapsedMilliseconds) xs
+            let result = SoundChangeRule.transform options.verbose rule word
+            sw.Stop()
+            if options.showTransformations && word <> result then
+                printfn "%7d. %15s -> %s" (i + 1) word result
+            inner result (totalTime + sw.ElapsedMilliseconds) xs
 
     rules
     |> List.indexed
@@ -132,31 +132,31 @@ let main argv =
         printfn "Syntax error at row %d column %d: %s" row col msg
     | OK tokens ->
         let rules = compileRules options tokens
-        fprintfn stderr ""
-        printfn "Passed validation!\n"
 
-        rules
-        |> List.indexed
-        |> List.map (fun (i, (r, _, compileTime)) -> sprintf "%2d. [%4d ms] %O" (i + 1) compileTime r)
-        |> String.concat "\n"
-        |> printfn "%s"
+        if options.verbose || options.showTransformations then
+            fprintfn stderr ""
 
-        let totalCompileTime = List.sumBy (fun (_, _, compileTime) -> compileTime) rules
-        printfn "\nTotal compile time: %d ms" totalCompileTime
+            rules
+            |> List.indexed
+            |> List.map (fun (i, (r, _, compileTime)) -> sprintf "%2d. [%4d ms] %O" (i + 1) compileTime r)
+            |> String.concat "\n"
+            |> printfn "%s"
 
-        // TODO
-        //   * Figure out how to correctly apply transformations that are followed by non-producing transitions
-        //   * Figure out the tension between apply undo and applying production - currently breaking rule 47
+            let totalCompileTime = List.sumBy (fun (_, _, compileTime) -> compileTime) rules
+            printfn "\nTotal compile time: %d ms" totalCompileTime
 
         let lexicon =
             IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
             |> Array.map trim
-            |> List.ofArray
+            |> Array.indexed
+            |> Array.choose (fun (i, word) ->
+                match options.testWords with
+                | None -> Some word
+                | Some x when List.contains (i + 1) x -> Some word
+                | _ -> None)
 
-        let word = lexicon.[0]
-        fprintfn stderr "%50s %s" "" word
-        let result, totalTime = transform rules word
-
-        printfn "total transformation time: %d ms" totalTime
+        for word in lexicon do
+            let result, totalTime = transform options rules word
+            printfn "[%3d ms] %15s -> %s" totalTime word result
 
     0 // return an integer exit code
