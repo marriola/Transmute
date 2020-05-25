@@ -17,6 +17,9 @@
     <Compile Include="RuleParser.fs" />
     <Compile Include="SyntaxAnalyzer.fs" />
     <Compile Include="PrefixTree.fs" />
+    <Compile Include="Special.fs" />
+    <Compile Include="State.fs" />
+    <Compile Include="DeterministicFiniteAutomaton.fs" />
     <Compile Include="SoundChangeRule.fs" />
   </ItemGroup>
 

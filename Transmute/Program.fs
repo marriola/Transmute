@@ -2,7 +2,6 @@
 open TransmuteLib
 open TransmuteLib.Lexer
 open TransmuteLib.Node
-open TransmuteLib.SoundChangeRule
 open System.Collections.Generic
 open System.Diagnostics
 open Arguments
@@ -55,11 +54,13 @@ let compileRules options tokens =
 
     fprintf stderr "."
 
+    let showNfa = options.verbosityLevel.showNfa()
+
     let result =
         selectedNodes
         |> List.map (fun (_, x) ->
             sw.Restart()
-            let rule = SoundChangeRule.compile features sets x
+            let rule = SoundChangeRule.compile features sets x showNfa
             sw.Stop()
             fprintf stderr "."
             x, rule, float sw.ElapsedTicks / 10000.0)
@@ -75,7 +76,7 @@ let transform options rules word =
         | [] ->
             word, totalTime
         | (i, (ruleDesc, rule, _))::xs ->
-            if options.verbose then
+            if options.verbosityLevel.verbose() then
                 let transitions, transformations = rule
                 printfn "\nRule %d: %O" i ruleDesc
                 printfn "\nDFA:\n"
@@ -96,13 +97,13 @@ let transform options rules word =
                     printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
-            if options.verbose then
+            if options.verbosityLevel.verbose() then
                 printfn "%50s" word
 
-            let result = SoundChangeRule.transform options.verbose rule word
+            let result = SoundChangeRule.transform (options.verbosityLevel.verbose()) rule word
             sw.Stop()
 
-            if options.showTransformations && word <> result then
+            if options.verbosityLevel.showTransformations() && word <> result then
                 printfn "%7d. %15s -> %s" i word result
 
             inner result (totalTime + sw.ElapsedTicks) xs
@@ -134,7 +135,7 @@ let main argv =
     | OK tokens ->
         let rules = compileRules options tokens
 
-        if options.verbose || options.showTransformations then
+        if options.verbosityLevel <> Silent then
             fprintfn stderr ""
 
             rules
