@@ -17,10 +17,10 @@
 
 [+$palatalized]/[-$palatalized]/_
 
-m/um/(#|$C)_$C
-n/un/(#|$C)_$C
-l/ul/(#|$C)_$C
-r/ur/(#|$C)_$C
+m/um/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
+n/un/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
+l/ul/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
+r/ur/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 
 $LARYNGEAL//#_$C
 
@@ -28,6 +28,13 @@ $LARYNGEAL//#_$C
 χʷe/o/_
 χe/a/_
 $LARYNGEAL//_$V
+
+; Homorganic vowels in hiatus -> long vowel
+aa/aː/_
+ee/eː/_
+ii/iː/_
+oo/oː/_
+uu/uː/_
 
 ; e-coloring, compensatory lengthening and dropping of laryngeals in coda
 e/o/_(w|j)χʷ
@@ -63,13 +70,13 @@ o//_#
 
 ; Grimm's law: aspirated stops become unaspirated
 [$STOP+$aspirated]/[-$aspirated]/_
-g/ɣ/#_
+g/ɣ/(#|$LIQUID|[+$fricative])_
 
 ; Lenition of intervocalic voiced stops
 [$STOP+$voiced]/[+$fricative]/($V|$GLIDE)_($V|$GLIDE)
 
 ; Verner's law
-[+$fricative]/[+$voiced]/(#|$C)[-$stressed]($C)_
+[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed]($C)_
 
 ; Undo Verner's law before voiceless stops
 [+$fricative+$voiced]/[-$voiced]/_[$STOP-$voiced]
@@ -89,7 +96,8 @@ gʷ/b/#_
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 e/i/$V($GLIDE)($C)($C)_(#|$C)
-ji/i/$V($GLIDE)($C)($C)_(#|$C)
+; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
+ji/i/$V($C)($C)_(#|$C)
 ei/iː/_
 ej/iː/_
 
@@ -146,6 +154,10 @@ $V {
     ɔ => ˈɔ
     u => ˈu
     ə => ˈə
+    m => 'm
+    n => 'n
+    l => 'l
+    r => 'r
 }
 
 ; TODO map sets
@@ -153,18 +165,19 @@ $V {
 ;   produces aː eː iː oː uː
 
 $C {
-    s
+    s  z
     ʔ  χ   χʷ
     k  kʲ  kʷ  p  t
     g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
-    m  n   l   r  w  y
+    m  n   l   r  w  j
     x  xʷ  ɸ   θ  ɣ  β  ð
 }
 
-$DENTAL { t d dʰ θ ð }
+$DENTAL { t d dʰ θ ð s z }
 $LABIAL { m p b bʰ ɸ β }
 $VELAR { k kʷ g gʷ x ɣ }
+$LIQUID { l r }
 $SONORANT { m n l r }
 $NASAL { m n }
 $LARYNGEAL { ʔ χ χʷ }

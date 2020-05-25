@@ -62,9 +62,9 @@ let compileRules options tokens =
             let rule = SoundChangeRule.compile features sets x
             sw.Stop()
             fprintf stderr "."
-            x, rule, sw.ElapsedMilliseconds)
+            x, rule, float sw.ElapsedTicks / 10000.0)
 
-    printfn ""
+    fprintfn stderr ""
     result
 
 let transform options rules word =
@@ -82,19 +82,18 @@ let transform options rules word =
 
                 transitions
                 |> Seq.map (fun (pair: KeyValuePair<State * InputSymbol, State>) -> pair.Key, pair.Value)
-                |> Seq.indexed
-                |> Seq.map (fun (i, ((fromState, m), toState)) ->
+                |> Seq.mapi (fun j ((fromState, m), toState) ->
                     let t = sprintf "(%O, %O)" fromState m
-                    sprintf "%d.\t%-35s-> %O" (i + 1) t toState)
+                    sprintf "%d.\t%-35s-> %O" (j + 1) t toState)
                 |> String.concat "\n"
                 |> printfn "%s"
 
                 printfn "\ntransformations:"
                 transformations
-                |> Seq.iteri (fun i (pair: KeyValuePair<Transition<State>, string>) ->
+                |> Seq.iteri (fun j (pair: KeyValuePair<Transition<State>, string>) ->
                     let (From origin, input, To dest) = pair.Key
                     let result = pair.Value
-                    printfn "%d. (%O, %O) -> %O => %s" (i + 1) origin input dest result)
+                    printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
             if options.verbose then
@@ -102,9 +101,11 @@ let transform options rules word =
 
             let result = SoundChangeRule.transform options.verbose rule word
             sw.Stop()
+
             if options.showTransformations && word <> result then
-                printfn "%7d. %15s -> %s" (i + 1) word result
-            inner result (totalTime + sw.ElapsedMilliseconds) xs
+                printfn "%7d. %15s -> %s" i word result
+
+            inner result (totalTime + sw.ElapsedTicks) xs
 
     rules
     |> List.indexed
@@ -138,12 +139,12 @@ let main argv =
 
             rules
             |> List.indexed
-            |> List.map (fun (i, (r, _, compileTime)) -> sprintf "%2d. [%4d ms] %O" (i + 1) compileTime r)
+            |> List.map (fun (i, (r, _, compileTime)) -> sprintf "%2d. [%6.1f ms] %O" (i + 1) compileTime r)
             |> String.concat "\n"
             |> printfn "%s"
 
             let totalCompileTime = List.sumBy (fun (_, _, compileTime) -> compileTime) rules
-            printfn "\nTotal compile time: %d ms" totalCompileTime
+            printfn "\nTotal compile time: %.1f ms" totalCompileTime
 
         let lexicon =
             IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
@@ -157,6 +158,7 @@ let main argv =
 
         for word in lexicon do
             let result, totalTime = transform options rules word
-            printfn "[%3d ms] %15s -> %s" totalTime word result
+            let totalMilliseconds = (float totalTime / 10000.0)
+            printfn "[%5.2f ms] %15s -> %s" totalMilliseconds word result
 
     0 // return an integer exit code
