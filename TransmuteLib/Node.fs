@@ -107,6 +107,25 @@ module Node =
         | x ->
             x
 
+    let rec untagAll nodes =
+        nodes
+        |> List.map untag
+        |> List.map (function
+            | RuleNode (target, result, environment) ->
+                RuleNode (untagAll target, untagAll result, untagAll environment)
+            | CompoundSetIdentifierNode xs ->
+                CompoundSetIdentifierNode (untagAll xs)
+            | SetDefinitionNode (name, members) ->
+                SetDefinitionNode (name, untagAll members)
+            | FeatureDefinitionNode (name, members) ->
+                FeatureDefinitionNode (name, untagAll members)
+            | OptionalNode xs ->
+                OptionalNode (untagAll xs)
+            | DisjunctNode xs ->
+                DisjunctNode (List.map untagAll xs)
+            | x ->
+                x)
+
     let (|Untag|_|) node =
         match node with
         | TaggedNode (position, inner) -> Some (inner, position)
@@ -279,7 +298,7 @@ module Node =
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier"></param>
-    let setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setIdentifier =
+    let setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
         let rec inner (terms: Node list) (result: Set<string>) =
             let addToSet isPresent s =
                 if isPresent
@@ -312,4 +331,4 @@ module Node =
                     | Untag (node, position) ->
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs nextSet
-        inner setIdentifier alphabet |> List.ofSeq
+        inner setDescriptor alphabet |> List.ofSeq

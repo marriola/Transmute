@@ -2,8 +2,6 @@
 
 open System.Collections.Generic
 open TransmuteLib
-open TransmuteLib.Node
-open TransmuteLib.Exceptions
 
 type PrefixTree =
     | Root of children:PrefixTree list
@@ -70,10 +68,10 @@ type PrefixTree with
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier">The CompoundSetIdentifierNode listing the sets and features to intersect.</param>
-    static member fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setIdentifier =
+    static member fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
         let getVal (kvp: KeyValuePair<'a, 'b>) = kvp.Value
         let alphabet =
             Node.getAlphabet
                 (Seq.map getVal features |> List.ofSeq)
                 (Seq.map getVal sets |> List.ofSeq)
-        Node.setIntersection alphabet features sets setIdentifier |> PrefixTree.makeTree
+        Node.setIntersection alphabet features sets setDescriptor |> PrefixTree.makeTree

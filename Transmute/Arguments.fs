@@ -76,11 +76,13 @@ let parse (argv: string[]) =
             parse' xs nextOptions
         | "-v"::x::xs when verbosityLevels.ContainsKey(x) ->
             parse' xs { options with verbosityLevel = verbosityLevels.[x] }
-        | "--verbose"::xs ->
+        | "--verbose"::xs
+        | "-v"::xs ->
             parse' xs { options with verbosityLevel = ShowDFA }
         | "--show-transformations"::xs ->
             parse' xs { options with verbosityLevel = ShowTransformations }
         | x::xs ->
-            eprintfn "Option '%s' is unrecognized" x
+            eprintfn "Unrecognized option '%s'" x
             parse' xs options
+
     parse' (Array.toList argv) defaultOptions

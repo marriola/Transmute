@@ -12,7 +12,7 @@ module DeterministicFiniteAutomaton =
         | Deterministic of (Transition<'TState> * TransitionResult)
 
     /// Returns true if both states are equal, or if one state is a merged state that contains the other.
-    let inline private (<%>) x y =
+    let inline private ( <%> ) x y =
         match x, y with
         | _ when x = y -> true
         | (State _ as s), MergedState children
@@ -97,19 +97,17 @@ module DeterministicFiniteAutomaton =
     let fromNfa startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
         let table = augment table transformations
 
-        let hasTransitionOn fCompare state =
+        let hasNonEpsilonTransition state =
             List.exists
-                (fun ((From origin, input, _), _) -> state = origin && fCompare input)
+                (fun ((From origin, input, _), _) -> state = origin && input <> OnEpsilon)
                 table
-
-        let hasNonEpsilonTransition = hasTransitionOn ((<>) OnEpsilon)
 
         let allTransitionsDeterministic origin =
             table
-            |> Seq.filter (function
+            |> List.exists (function
                 | (From o, OnEpsilon, _), _ when o = origin -> true
                 | _ -> false)
-            |> Seq.isEmpty
+            |> not
 
         // TODO: refactor this 8 level indented beast
         /// <summary>
@@ -228,14 +226,14 @@ module DeterministicFiniteAutomaton =
                     (From current, on, To mergedDest), production)
             single @ merged
 
-        let rec fromNfa' stack dfaTransitions =
-            match stack with
+        let rec fromNfa' searchStack dfaTransitions =
+            match searchStack with
             | [] -> 
                 dfaTransitions
                 |> List.ofSeq
-            | x::stack when x = errorState ->
-                fromNfa' stack dfaTransitions
-            | current::stack ->
+            | x::rest when x = errorState ->
+                fromNfa' rest dfaTransitions
+            | current::rest ->
                 // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
                     table
@@ -247,7 +245,7 @@ module DeterministicFiniteAutomaton =
                     transitionsFromCurrent
                     |> List.map getDest
                     |> List.where ((<>) current)
-                    |> List.append stack
+                    |> List.append rest
                     |> List.distinct
                 let nextTransitions =
                     transitionsFromCurrent

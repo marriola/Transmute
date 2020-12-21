@@ -28,6 +28,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="FSPowerPack.Parallel.Seq.Community" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\TransmuteLib\TransmuteLib.fsproj" />
   </ItemGroup>
 

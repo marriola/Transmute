@@ -20,7 +20,8 @@
     <Compile Include="Special.fs" />
     <Compile Include="State.fs" />
     <Compile Include="DeterministicFiniteAutomaton.fs" />
-    <Compile Include="SoundChangeRule.fs" />
+    <Compile Include="RuleCompiler.fs" />
+    <Compile Include="RuleMachine.fs" />
   </ItemGroup>
 
   <ItemGroup>

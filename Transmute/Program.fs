@@ -5,6 +5,7 @@ open TransmuteLib.Node
 open System.Collections.Generic
 open System.Diagnostics
 open Arguments
+open Microsoft.FSharp.Collections
 
 let validateOptions (options: Options) =
     let mutable isValid = true
@@ -32,8 +33,6 @@ let compileRules options tokens =
     | Result.Error message ->
         failwith message
 
-    let sw = new Stopwatch()
-
     let indexedNodes =
         nodes
         |> List.choose (fun x ->
@@ -55,18 +54,24 @@ let compileRules options tokens =
     fprintf stderr "."
 
     let showNfa = options.verbosityLevel.showNfa()
+    let outerStopwatch = Stopwatch()
+    outerStopwatch.Start()
 
-    let result =
+    let rules =
         selectedNodes
-        |> List.map (fun (_, x) ->
-            sw.Restart()
-            let rule = SoundChangeRule.compile features sets x showNfa
-            sw.Stop()
+        |> List.indexed
+        |> PSeq.map (fun (i, (_, node)) ->
+            let rule = RuleCompiler.compile features sets node showNfa
             fprintf stderr "."
-            x, rule, float sw.ElapsedTicks / 10000.0)
+            i, (node, rule))
+        |> PSeq.sortBy fst
+        |> PSeq.map snd
+        |> List.ofSeq
+
+    outerStopwatch.Stop()
 
     fprintfn stderr ""
-    result
+    outerStopwatch.ElapsedMilliseconds, rules
 
 let transform options rules word =
     let sw = new Stopwatch()
@@ -75,7 +80,7 @@ let transform options rules word =
         match rules with
         | [] ->
             word, totalTime
-        | (i, (ruleDesc, rule, _))::xs ->
+        | (i, (ruleDesc, rule))::xs ->
             if options.verbosityLevel.verbose() then
                 let transitions, transformations = rule
                 printfn "\nRule %d: %O" i ruleDesc
@@ -100,7 +105,7 @@ let transform options rules word =
             if options.verbosityLevel.verbose() then
                 printfn "%50s" word
 
-            let result = SoundChangeRule.transform (options.verbosityLevel.verbose()) rule word
+            let result = RuleMachine.transform (options.verbosityLevel.verbose()) rule word
             sw.Stop()
 
             if options.verbosityLevel.showTransformations() && word <> result then
@@ -133,19 +138,18 @@ let main argv =
     | SyntaxError (msg, row, col) ->
         printfn "Syntax error at row %d column %d: %s" row col msg
     | OK tokens ->
-        let rules = compileRules options tokens
+        let totalCompileTime, rules = compileRules options tokens
 
         if options.verbosityLevel <> Silent then
             fprintfn stderr ""
 
             rules
             |> List.indexed
-            |> List.map (fun (i, (r, _, compileTime)) -> sprintf "%2d. [%6.1f ms] %O" (i + 1) compileTime r)
+            |> List.map (fun (i, (node, _)) -> sprintf "%2d. %O" (i + 1) node)
             |> String.concat "\n"
             |> printfn "%s"
 
-            let totalCompileTime = List.sumBy (fun (_, _, compileTime) -> compileTime) rules
-            printfn "\nTotal compile time: %.1f ms" totalCompileTime
+            printfn "\nTotal compile time: %d ms" totalCompileTime
 
         let lexicon =
             IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')

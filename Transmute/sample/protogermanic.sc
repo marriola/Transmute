@@ -24,9 +24,12 @@ r/ur/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 
 $LARYNGEAL//#_$C
 
+ː/ːː/_#
+
 ; e-coloring and dropping of laryngeals in onset
-χʷe/o/_
-χe/a/_
+e/o/χʷ(ˈ)_
+e/a/χ(ˈ)_
+$LARYNGEAL//#_
 $LARYNGEAL//_$V
 
 ; Homorganic vowels in hiatus -> long vowel
@@ -36,15 +39,18 @@ ii/iː/_
 oo/oː/_
 uu/uː/_
 
-; e-coloring, compensatory lengthening and dropping of laryngeals in coda
+; e-coloring
 e/o/_(w|j)χʷ
 e/a/_(w|j)χ
 eχʷ/oː/_
 eχ/ɑː/_
-$LARYNGEAL/ː/$V_
+
+; Compensatory lengthening with loss of laryngeals after sonorants
+[-$long]/[+$long]/_$LARYNGEAL
+$LARYNGEAL//($V|$SONORANT)_
 
 ; Cowgill's law
-χʷ/g/($GLIDE|$SONORANT)_w
+χʷ/g/($SONORANT)_w
 
 ; Vocalization of remaining laryngeals
 $LARYNGEAL/ə/_
@@ -57,13 +63,21 @@ e//_#
 a//_#
 o//_#
 
-; Grimm's law: voiceless stops become fricatives
+; Grimm's law: voiceless stops become fricatives, except after an obstruent
 ; TODO: fix optional node moving to end inside branch of disjunct node
-[$STOP-$voiced]/[+$fricative]/_($V|ˈ$V|$C)
-[+$fricative-$voiced-$SIBILANT]/[-$fricative]/[$C-$voiced]_
+[$STOP-$voiced]/[+$fricative]/(#|$V|$SONORANT)_
+;[$STOP-$voiced]/[+$fricative]/!($OBSTRUENT)_
 
 ; Undo Grimm's law after s-
 [+$fricative-$voiced]/[-$fricative]/s_
+
+; Germanic spirant law
+[$STOP+$LABIAL]/ɸ/_(t|s) ;($C|$V)
+[$STOP+$DENTAL]/ts/_(t|s) ;($C|$V)
+;tst/ss/_
+;tss/ss/_
+ss/s/_
+[$STOP+$VELAR]/x/_(t|s)($C|$V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
 [$STOP+$voiced-$aspirated]/[-$voiced]/_(#|$V|ˈ$V|$C)
@@ -73,20 +87,16 @@ o//_#
 g/ɣ/(#|$LIQUID|[+$fricative])_
 
 ; Lenition of intervocalic voiced stops
-[$STOP+$voiced]/[+$fricative]/($V|$GLIDE)_($V|$GLIDE)
+[$STOP+$voiced]/[+$fricative]/($V|$GLIDE)_(#|$V|$GLIDE)
 
 ; Verner's law
-[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed]($C)_
+[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_
 
 ; Undo Verner's law before voiceless stops
 [+$fricative+$voiced]/[-$voiced]/_[$STOP-$voiced]
 
-; Germanic spirant law
-[$STOP+$LABIAL]/ɸ/_(t|s)($C|$V)
-[$STOP+$DENTAL]/ts/_(t|s)($C|$V)
-tst/ss/_
-tss/ss/_
-[$STOP+$VELAR]/x/_(t|s)($C|$V)
+; Voiced fricatives resulting from Verner's law to stops after nasal
+[+$fricative+$voiced]/[-$fricative]/$NASAL_
 
 ; Stress moves to initial syllable. Let's just stop marking it.
 [+$stressed]/[-$stressed]/_
@@ -94,12 +104,17 @@ s/z/$V_# ; Analogy
 
 gʷ/b/#_
 
+nw/nn/_
+ln/ll/_
+zm/mm/_
+
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 e/i/$V($GLIDE)($C)($C)_(#|$C)
 ; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
 ji/i/$V($C)($C)_(#|$C)
 ei/iː/_
 ej/iː/_
+ij/iː/_
 
 o/ɑ/_
 a/ɑ/_
@@ -131,12 +146,6 @@ t//$V($C)($C)$V($C)_#
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-$VSHORT { ə ɑ a e i o u }
-
-$VLONG { ɑː aː eː iː oː uː }
-
-$GLIDE { w j }
-
 $V {
     ə
     ɑ  a  e  i  o     u
@@ -145,53 +154,25 @@ $V {
     ɑ̃ː ẽː ĩː õː ɔ̃ː ũː
 }
 
-[$stressed] {
-    a => ˈa
-    ɑ => ˈɑ
-    e => ˈe
-    i => ˈi
-    o => ˈo
-    ɔ => ˈɔ
-    u => ˈu
-    ə => ˈə
-    m => 'm
-    n => 'n
-    l => 'l
-    r => 'r
-}
-
-; TODO map sets
-; $V -> &ː
-;   produces aː eː iː oː uː
-
-$C {
-    s  z
-    ʔ  χ   χʷ
-    k  kʲ  kʷ  p  t
-    g  gʲ  gʷ  b  d
-    gʰ gʲʰ gʷʰ bʰ dʰ
-    m  n   l   r  w  j
-    x  xʷ  ɸ   θ  ɣ  β  ð
-}
-
-$DENTAL { t d dʰ θ ð s z }
-$LABIAL { m p b bʰ ɸ β }
-$VELAR { k kʷ g gʷ x ɣ }
-$LIQUID { l r }
-$SONORANT { m n l r }
-$NASAL { m n }
-$LARYNGEAL { ʔ χ χʷ }
-$SIBILANT { s }
-
-$STOP {
-    k  kʲ  kʷ  p  t
-    g  gʲ  gʷ  b  d
-    gʰ gʲʰ gʷʰ bʰ dʰ
-}
-
 [$mid] { e o }
 [$round] { o u }
 [$high] { i u }
+
+[$long] {
+    ɑ => ɑː
+    a => aː
+    e => eː
+    i => iː
+    o => oː
+    u => uː
+    ɔː 
+    ɑ̃ => ɑ̃ː
+    ẽ => ẽː
+    ĩ => ĩː
+    õ => õː
+    ũ => ũː
+    ɔ̃ː
+}
 
 [$nasalized] {
     ɑ => ɑ̃
@@ -204,6 +185,71 @@ $STOP {
     iː => ĩː
     oː => õː
     uː => ũː
+}
+
+[$stressed] {
+    a => ˈa
+    aː => ˈaː
+    ɑ => ˈɑ
+    ɑː => ˈɑː
+    e => ˈe
+    eː => ˈeː
+    i => ˈi
+    iː => ˈiː
+    o => ˈo
+    oː => ˈoː
+    ɔ => ˈɔ
+    ɔː => ˈɔː
+    u => ˈu
+    uː => ˈuː
+    ə => ˈə
+    m => 'm
+    n => 'n
+    l => 'l
+    r => 'r
+}
+
+; TODO map sets
+; $V -> &ː
+;   produces aː eː iː oː uː
+
+$C {
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
+    gʰ gʲʰ gʷʰ bʰ dʰ
+    x      xʷ  ɸ  θ
+    ɣ      ɣʷ  β  ð
+    s  z
+    ʔ  χ   χʷ
+    m  n
+    l  r
+    w  j
+}
+
+$OBSTRUENT {
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
+    gʰ gʲʰ gʷʰ bʰ dʰ
+    x      xʷ  ɸ  θ
+    ɣ      ɣʷ  β  ð
+    s  z
+    ʔ  χ   χʷ
+}
+
+$DENTAL { t d dʰ θ ð s z }
+$LABIAL { m p b bʰ ɸ β }
+$VELAR { k kʷ g gʷ x ɣ }
+$SONORANT { m n l r w j }
+$LIQUID { l r }
+$GLIDE { w j }
+$NASAL { m n }
+$LARYNGEAL { ʔ χ χʷ }
+$SIBILANT { s }
+
+$STOP {
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
+    gʰ gʲʰ gʷʰ bʰ dʰ
 }
 
 [$voiced] {
