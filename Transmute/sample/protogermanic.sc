@@ -1,6 +1,5 @@
-﻿; From https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic
-; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, χ and χʷ, respectively, on the basis that I think
-; they're neat.
+﻿; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, χ and χʷ, respectively, on the basis that I think they're neat.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                        Rules                        ;;
@@ -10,7 +9,10 @@
 ;   $SONORANT/u$SONORANT/$V_!$V
 ;   $SONORANT/u$SONORANT/!$V_$V
 
-; Pre-PGmc
+
+;;;;;;;;;;;;
+; Pre-PGmc ;
+;;;;;;;;;;;;
 
 ; TODO implement transformation of Ø, i.e. insertion
 ; /u/#_$SONORANT$C
@@ -55,7 +57,10 @@ $LARYNGEAL//($V|$SONORANT)_
 ; Vocalization of remaining laryngeals
 $LARYNGEAL/ə/_
 
-; Early PGmc
+
+;;;;;;;;;;;;;;
+; Early PGmc ;
+;;;;;;;;;;;;;;
 
 j//_(e|a|o)#
 w//_(e|a|o)#
@@ -119,7 +124,10 @@ ij/iː/_
 o/ɑ/_
 a/ɑ/_
 
-; Late PGmc
+
+;;;;;;;;;;;;;
+; Late PGmc ;
+;;;;;;;;;;;;;
 
 m/n/_#
 m/n/_$DENTAL
@@ -140,6 +148,7 @@ t//$V($C)($C)$V($C)_#
 
 ɑː/ɔː/_
 ɑ̃ː/ɔ̃ː/_
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                  Sets and features                  ;;

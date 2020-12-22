@@ -125,7 +125,14 @@ module RuleMachine =
         state: RuleMachineState
     }
 
-    let transform verbose (transitions, transformations) word =
+    /// <summary>
+    /// Applies a compiled rule to a word.
+    /// </summary>
+    /// <param name="verbose">If true, displays the state of the state machine at each step.</param>
+    /// <param name="rule">The rule to apply.</param>
+    /// <param name="word">The word to transform.</param>
+    let transform verbose rule word =
+        let transitions, transformations = rule
         stateMachineConfig()
         |> withTransitions transitions
         |> withStartState RuleCompiler.START
@@ -145,7 +152,7 @@ module RuleMachine =
                 // The rule failed to match
                 | true, false ->
                     EnvironmentString.concatAll value.undo value.output
-                // The rule failed to match completely, but what did match was enough to commit the production.
+                // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
                 | true, true ->
                     // undo and production will never be populated at the same time
                     (List.map fst value.production) @ EnvironmentString.concatAll value.undo value.output
@@ -153,7 +160,7 @@ module RuleMachine =
                 | false, _ ->
                     EnvironmentString.add input value.output
             if verbose then
-                printf "x %2d %c %8O: " position input value.lastOutputOn
+                printf "  %2d %c %2s: " position input (if value.lastOutputOn = None then "" else string (Option.get value.lastOutputOn))
                 printfn "%-20s | %O %A %A %A"
                     (sprintf "Error at %O" current)
                     position
@@ -171,7 +178,7 @@ module RuleMachine =
         |> onTransition (fun position transition _ input current nextState value ->
             let { lastOutputOn = lastOutputOn; production = production; undo = undo; output = output } = value
             if verbose then
-                printf "√ %2d %c %8O: " position input lastOutputOn
+                printf "• %2d %c %2s: " position input (if lastOutputOn = None then "" else string (Option.get lastOutputOn))
             let isNextFinal = State.isFinal nextState
             let tf = Map.tryFind transition transformations
             let nextUndo, nextProduction, nextOutput =

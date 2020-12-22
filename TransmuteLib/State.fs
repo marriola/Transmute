@@ -35,7 +35,6 @@ type State =
             | MergedState _ as state ->
                 failwithf "%s is a merged state; it cannot be made final" (string state)
 
-
         /// Marks a state as corresponding to input matched in the environment segment.
         static member makeEnvironment = function
             | State (name, _, isFinal) ->

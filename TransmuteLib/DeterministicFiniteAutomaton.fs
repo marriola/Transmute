@@ -1,10 +1,10 @@
 ﻿namespace TransmuteLib
 
-type TransitionResult =
+type private TransitionResult =
     | NoOutput
     | Produces of string
 
-module DeterministicFiniteAutomaton =
+module private DeterministicFiniteAutomaton =
     type private TransitionType<'TState> =
         /// A transition with a destination state that needs to be checked for deterministic transitions.
         | MaybeDeterministic of (Transition<'TState> * TransitionResult)

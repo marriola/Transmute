@@ -67,8 +67,10 @@ module SyntaxAnalyzer =
             | [] -> Ok ()
             | Node.Untag (OptionalNode [], position)::_ ->
                 Result.Error (syntaxErrorMessage "Optional node may not be empty" position)
-            | _ ->
-                validateInternal nodes.Tail
+            | Node.Untag (DisjunctNode [], position)::_ ->
+                Result.Error (syntaxErrorMessage "Disjunct node may not be empty" position)
+            | _::rest ->
+                validateInternal rest
         validateInternal nodes
 
     let private validateRuleNode target replacement environment =                
