@@ -2,31 +2,17 @@
 
 type VerbosityLevel =
     | Silent
+    | Normal
     | ShowTransformations
     | ShowDFA
     | ShowNFA
-    with
-        member this.verbose () =
-            match this with
-            | Silent
-            | ShowTransformations -> false
-            | _ -> true
-
-        member this.showTransformations () =
-            match this with
-            | Silent -> false
-            | _ -> true
-
-        member this.showNfa () =
-            match this with
-            | ShowNFA -> true
-            | _ -> false
 
 let verbosityLevels = dict [
     "0", Silent
-    "1", ShowTransformations
-    "2", ShowDFA
-    "3", ShowNFA
+    "1", Normal
+    "2", ShowTransformations
+    "3", ShowDFA
+    "4", ShowNFA
 ]
 
 type Options =
@@ -42,7 +28,7 @@ let defaultOptions =
       rulesFile = null
       testRules = None
       testWords = None
-      verbosityLevel = Silent
+      verbosityLevel = Normal
     }
 
 let parse (argv: string[]) =
@@ -60,7 +46,7 @@ let parse (argv: string[]) =
                     testRules =
                         ruleNumbers.Split(',')
                         |> Array.map (fun s -> s.Trim() |> int)
-                        |> List.ofArray
+                            |> List.ofArray
                         |> Some
                 }
             parse' xs nextOptions

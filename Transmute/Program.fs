@@ -51,9 +51,10 @@ let compileRules options tokens =
         | None ->
             indexedNodes
 
-    fprintf stderr "."
+    if options.verbosityLevel > Silent then
+        fprintf stderr "Compiling.."
 
-    let showNfa = options.verbosityLevel.showNfa()
+    let showNfa = options.verbosityLevel = ShowNFA
     let outerStopwatch = Stopwatch()
     outerStopwatch.Start()
 
@@ -62,7 +63,8 @@ let compileRules options tokens =
         |> List.indexed
         |> PSeq.map (fun (i, (_, node)) ->
             let rule = RuleCompiler.compile features sets node showNfa
-            fprintf stderr "."
+            if options.verbosityLevel > Silent then
+                fprintf stderr "."
             i, (node, rule))
         |> PSeq.sortBy fst
         |> PSeq.map snd
@@ -70,7 +72,9 @@ let compileRules options tokens =
 
     outerStopwatch.Stop()
 
-    fprintfn stderr ""
+    if options.verbosityLevel > Silent then
+        fprintfn stderr ""
+
     outerStopwatch.ElapsedMilliseconds, rules
 
 let transform options rules word =
@@ -81,7 +85,7 @@ let transform options rules word =
         | [] ->
             word, totalTime
         | (i, (ruleDesc, rule))::xs ->
-            if options.verbosityLevel.verbose() then
+            if options.verbosityLevel > Normal then
                 let transitions, transformations = rule
                 printfn "\nRule %d: %O" i ruleDesc
                 printfn "\nDFA:\n"
@@ -102,13 +106,13 @@ let transform options rules word =
                     printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
-            if options.verbosityLevel.verbose() then
+            if options.verbosityLevel > Normal then
                 printfn "%50s" word
 
-            let result = RuleMachine.transform (options.verbosityLevel.verbose()) rule word
+            let result = RuleMachine.transform (options.verbosityLevel > Normal) rule word
             sw.Stop()
 
-            if options.verbosityLevel.showTransformations() && word <> result then
+            if options.verbosityLevel >= ShowTransformations && word <> result then
                 printfn "%7d. %15s -> %s" i word result
 
             inner result (totalTime + sw.ElapsedTicks) xs
