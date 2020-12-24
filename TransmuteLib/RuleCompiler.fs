@@ -189,8 +189,11 @@ module RuleCompiler =
                         let additions, removals = featureTransformations.[name]
                         let searchMap = if isPresent then additions else removals
                         match Map.tryFind value searchMap with
-                        | Some result -> (transition, result) :: transformations
-                        | None -> transformations
+                        | Some result ->
+                            (transition, result) :: transformations
+                        | None ->
+                            // If no transformation is defined for this sound, just "transform" it to itself.
+                            (transition, value) :: transformations
 
                     | Some (CompoundSetIdentifierNode _) ->
                         failwith "Only one feature may be transformed at a time"
@@ -234,7 +237,8 @@ module RuleCompiler =
                                             transformations = nextInnerState.transformations }
 
                                     | PrefixTree.Leaf value ->
-                                        // No more input symbols. Create a transition to the terminator state.
+                                        // We have reached a leaf node and now have a complete sound to transform.
+                                        // Add the transformation and a transition to the terminator state.
                                         let t = From state.current, OnEpsilon, To terminator
                                         let nextTransformations, nextResult = addSetTransformation value t innerState.transformations innerState.result
                                         let nextTransitions = t :: innerState.transitions
@@ -274,7 +278,7 @@ module RuleCompiler =
 
             /// Optionally match a sequence of nodes. Continue even if no match possible.
             let matchOptional nodes =
-                let state, lastState = getNextState (areAllSubtreesFinal ()) state
+                let state, terminator = getNextState (areAllSubtreesFinal ()) state
                 let nextState = buildStateMachine' {
                     state with
                         input = nodes
@@ -282,51 +286,53 @@ module RuleCompiler =
                         subtreePosition = SubtreeNonfinal :: state.subtreePosition
                 }
                 let transitions =
-                    [ From state.current, OnEpsilon, To lastState
-                      From nextState.current, OnEpsilon, To lastState ]
+                    [ From state.current, OnEpsilon, To terminator
+                      From nextState.current, OnEpsilon, To terminator ]
                     @ nextState.transitions
                 { nextState with
                     transitions = transitions
-                    current = lastState
+                    current = terminator
                     subtreePosition = state.subtreePosition }
+
+            let matchDisjunctBranch nodes ((states, result, transitions, transformations, _)::_ as acc) = 
+                let innerSubtreePosition =
+                    match state.subtreePosition with
+                    | SubtreeFinal::_ when areAllSubtreesFinal () -> SubtreeFinal
+                    | _ -> SubtreeNonfinal
+                let { current = current; states = states; result = result; transitions = transitions; transformations = transformations } =
+                    buildStateMachine'
+                        { state with
+                            current = state.current
+                            states = states
+                            input = nodes
+                            result = result
+                            transitions = transitions
+                            transformations = transformations
+                            subtreePosition = innerSubtreePosition :: state.subtreePosition }
+                (states, result, transitions, transformations, current) :: acc
 
             /// Match exactly one of many sequences of nodes.
             let matchDisjunct branches =
                 // Create a common exit point for all subtrees
-                let state, lastState = getNextState (areAllSubtreesFinal ()) state
+                let state, terminator = getNextState (areAllSubtreesFinal ()) state
 
                 // Build a subtree for each branch
                 let out =
                     List.foldBack
-                        (fun nodes ((states, result, transitions, transformations, _)::_ as acc) ->
-                            let innerSubtreePosition =
-                                match state.subtreePosition with
-                                | SubtreeFinal::_ when areAllSubtreesFinal () -> SubtreeFinal
-                                | _ -> SubtreeNonfinal
-                            let { current = current; states = states; result = result; transitions = transitions; transformations = transformations } =
-                                buildStateMachine'
-                                    { state with
-                                        current = state.current
-                                        states = states
-                                        input = nodes
-                                        result = result
-                                        transitions = transitions
-                                        transformations = transformations
-                                        subtreePosition = innerSubtreePosition :: state.subtreePosition }
-                            (states, result, transitions, transformations, current) :: acc)
+                        matchDisjunctBranch
                         branches
                         [state.states, state.result, state.transitions, state.transformations, state.current]
 
                 // Continue with the state of the last subtree built.
                 let (states, result, transitions, transformations, _)::_ = out
 
-                // Transition from last state of each subtree to lastState.
+                // Add epsilon transitions from the last state of each subtree to the terminator state.
                 // Reverse the list and take the tail first so we don't epsilon from current to lastState and match without consuming input.
                 let subtreeFinalToLastState =
                     out
                     |> List.rev
                     |> List.tail
-                    |> List.map (fun (_, _, _, _, subtreeFinal) -> From subtreeFinal, OnEpsilon, To lastState)
+                    |> List.map (fun (_, _, _, _, subtreeFinal) -> From subtreeFinal, OnEpsilon, To terminator)
 
                 let transitions =
                     [ From state.current, OnAny, To ERROR ] @ // Go to ERROR if we can't match anything
@@ -334,7 +340,7 @@ module RuleCompiler =
                     transitions
 
                 { state with
-                    current = lastState
+                    current = terminator
                     states = states
                     result = result
                     transitions = transitions
