@@ -6,7 +6,7 @@ module RuleMachine =
     let private (|IsTarget|_|) state =
         match state with
         | State (_, TargetSegment, _)
-        | MergedState ((State (_, TargetSegment, _))::_) ->
+        | MergedState (_, TargetSegment) ->
             Some state
         | _ ->
             None
@@ -14,7 +14,7 @@ module RuleMachine =
     let private (|IsEnvironment|_|) state =
         match state with
         | State (_, EnvironmentSegment, _)
-        | MergedState ((State (_, EnvironmentSegment, _))::_) ->
+        | MergedState (_, EnvironmentSegment) ->
             Some state
         | _ ->
             None

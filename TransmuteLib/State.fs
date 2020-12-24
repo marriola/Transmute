@@ -5,12 +5,12 @@ type Segment = EnvironmentSegment | TargetSegment
 
 type State =
     | State of name: string * segment: Segment * stateType: StateType
-    | MergedState of State list
+    | MergedState of State list * segment: Segment
     with
         /// Returns the state's name.
         static member name = function
             | State (name, _, _) -> name
-            | MergedState states ->
+            | MergedState (states, _) ->
                 states
                 |> Seq.map State.name
                 |> String.concat (string Special.JOINER)
@@ -39,11 +39,11 @@ type State =
         static member makeEnvironment = function
             | State (name, _, isFinal) ->
                 State (name, EnvironmentSegment, isFinal)
-            | MergedState states ->
+            | MergedState (states, _) ->
                 let states =
                     states
                     |> List.map (fun (State (name, _, isFinal)) -> State (name, EnvironmentSegment, isFinal))
-                MergedState states
+                MergedState (states, EnvironmentSegment)
 
         /// Merges a list of states into one merged state.
         static member merge states =
@@ -51,27 +51,34 @@ type State =
                 states
                 |> Seq.collect (function
                     | State _ as state -> [ state ]
-                    | MergedState states -> states)
+                    | MergedState (states, _) -> states)
                 |> Seq.distinct
                 |> Seq.sortBy State.ord
                 |> List.ofSeq
+            let segment =
+                match statesToMerge with
+                | (State (_, TargetSegment, _))::_ ->
+                    TargetSegment
+                | _ ->
+                    EnvironmentSegment
             match statesToMerge with
             | [state] -> state
-            | _ -> MergedState statesToMerge
+            | _ -> MergedState (statesToMerge, segment)
 
         /// Returns a boolean indicating whether the state is final.
         static member isFinal = function
             | State (_, _, Final) -> true
             | State (_, _, NonFinal) -> false
-            | MergedState states ->
+            | MergedState (states, _) ->
                 List.exists State.isFinal states
 
         /// Returns a boolean indicating whether the state corresponds to input matched in the environment segment.
         static member isEnvironment = function
-            | State (_, EnvironmentSegment, _) -> true
-            | State (_, TargetSegment, _) -> false
-            | MergedState states ->
-                List.exists State.isEnvironment states
+            | State (_, EnvironmentSegment, _)
+            | MergedState (_, EnvironmentSegment) ->
+                true
+            | _ ->
+                false
 
         override this.ToString() =
             if State.isFinal this
