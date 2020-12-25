@@ -135,7 +135,7 @@ module RuleParser =
                         matchDisjunct xs lparen [result]
                     | _ ->
                         let tokens, ruleSegment = matchRuleSegment tokens
-                        (List.rev ruleSegment) @ result
+                        ruleSegment @ result
                         |> matchOptional_DisjunctInteral tokens
                 matchOptional_DisjunctInteral tokens []
 
