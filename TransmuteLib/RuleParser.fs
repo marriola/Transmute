@@ -135,8 +135,7 @@ module RuleParser =
                         matchDisjunct xs lparen [result]
                     | _ ->
                         let tokens, ruleSegment = matchRuleSegment tokens
-                        ruleSegment @ result
-                        |> matchOptional_DisjunctInteral tokens
+                        matchOptional_DisjunctInteral tokens (ruleSegment @ result)
                 matchOptional_DisjunctInteral tokens []
 
             let rec inner tokens result =
@@ -171,7 +170,7 @@ module RuleParser =
             match tokens with
             | OfType Whitespace _::xs ->
                 matchUtterance_Transformation xs utterance
-            | OfType Gives _::xs ->
+            | OfType Arrow _::xs ->
                 let tokens, result = matchToken xs Utterance
                 let targetNode = Node.tag (UtteranceNode utterance.value) utterance.position
                 let resultNode = Node.tag (UtteranceNode result.value) result.position
@@ -207,7 +206,7 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let matchRule tokens headPosition =
             let tokens, target = matchRuleSegment tokens
-            let tokens, _ = matchToken tokens Divider
+            let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
             let tokens, replacement = matchRuleSegment tokens
             let tokens, _ = matchToken tokens Divider
             let tokens, environment = matchRuleSegment tokens

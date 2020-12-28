@@ -23,14 +23,14 @@ module Lexer =
         | Q_LParen
         | Q_RParen
         | Q_Divider
+        | Q0
+        | Q_Arrow
         | Q_Placeholder
         | Q_Boundary
         | Q_Plus
         | Q_Minus
         | Q_Pipe
         | Q_Not
-        | Q0
-        | Q_Gives
         | Q_Identifier
         | Q_IdentifierFinal
         | Q_Utterance
@@ -74,13 +74,13 @@ module Lexer =
                   To Q_Placeholder, OnChar '_'
                   To Q_Boundary, OnChar '#'
                   To Q_Plus, OnChar '+'
-                  To Q_Minus, OnChar '-'
                   To Q_Pipe, OnChar '|'
                   To Q_Not, OnChar '!'
               ]
 
-              makeTransitions (From START) [ To Q0, OnChar '=' ]
-              makeTransitions (From Q0) [ To Q_Gives, OnChar '>' ]
+              makeTransitions (From START) [ To Q0, OnChar '-' ]
+              makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
+              makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
 
               makeTransitions (From START) [ To Q_Identifier, OnChar '$' ]
               makeTransitions (From Q_Identifier) identifierTransitions
@@ -113,13 +113,13 @@ module Lexer =
           Q_LParen, LParen.id
           Q_RParen, RParen.id
           Q_Divider, Divider.id
+          Q_Arrow, Arrow.id
           Q_Placeholder, Placeholder.id
           Q_Boundary, Boundary.id
           Q_Plus, Plus.id
           Q_Minus, Minus.id
           Q_Pipe, Pipe.id
           Q_Not, Not.id
-          Q_Gives, Gives.id
           Q_IdentifierFinal, Id.id
           Q_UtteranceFinal, Utterance.id
           Q_CommentFinal, Comment.apply trimComment
@@ -138,7 +138,7 @@ module Lexer =
     let lex (filename: string) =
         let isFinal state = stateTokenTypes.ContainsKey state
         let accumulate (builder: char list) =
-            System.String.Concat(builder |> List.rev |> Array.ofList)
+            System.String.Concat(builder |> List.rev |> Array.ofList).Trim()
 
         try
             use stream = new StreamReader(filename, true)
@@ -158,7 +158,7 @@ module Lexer =
                 | MismatchAction.Restart ->
                     ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
                 | MismatchAction.Stop ->
-                    (sprintf "Unrecognized token '%s%c'" ((accumulate value.builder).Trim()) inputSymbol, row, col)
+                    (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, row, col)
                     |> SyntaxError
                     |> ErrorAction.Stop)
             |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->

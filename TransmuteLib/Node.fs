@@ -50,6 +50,7 @@ type Node =
 
     with
     override this.ToString() =
+        let stringifyList = List.map string >> String.concat ""
         match this with
         | TaggedNode (_, node) -> node.ToString()
         | PlaceholderNode -> "_"
@@ -85,14 +86,16 @@ type Node =
             |> sprintf "(%s)"
         | DisjunctNode branches ->
             branches
-            |> List.map (List.map string >> String.concat "")
+            |> List.map stringifyList
             |> String.concat "|"
             |> sprintf "(%s)"
         | RuleNode (target, replacement, environment) ->
-            sprintf "%s/%s/%s"
-                (target |> List.map string |> String.concat "")
-                (replacement |> List.map string |> String.concat "")
-                (environment |> List.map string |> String.concat "")
+            sprintf "%s→%s/%s"
+                (stringifyList target)
+                // I know this technically isn't the empty set symbol, but the actual one doesn't display
+                // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
+                (if replacement = [] then "Ø" else stringifyList replacement)
+                (stringifyList environment)
 
 /// Provides functions on the Node type.
 module Node =

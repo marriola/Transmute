@@ -31,14 +31,14 @@ type TokenType =
     /// A '/' token.
     | Divider
 
+    /// A '->' token.
+    | Arrow
+
     /// A '_' token.
     | Placeholder
 
     /// A '#' token.
     | Boundary
-
-    /// A '=>' token.
-    | Gives
 
     /// A '+' token.
     | Plus

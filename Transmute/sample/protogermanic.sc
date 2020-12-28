@@ -17,29 +17,30 @@
 ; TODO implement transformation of Ø, i.e. insertion
 ; /u/#_$SONORANT$C
 
-[+$palatalized]/[-$palatalized]/_
+; You can use either / or -> after the input segment
+[+$palatalized]->[-$palatalized]/_
 
 m/um/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 n/un/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 l/ul/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 r/ur/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 
-$LARYNGEAL//#_$C
+[-$overlong]/[+$overlong]/_#
 
-ː/ːː/_#
+$LARYNGEAL//#_$C
 
 ; e-coloring and dropping of laryngeals in onset
 e/o/χʷ(ˈ)_
 e/a/χ(ˈ)_
 $LARYNGEAL//#_
-$LARYNGEAL//_$V
+$LARYNGEAL//_(ˈ)$V
 
 ; Homorganic vowels in hiatus -> long vowel
-aa/aː/_
-ee/eː/_
-ii/iː/_
-oo/oː/_
-uu/uː/_
+aa/aːː/_
+ee/eːː/_
+ii/iːː/_
+oo/oːː/_
+uu/uːː/_
 
 ; e-coloring
 e/o/_(w|j)χʷ
@@ -69,7 +70,6 @@ a//_#
 o//_#
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
-; TODO: fix optional node moving to end inside branch of disjunct node
 [$STOP-$voiced]/[+$fricative]/(#|$V|$SONORANT)_
 ;[$STOP-$voiced]/[+$fricative]/!($OBSTRUENT)_
 
@@ -79,13 +79,16 @@ o//_#
 ; Germanic spirant law
 [$STOP+$LABIAL]/ɸ/_(t|s) ;($C|$V)
 [$STOP+$DENTAL]/ts/_(t|s) ;($C|$V)
-;tst/ss/_
+tst/ss/_
 ;tss/ss/_
-ss/s/_
+ss/s/_#
 [$STOP+$VELAR]/x/_(t|s)($C|$V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
-[$STOP+$voiced-$aspirated]/[-$voiced]/_(#|$V|ˈ$V|$C)
+; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
+; Fix: identify features that have the sound as a prefix and transition on error
+; e.g. don't match b for [$STOP+$voiced-$aspirated] when it is followed by ʰ
+[$STOP+$voiced-$aspirated]/[-$voiced]/_(#|(ˈ)$V|$C)
 
 ; Grimm's law: aspirated stops become unaspirated
 [$STOP+$aspirated]/[-$aspirated]/_
@@ -95,7 +98,11 @@ g/ɣ/(#|$LIQUID|[+$fricative])_
 [$STOP+$voiced]/[+$fricative]/($V|$GLIDE)_(#|$V|$GLIDE)
 
 ; Verner's law
+;[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_(#|(ˈ)$V) ; Why does this one result in environment and target states being merged?
 [+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_
+
+; Undo Verner's law after voiceless consonant
+[+$fricative+$voiced]/[-$voiced]/[-$voiced]_
 
 ; Undo Verner's law before voiceless stops
 [+$fricative+$voiced]/[-$voiced]/_[$STOP-$voiced]
@@ -105,7 +112,9 @@ g/ɣ/(#|$LIQUID|[+$fricative])_
 
 ; Stress moves to initial syllable. Let's just stop marking it.
 [+$stressed]/[-$stressed]/_
-s/z/$V_# ; Analogy
+
+; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
+s/z/$V_#
 
 gʷ/b/#_
 
@@ -149,6 +158,9 @@ t//$V($C)($C)$V($C)_#
 ɑː/ɔː/_
 ɑ̃ː/ɔ̃ː/_
 
+; Not really sure where this should go, so I'll just stick it at the end
+sr/str/_
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                  Sets and features                  ;;
@@ -168,54 +180,61 @@ $V {
 [$high] { i u }
 
 [$long] {
-    ɑ => ɑː
-    a => aː
-    e => eː
-    i => iː
-    o => oː
-    u => uː
+    ɑ -> ɑː
+    a -> aː
+    e -> eː
+    i -> iː
+    o -> oː
+    u -> uː
     ɔː 
-    ɑ̃ => ɑ̃ː
-    ẽ => ẽː
-    ĩ => ĩː
-    õ => õː
-    ũ => ũː
+    ɑ̃ -> ɑ̃ː
+    ẽ -> ẽː
+    ĩ -> ĩː
+    õ -> õː
+    ũ -> ũː
     ɔ̃ː
 }
 
+[$overlong] {
+    aː -> aːː
+    oː -> oːː    
+}
+
 [$nasalized] {
-    ɑ => ɑ̃
-    e => ẽ
-    i => ĩ
-    o => õ
-    u => ũ
-    ɑː => ɑ̃ː
-    eː => ẽː
-    iː => ĩː
-    oː => õː
-    uː => ũː
+    ɑ -> ɑ̃
+    e -> ẽ
+    i -> ĩ
+    o -> õ
+    u -> ũ
+    ɑː -> ɑ̃ː
+    eː -> ẽː
+    iː -> ĩː
+    oː -> õː
+    uː -> ũː
+    ɑːː -> ɑ̃ːː
+    oːː -> õːː
 }
 
 [$stressed] {
-    a => ˈa
-    aː => ˈaː
-    ɑ => ˈɑ
-    ɑː => ˈɑː
-    e => ˈe
-    eː => ˈeː
-    i => ˈi
-    iː => ˈiː
-    o => ˈo
-    oː => ˈoː
-    ɔ => ˈɔ
-    ɔː => ˈɔː
-    u => ˈu
-    uː => ˈuː
-    ə => ˈə
-    m => 'm
-    n => 'n
-    l => 'l
-    r => 'r
+    a -> ˈa
+    aː -> ˈaː
+    ɑ -> ˈɑ
+    ɑː -> ˈɑː
+    e -> ˈe
+    eː -> ˈeː
+    i -> ˈi
+    iː -> ˈiː
+    o -> ˈo
+    oː -> ˈoː
+    ɔ -> ˈɔ
+    ɔː -> ˈɔː
+    u -> ˈu
+    uː -> ˈuː
+    ə -> ˈə
+    m -> 'm
+    n -> 'n
+    l -> 'l
+    r -> 'r
 }
 
 ; TODO map sets
@@ -262,51 +281,52 @@ $STOP {
 }
 
 [$voiced] {
-    k => g
+    k -> g
     gʰ
-    x => ɣ
-    xʷ => ɣʷ
-    kʲ => gʲ
+    x -> ɣ
+    xʷ -> ɣʷ
+    kʲ -> gʲ
     gʲʰ
-    kʷ => gʷ
+    kʷ -> gʷ
     gʷʰ
-    p => b
+    p -> b
     bʰ
-    ɸ => β
-    t => d
-    s => z
+    ɸ -> β
+    t -> d
+    s -> z
     dʰ
-    θ => ð
+    θ -> ð
 }
 
 [$palatalized] {
-    k => kʲ
-    g => gʲ
-    gʰ => gʲʰ
+    k -> kʲ
+    g -> gʲ
+    gʰ -> gʲʰ
 }
 
 [$labialized] {
-    k => kʷ
-    g => gʷ
-    gʰ => gʷʰ
+    k -> kʷ
+    g -> gʷ
+    gʰ -> gʷʰ
 }
 
 [$aspirated] {
-    g => gʰ
-    gʲ => gʲʰ
-    gʷ => gʷʰ
-    b => bʰ
-    d => dʰ
+    g -> gʰ
+    gʲ -> gʲʰ
+    gʷ -> gʷʰ
+    b -> bʰ
+    d -> dʰ
 }
 
 [$fricative] {
-    k => x
-    kʷ => xʷ
-    p => ɸ
-    t => θ
-    g => ɣ
-    gʷ => ɣʷ
-    b => β
-    d => ð
+    k -> x
+    kʷ -> xʷ
+    p -> ɸ
+    t -> θ
+    g -> ɣ
+    gʷ -> ɣʷ
+    b -> β
+    d -> ð
     s
+    z
 }
