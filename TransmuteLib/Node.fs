@@ -21,20 +21,20 @@ type Node =
     /// Represents an utterance.
     | UtteranceNode of string
 
-    /// Represents the placeholder for the target segment in the environment segment.
+    /// Represents the placeholder for the input segment in the environment segment.
     | PlaceholderNode
 
     /// Represents a word boundary in the environment segment.
     | BoundaryNode
 
     /// Represents a phonological rule.
-    | RuleNode of target:Node list * result:Node list * environment:Node list
+    | RuleNode of input:Node list * output:Node list * environment:Node list
 
     /// Defines a set of utterances.
     | SetDefinitionNode of name:string * members:Node list
 
     /// Defines a transformation from one phoneme to another.
-    | TransformationNode of target:Node * result:Node
+    | TransformationNode of input:Node * output:Node
 
     /// Defines a set of phonemes possessing this feature and transformations on it.
     | FeatureDefinitionNode of name:string * members:Node list
@@ -72,8 +72,8 @@ type Node =
             |> List.map string
             |> String.concat " "
             |> sprintf "%s { %s }" name
-        | TransformationNode (target, result) ->
-            sprintf "%s => %s" (string target) (string result)
+        | TransformationNode (input, output) ->
+            sprintf "%s => %s" (string input) (string output)
         | FeatureDefinitionNode (name, members) ->
             members 
             |> List.map string
@@ -89,12 +89,12 @@ type Node =
             |> List.map stringifyList
             |> String.concat "|"
             |> sprintf "(%s)"
-        | RuleNode (target, replacement, environment) ->
+        | RuleNode (input, output, environment) ->
             sprintf "%s→%s/%s"
-                (stringifyList target)
+                (stringifyList input)
                 // I know this technically isn't the empty set symbol, but the actual one doesn't display
                 // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
-                (if replacement = [] then "Ø" else stringifyList replacement)
+                (if output = [] then "Ø" else stringifyList output)
                 (stringifyList environment)
 
 /// Provides functions on the Node type.
@@ -114,8 +114,8 @@ module Node =
         nodes
         |> List.map untag
         |> List.map (function
-            | RuleNode (target, result, environment) ->
-                RuleNode (untagAll target, untagAll result, untagAll environment)
+            | RuleNode (input, output, environment) ->
+                RuleNode (untagAll input, untagAll output, untagAll environment)
             | CompoundSetIdentifierNode xs ->
                 CompoundSetIdentifierNode (untagAll xs)
             | SetDefinitionNode (name, members) ->
@@ -137,16 +137,16 @@ module Node =
     /// Gets the left string value of a TransformationNode.
     let getLeft node =
         match untag node with
-        | TransformationNode (target, _) ->
-            target
+        | TransformationNode (input, _) ->
+            input
         | _ ->
             invalidArg "this" "Must be a TranformationNode"
 
     /// Gets the right string value of a TransformationNode.
     let getRight node =
         match untag node with
-        | TransformationNode (_, result)->
-            result
+        | TransformationNode (_, output)->
+            output
         | _ ->
             invalidArg "this" "Must be a TranformationNode"
 
@@ -216,8 +216,8 @@ module Node =
                     match x with
                     | Untag (UtteranceNode value, _) when isPresent ->
                         value :: out
-                    | Untag (TransformationNode (target, result), _) ->
-                        let utterance = if isPresent then result else target
+                    | Untag (TransformationNode (input, output), _) ->
+                        let utterance = if isPresent then output else input
                         match utterance with
                         | Untag (UtteranceNode value, _) -> value :: out
                     | _ ->
@@ -226,8 +226,8 @@ module Node =
         inner (getMembers feature) []
 
     type private Transformation =
-        | Add of target: string * result: string
-        | Remove of target: string * result: string
+        | Add of input: string * output: string
+        | Remove of input: string * output: string
 
     /// Returns a map of phonemes that can be transformed to add the feature, and
     /// a map of phonemes that can be transformed to remove the feature.
@@ -237,25 +237,25 @@ module Node =
             |> getMembers
             |> List.choose (fun m ->
                 match m with
-                | TaggedNode (_, TransformationNode (target, result)) ->
-                    let target = getStringValue target
-                    let result = getStringValue result
+                | TaggedNode (_, TransformationNode (input, output)) ->
+                    let input = getStringValue input
+                    let output = getStringValue output
                     Some [
-                        Add (target, result)
-                        Remove (result, target)
+                        Add (input, output)
+                        Remove (output, input)
                     ]
                 | _ -> None)
             |> List.concat
         let additions =
             transformations
             |> List.choose (function
-                | Add (target, result) -> Some (target, result)
+                | Add (input, output) -> Some (input, output)
                 | Remove _ -> None)
             |> Map.ofSeq
         let removals =
             transformations
             |> List.choose (function
-                | Remove (target, result) -> Some (target, result)
+                | Remove (input, output) -> Some (input, output)
                 | Add _ -> None)
             |> Map.ofSeq
         additions, removals

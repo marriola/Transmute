@@ -1,7 +1,7 @@
 ﻿namespace TransmuteLib
 
 type StateType = Final | NonFinal
-type Segment = EnvironmentSegment | TargetSegment
+type Segment = EnvironmentSegment | InputSegment
 
 type State =
     | State of name: string * segment: Segment * stateType: StateType
@@ -25,13 +25,13 @@ type State =
             | MergedState _ ->
                 failwith "Merged states have no ordinal"
 
-        /// Creates a non-final state marked as matching input in the target segment.
-        static member make name = State (name, TargetSegment, NonFinal)
+        /// Creates a non-final state marked as matching a symbol in the input segment.
+        static member make name = State (name, InputSegment, NonFinal)
     
         /// Marks a state as being final.
         static member makeFinal = function
-            | State (name, isTarget, _) ->
-                State (name, isTarget, Final)
+            | State (name, isInput, _) ->
+                State (name, isInput, Final)
             | MergedState _ as state ->
                 failwithf "%s is a merged state; it cannot be made final" (string state)
 
@@ -57,8 +57,8 @@ type State =
                 |> List.ofSeq
             let segment =
                 match statesToMerge with
-                | (State (_, TargetSegment, _))::_ ->
-                    TargetSegment
+                | (State (_, InputSegment, _))::_ ->
+                    InputSegment
                 | _ ->
                     EnvironmentSegment
             match statesToMerge with

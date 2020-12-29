@@ -3,10 +3,10 @@
 open TransmuteLib.StateMachine
 
 module RuleMachine =
-    let private (|IsTarget|_|) state =
+    let private (|IsInput|_|) state =
         match state with
-        | State (_, TargetSegment, _)
-        | MergedState (_, TargetSegment) ->
+        | State (_, InputSegment, _)
+        | MergedState (_, InputSegment) ->
             Some state
         | _ ->
             None
@@ -30,13 +30,13 @@ module RuleMachine =
 
     /// An input symbol tagged with the segment it came from and its position.
     type private EnvironmentString =
-        | FromTarget of input: string * position: int
+        | FromInput of input: string * position: int
         | FromEnvironment of input: string * position: int
         with
             /// Gets the input symbol.
             static member get = function
                 | FromEnvironment (s, _)
-                | FromTarget (s, _) -> s
+                | FromInput (s, _) -> s
 
             /// Adds the input symbol c to xs.
             static member add c xs =
@@ -44,16 +44,16 @@ module RuleMachine =
                     (fun () -> string c :: xs)
                     c xs
 
-            /// Tags the input symbol c with its position and adds it to xs.
+            /// Tags the symbol c with its position and adds it to xs.
             static member addWithPosition c position xs =
                 specialSymbolCata
                     (fun () -> (string c, position) :: xs)
                     c xs
 
-            /// Tags the input symbol as originating from the target segment and adds it to xs.
-            static member addTarget position c xs =
+            /// Tags the input symbol as originating from the input segment and adds it to xs.
+            static member addInput position c xs =
                 specialSymbolCata
-                    (fun () -> (FromTarget (string c, position)) :: xs)
+                    (fun () -> (FromInput (string c, position)) :: xs)
                     c xs
 
             /// Tags the input symbol as originating from the environment segment and adds it to xs.
@@ -175,43 +175,43 @@ module RuleMachine =
                     undo = []
                     output = nextOutput
             })
-        |> onTransition (fun position transition _ input current nextState value ->
+        |> onTransition (fun position transition _ symbol current nextState value ->
             let { lastOutputOn = lastOutputOn; production = production; undo = undo; output = output } = value
             if verbose then
-                printf "• %2d %c %2s: " position input (if lastOutputOn = None then "" else string (Option.get lastOutputOn))
+                printf "• %2d %c %2s: " position symbol (if lastOutputOn = None then "" else string (Option.get lastOutputOn))
             let isNextFinal = State.isFinal nextState
             let tf = Map.tryFind transition transformations
             let nextUndo, nextProduction, nextOutput =
                 match isNextFinal, nextState, tf with
                 // Completed match in environment segment with no transformation.
-                // Commit the input symbol and combine the undo and production buffers.
+                // Commit the symbol and combine the undo and production buffers.
                 | true, IsEnvironment _, None ->
                     let nextProduction =
                         production
-                        |> EnvironmentString.addWithPosition input position
+                        |> EnvironmentString.addWithPosition symbol position
                         |> EnvironmentString.concatEnvironmentWithPosition undo
                     [], nextProduction, output
                 // Completed match with a transformation.
                 // Set production to the output of the transformation and add undo to output.
                 | true, IsEnvironment _, Some tf'
-                | true, IsTarget _, Some tf' ->
+                | true, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
                     [], nextProduction, EnvironmentString.concatEnvironment undo output
                 // Partial match in environment segment.
-                // Add input to undo.
+                // Add symbol to undo.
                 | false, IsEnvironment _, _ ->
-                    let nextUndo = EnvironmentString.addEnvironment position input undo
+                    let nextUndo = EnvironmentString.addEnvironment position symbol undo
                     nextUndo, production, output
-                // Partial match in target segment with a transformation.
-                // Set production to the output of the transformation and add input to undo.
-                | false, IsTarget _, Some tf' ->
+                // Partial match in input segment with a transformation.
+                // Set production to the output of the transformation and add symbol to undo.
+                | false, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
-                    let nextUndo = EnvironmentString.addTarget position input undo
+                    let nextUndo = EnvironmentString.addInput position symbol undo
                     nextUndo, nextProduction, output
-                // Partial match in target segment with no transformation.
-                // Add input to undo.
-                | false, IsTarget _, None ->
-                    let nextUndo = EnvironmentString.addTarget position input undo
+                // Partial match in input segment with no transformation.
+                // Add symbol to undo.
+                | false, IsInput _, None ->
+                    let nextUndo = EnvironmentString.addInput position symbol undo
                     nextUndo, production, output
                 | _ ->
                     undo, production, output

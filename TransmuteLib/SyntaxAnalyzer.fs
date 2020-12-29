@@ -73,12 +73,12 @@ module SyntaxAnalyzer =
                 validateInternal rest
         validateInternal nodes
 
-    let private validateRuleNode target replacement environment =                
+    let private validateRuleNode input output environment =                
         Ok ()
-        ?|> onlyEnvironmentMayContainBoundaryNode "Target" target
-        ?|> onlyEnvironmentMayContainBoundaryNode "Replacement" replacement
-        ?|> onlyEnvironmentMayContainPlaceholderNode "Target" target
-        ?|> onlyEnvironmentMayContainPlaceholderNode "Replacement" replacement
+        ?|> onlyEnvironmentMayContainBoundaryNode "Input" input
+        ?|> onlyEnvironmentMayContainBoundaryNode "Output" output
+        ?|> onlyEnvironmentMayContainPlaceholderNode "Input" input
+        ?|> onlyEnvironmentMayContainPlaceholderNode "Output" output
         ?|> onlyOnePlaceholderNodeIsAllowed environment
         ?|> boundaryMayOnlyAppearAtEnds (BoundedList.fromList environment)
         ?|> optionalNodeMayNotBeEmpty environment
@@ -87,8 +87,8 @@ module SyntaxAnalyzer =
         let rec validateInternal nodes =
             match nodes with
             | [] -> Ok ()
-            | TaggedNode (_, RuleNode (target, replacement, environment))::xs ->
-                validateRuleNode target replacement environment
+            | TaggedNode (_, RuleNode (input, output, environment))::xs ->
+                validateRuleNode input output environment
                 validateInternal xs
             | _::xs ->
                 validateInternal xs

@@ -23,7 +23,7 @@ module PrefixTree =
     let START_MATCH = '␂'
     let END_MATCH = '␃'
 
-    let private isEmpty = String.length >> (=) 0
+    let private isEmpty = System.String.IsNullOrEmpty
 
     /// <summary>
     /// Creates a prefix tree from a set of utterances.
