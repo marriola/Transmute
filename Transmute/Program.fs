@@ -85,7 +85,7 @@ let transform options rules word =
         | [] ->
             word, totalTime
         | (i, (ruleDesc, rule))::xs ->
-            if options.verbosityLevel > Normal then
+            if options.verbosityLevel >= ShowDFA then
                 let transitions, transformations = rule
                 printfn "\nRule %d: %O" i ruleDesc
                 printfn "\nDFA:\n"
@@ -106,10 +106,10 @@ let transform options rules word =
                     printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
-            if options.verbosityLevel > Normal then
+            if options.verbosityLevel > ShowDFA then
                 printfn "%50s" word
 
-            let result = RuleMachine.transform (options.verbosityLevel > Normal) rule word
+            let result = RuleMachine.transform (options.verbosityLevel > ShowDFA) rule word
             sw.Stop()
 
             if options.verbosityLevel >= ShowTransformations && word <> result then
