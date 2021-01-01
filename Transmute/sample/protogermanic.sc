@@ -17,8 +17,9 @@
 ; TODO implement transformation of Ø, i.e. insertion
 ; /u/#_$SONORANT$C
 
-; You can use either / or -> after the input segment
-[+$palatalized]->[-$palatalized]/_
+; You can use either / or -> after the input segment.
+; You can also omit the environment segment for unconditional rules.
+[+$palatalized]->[-$palatalized]
 
 m/um/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
 n/un/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
@@ -36,17 +37,17 @@ $LARYNGEAL//#_
 $LARYNGEAL//_(ˈ)$V
 
 ; Homorganic vowels in hiatus -> long vowel
-aa/aːː/_
-ee/eːː/_
-ii/iːː/_
-oo/oːː/_
-uu/uːː/_
+aa/aːː
+ee/eːː
+ii/iːː
+oo/oːː
+uu/uːː
 
 ; e-coloring
 e/o/_(w|j)χʷ
 e/a/_(w|j)χ
-eχʷ/oː/_
-eχ/ɑː/_
+eχʷ/oː
+eχ/ɑː
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 [-$long]/[+$long]/_$LARYNGEAL
@@ -56,7 +57,7 @@ $LARYNGEAL//($V|$SONORANT)_
 χʷ/g/($SONORANT)_w
 
 ; Vocalization of remaining laryngeals
-$LARYNGEAL/ə/_
+$LARYNGEAL/ə
 
 
 ;;;;;;;;;;;;;;
@@ -79,8 +80,8 @@ o//_#
 ; Germanic spirant law
 [$STOP+$LABIAL]/ɸ/_(t|s) ;($C|$V)
 [$STOP+$DENTAL]/ts/_(t|s) ;($C|$V)
-tst/ss/_
-;tss/ss/_
+tst/ss
+;tss/ss
 ss/s/_#
 [$STOP+$VELAR]/x/_(t|s)($C|$V)
 
@@ -91,14 +92,14 @@ ss/s/_#
 [$STOP+$voiced-$aspirated]/[-$voiced]/_(#|(ˈ)$V|$C)
 
 ; Grimm's law: aspirated stops become unaspirated
-[$STOP+$aspirated]/[-$aspirated]/_
+[$STOP+$aspirated]/[-$aspirated]
 g/ɣ/(#|$LIQUID|[+$fricative])_
 
 ; Lenition of intervocalic voiced stops
 [$STOP+$voiced]/[+$fricative]/($V|$GLIDE)_(#|$V|$GLIDE)
 
 ; Verner's law
-;[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_(#|(ˈ)$V) ; Why does this one result in environment and target states being merged?
+;[+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_(#|(ˈ)$V) ; Why does this one result in environment and input states being merged?
 [+$fricative-$voiced]/[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_
 
 ; Undo Verner's law after voiceless consonant
@@ -111,28 +112,27 @@ g/ɣ/(#|$LIQUID|[+$fricative])_
 [+$fricative+$voiced]/[-$fricative]/$NASAL_
 
 ; Stress moves to initial syllable. Let's just stop marking it.
-[+$stressed]/[-$stressed]/_
+[+$stressed]/[-$stressed]
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
 s/z/$V_#
 
 gʷ/b/#_
 
-nw/nn/_
-ln/ll/_
-zm/mm/_
+nw/nn
+ln/ll
+zm/mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 e/i/$V($GLIDE)($C)($C)_(#|$C)
 ; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
 ji/i/$V($C)($C)_(#|$C)
-ei/iː/_
-ej/iː/_
-ij/iː/_
+ei/iː
+ej/iː
+ij/iː
 
-o/ɑ/_
-a/ɑ/_
-
+o/ɑ
+a/ɑ
 
 ;;;;;;;;;;;;;
 ; Late PGmc ;
@@ -142,24 +142,24 @@ m/n/_#
 m/n/_$DENTAL
 [-$nasalized]n/[+$nasalized]/_#
 
-ẽː/ɑ̃ː/_
+ẽː/ɑ̃ː
 
 ; Stressed schwa becomes /a/
 ə/ɑ/#($C)($C)_
 
 ; Unstressed schwa disappears between consonants
 ə//$C_$C
-ə/ɑ/_
+ə/ɑ
 
 ;t//$V$C($C)($C)$V($C)($C)_#
 t//$V($C)($C)$V($C)_#
-ɣʷ/w/_
+ɣʷ/w
 
-ɑː/ɔː/_
-ɑ̃ː/ɔ̃ː/_
+ɑː/ɔː
+ɑ̃ː/ɔ̃ː
 
 ; Not really sure where this should go, so I'll just stick it at the end
-sr/str/_
+sr/str
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
