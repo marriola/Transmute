@@ -90,12 +90,17 @@ type Node =
             |> String.concat "|"
             |> sprintf "(%s)"
         | RuleNode (input, output, environment) ->
-            sprintf "%s→%s/%s"
+            let environmentSegment =
+                match environment with
+                | [PlaceholderNode] -> ""
+                | _ -> sprintf "/%s" (stringifyList environment)
+
+            sprintf "%s→%s%s"
                 (stringifyList input)
                 // I know this technically isn't the empty set symbol, but the actual one doesn't display
                 // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
                 (if output = [] then "Ø" else stringifyList output)
-                (stringifyList environment)
+                environmentSegment
 
 /// Provides functions on the Node type.
 module Node =

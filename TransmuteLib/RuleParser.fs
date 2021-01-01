@@ -27,6 +27,15 @@ module RuleParser =
             | x::_ ->
                 unexpectedToken [tokenType] x
 
+        let rec tryMatchToken tokens tokenType =
+            match tokens with
+            | OfType Whitespace _::xs ->
+                tryMatchToken xs tokenType
+            | { tokenType = t } as x::xs when tokenType = t ->
+                xs, Some t
+            | _ ->
+                tokens, None
+
         /// Matches a token to one of a list of token types.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
@@ -205,9 +214,16 @@ module RuleParser =
             let tokens, input = matchRuleSegment tokens
             let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
             let tokens, output = matchRuleSegment tokens
-            let tokens, _ = matchToken tokens Divider
-            let tokens, environment = matchRuleSegment tokens
+            let tokens, divider = tryMatchToken tokens Divider
+            let tokens, environment =
+                match divider with
+                | Some _ ->
+                    let tokens, environment = matchRuleSegment tokens
+                    tokens, environment
+                | None ->
+                    tokens, [PlaceholderNode]
             tokens, Node.tag (RuleNode (input, output, environment)) headPosition
+
 
         /// <summary>
         /// Matches a rule when an identifier has already been matched.
