@@ -3,12 +3,12 @@
 open System.Collections.Generic
 open TransmuteLib
 
-type PrefixTree =
+type private PrefixTree =
     | Root of children:PrefixTree list
     | Node of prefix:string * value:char * children:PrefixTree list
     | Leaf of utterance:string
 
-module PrefixTree =
+module private PrefixTree =
     // maketree [ "k"; "kw"; "g"; "gw"; "p"; "b"; "t"; "d" ]
 
     //                Ø
@@ -46,7 +46,7 @@ module PrefixTree =
             followSet @ final
         Root (inner set "")
 
-type PrefixTree with
+type private PrefixTree with
     /// <summary>
     /// Creates a prefix tree from the members of a feature
     /// </summary>

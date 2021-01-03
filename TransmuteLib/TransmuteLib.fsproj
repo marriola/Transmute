@@ -14,8 +14,8 @@
     <Compile Include="Node.fs" />
     <Compile Include="StateMachine.fs" />
     <Compile Include="Lexer.fs" />
-    <Compile Include="RuleParser.fs" />
     <Compile Include="SyntaxAnalyzer.fs" />
+    <Compile Include="RuleParser.fs" />
     <Compile Include="PrefixTree.fs" />
     <Compile Include="Special.fs" />
     <Compile Include="State.fs" />

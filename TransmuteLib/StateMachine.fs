@@ -29,7 +29,7 @@ type StateTransition<'TState> =
       Transitions: (Destination<'TState> * InputSymbol) list
     }
 
-module StateMachine =
+module private StateMachine =
     let getOrigin (From origin, _, _) = origin
     let getInput (_, on, _) = on
     let getDest (_, _, To dest) = dest
