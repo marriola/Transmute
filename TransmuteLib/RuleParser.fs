@@ -1,5 +1,7 @@
 ﻿namespace TransmuteLib
 
+open TransmuteLib.Lexer
+open TransmuteLib.Node
 open TransmuteLib.Token
 open TransmuteLib.Utils
 
@@ -372,6 +374,11 @@ module RuleParser =
         /// <exception cref="SyntaxException">No rule matches the available tokens.</exception>
         let rec nextInternal tokens =
             try
+                _position <-
+                    match tokens with
+                    | [] -> _position
+                    | x::_ -> x.position
+
                 match tokens with
                 | [] ->
                     Result.Error (syntaxErrorMessage "End of file" _position)
@@ -391,22 +398,13 @@ module RuleParser =
                 Exceptions.SyntaxError (message, row, col) ->
                     Result.Error (syntaxErrorMessage message (row, col))
    
-        // Store result and update position before returning
-        let result = (nextInternal tokens)
-
-        match result with
-        | Ok (nextTokens, node) ->
-            if [] <> nextTokens then
-                _position <- nextTokens.Head.position
-            result
-        | _ ->
-            result
+        nextInternal tokens
 
     /// <summary>
     /// Parses a list of tokens to a list of nodes.
     /// </summary>
     /// <param name="tokens">The list of tokens to parse.</param>
-    let parse tokens =
+    let private parse tokens =
         let rec parseInternal tokens out =
             match tokens with
             | [] ->
@@ -418,3 +416,33 @@ module RuleParser =
                 | Result.Error message ->
                     Result.Error message
         parseInternal tokens []
+
+    let parseRulesFile path =
+        let tokens =
+            match lex path with
+            | FileError msg ->
+                Result.Error (sprintf "%s" msg)
+            | SyntaxError (msg, row, col) ->
+                Result.Error (sprintf "Syntax error at row %d column %d: %s" row col msg)
+            | OK tokens ->
+                Result.Ok tokens
+
+        let nodes = Result.bind parse tokens
+        let nodes = Result.bind SyntaxAnalyzer.validate nodes
+        let sets = Result.bind (Node.getSets >> Ok) nodes
+        let features = Result.bind (Node.getFeatures >> Ok) nodes
+
+        let rules =
+            nodes
+            |> Result.bind (Ok << List.choose (fun x ->
+                match untag x with
+                | RuleNode _ as x -> Some x
+                | _ -> None))
+
+        match sets, features, rules with
+        | _, _, (Result.Error msg)
+        | _, (Result.Error msg), _
+        | (Result.Error msg), _, _ ->
+            Result.Error msg
+        | (Ok sets), (Ok features), (Ok rules) ->
+            Ok (sets, features, rules)

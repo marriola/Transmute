@@ -1,7 +1,6 @@
 ﻿open System
 open TransmuteLib
-open TransmuteLib.Lexer
-open TransmuteLib.Node
+open TransmuteLib.RuleParser
 open System.Collections.Generic
 open System.Diagnostics
 open Arguments
@@ -19,26 +18,9 @@ let validateOptions (options: Options) =
 
 let trim (s: string) = s.Trim()
 
-let compileRules options tokens =
-    let nodes =
-        match RuleParser.parse tokens with
-        | Ok nodes -> nodes
-        | Result.Error message -> failwith message
-    let features = getFeatures nodes
-    let sets = getSets nodes
-
-    match SyntaxAnalyzer.validate nodes with
-    | Ok () ->
-        ()
-    | Result.Error message ->
-        failwith message
-
+let compileRules options sets features rules =
     let indexedNodes =
-        nodes
-        |> List.choose (fun x ->
-            match untag x with
-            | RuleNode _ as x -> Some x
-            | _ -> None)
+        rules
         |> List.indexed
         |> List.map (fun (i, n) -> (i + 1), n)
 
@@ -136,38 +118,43 @@ let main argv =
     if not (validateOptions options) then
         Environment.Exit(0)
 
-    match lex options.rulesFile with
-    | FileError msg ->
-        printfn "%s" msg
-    | SyntaxError (msg, row, col) ->
-        printfn "Syntax error at row %d column %d: %s" row col msg
-    | OK tokens ->
-        let totalCompileTime, rules = compileRules options tokens
+    let sets, features, rules =
+        match parseRulesFile options.rulesFile with
+        | Ok (sets, features, rules) ->
+            sets, features, rules
+        | Result.Error msg ->
+            failwith msg
 
-        if options.verbosityLevel <> Silent then
-            fprintfn stderr ""
+    let totalCompileTime, rules = compileRules options sets features rules
 
-            rules
-            |> List.indexed
-            |> List.map (fun (i, (node, _)) -> sprintf "%2d. %O" (i + 1) node)
-            |> String.concat "\n"
-            |> printfn "%s"
+    if options.verbosityLevel > Normal then
+        fprintfn stderr ""
 
-            printfn "\nTotal compile time: %d ms" totalCompileTime
+        rules
+        |> List.indexed
+        |> List.map (fun (i, (node, _)) -> sprintf "%2d. %O" (i + 1) node)
+        |> String.concat "\n"
+        |> printfn "%s"
 
-        let lexicon =
-            IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
-            |> Array.map trim
-            |> Array.indexed
-            |> Array.choose (fun (i, word) ->
-                match options.testWords with
-                | None -> Some word
-                | Some x when List.contains (i + 1) x -> Some word
-                | _ -> None)
+        printfn "\nTotal compile time: %d ms" totalCompileTime
 
-        for word in lexicon do
-            let result, totalTime = transform options rules word
-            let totalMilliseconds = (float totalTime / 10000.0)
+    let lexicon =
+        IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
+        |> Array.map trim
+        |> Array.indexed
+        |> Array.choose (fun (i, word) ->
+            match options.testWords with
+            | None -> Some word
+            | Some x when List.contains (i + 1) x -> Some word
+            | _ -> None)
+
+    for word in lexicon do
+        let result, totalTime = transform options rules word
+        let totalMilliseconds = (float totalTime / 10000.0)
+
+        if options.verbosityLevel > Normal then
             printfn "[%5.2f ms] %15s -> %s" totalMilliseconds word result
+        else
+            printfn "%s" result
 
     0 // return an integer exit code
