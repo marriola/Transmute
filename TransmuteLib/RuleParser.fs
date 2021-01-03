@@ -116,6 +116,7 @@ module RuleParser =
             /// <param name="out">The contents of the node.</param>
             let rec matchDisjunct tokens startToken out =
                 match tokens with
+                | OfType Empty _::xs
                 | OfType Whitespace _::xs ->
                     matchDisjunct xs startToken out
                 | OfType RParen _::xs ->
@@ -148,6 +149,7 @@ module RuleParser =
 
             let rec inner tokens out =
                 match tokens with
+                | OfType Empty _::xs
                 | OfType Separator _::xs ->
                     inner xs out
                 | OfType Id x::xs ->
@@ -243,7 +245,7 @@ module RuleParser =
                         environment))
                     identifier.position
             | _ ->
-                invalidSyntax "unexpected error" _position
+                invalidSyntax "Expected a rule" _position
 
         /// <summary>
         /// Matches either a set or a rule.
@@ -257,6 +259,7 @@ module RuleParser =
                 // TODO: include members of other sets
                 let tokens, members = matchMemberList xs
                 tokens, Node.tag (SetDefinitionNode (identifier.value, members)) identifier.position
+            | OfType Arrow _::xs
             | OfType Divider _::xs ->
                 let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
                 tokens, ruleNode
@@ -266,7 +269,7 @@ module RuleParser =
             | [] ->
                 failwith "No more input"
             | x::_ ->
-                invalidSyntax "unexpected error" x.position
+                unexpectedToken [ LBrace; Empty; Divider; Utterance ] x
 
         /// <summary>
         /// Matches a rule when a set identifier has already been matched.
@@ -279,7 +282,7 @@ module RuleParser =
             | RuleNode (input, output, environment) ->
                 tokens, Node.tag (RuleNode (setIdentifier :: input, output, environment)) headPosition
             | _ ->
-                invalidSyntax "unexpected error" _position
+                invalidSyntax "Expected a rule" _position
 
         /// <summary>
         /// Prepends a node list to the input segment of a RuleNode.
@@ -386,6 +389,7 @@ module RuleParser =
                     nextInternal xs
                 | OfType Comment x::xs ->
                     Ok (xs, Node.tag (CommentNode x.value) x.position)
+                | OfType Empty x::xs
                 | OfType Utterance x::xs ->
                     Ok (matchRule tokens x.position)
                 | OfType Id x::xs ->
@@ -429,8 +433,8 @@ module RuleParser =
 
         let nodes = Result.bind parse tokens
         let nodes = Result.bind SyntaxAnalyzer.validate nodes
-        let sets = Result.bind (Node.getSets >> Ok) nodes
         let features = Result.bind (Node.getFeatures >> Ok) nodes
+        let sets = Result.bind (Node.getSets >> Ok) nodes
 
         let rules =
             nodes
@@ -439,10 +443,10 @@ module RuleParser =
                 | RuleNode _ as x -> Some x
                 | _ -> None))
 
-        match sets, features, rules with
+        match features, sets, rules with
         | _, _, (Result.Error msg)
         | _, (Result.Error msg), _
         | (Result.Error msg), _, _ ->
             Result.Error msg
-        | (Ok sets), (Ok features), (Ok rules) ->
-            Ok (sets, features, rules)
+        | (Ok features), (Ok sets), (Ok rules) ->
+            Ok (features, sets, rules)

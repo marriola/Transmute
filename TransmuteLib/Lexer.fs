@@ -25,6 +25,7 @@ module private Lexer =
         | Q_Divider
         | Q0
         | Q_Arrow
+        | Q_Empty
         | Q_Placeholder
         | Q_Boundary
         | Q_Plus
@@ -71,6 +72,9 @@ module private Lexer =
                   To Q_LParen, OnChar '('
                   To Q_RParen, OnChar ')'
                   To Q_Divider, OnChar '/'
+                  To Q_Arrow, OnChar '→'
+                  To Q_Empty, OnChar '∅'
+                  To Q_Empty, OnChar 'Ø'
                   To Q_Placeholder, OnChar '_'
                   To Q_Boundary, OnChar '#'
                   To Q_Plus, OnChar '+'
@@ -114,6 +118,7 @@ module private Lexer =
           Q_RParen, RParen.id
           Q_Divider, Divider.id
           Q_Arrow, Arrow.id
+          Q_Empty, Empty.id
           Q_Placeholder, Placeholder.id
           Q_Boundary, Boundary.id
           Q_Plus, Plus.id

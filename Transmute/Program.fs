@@ -18,7 +18,7 @@ let validateOptions (options: Options) =
 
 let trim (s: string) = s.Trim()
 
-let compileRules options sets features rules =
+let compileRules options features sets rules =
     let indexedNodes =
         rules
         |> List.indexed
@@ -34,7 +34,7 @@ let compileRules options sets features rules =
             indexedNodes
 
     if options.verbosityLevel > Silent then
-        fprintf stderr "Compiling.."
+        fprintf stderr "Compiling"
 
     let showNfa = options.verbosityLevel = ShowNFA
     let outerStopwatch = Stopwatch()
@@ -69,16 +69,15 @@ let transform options rules word =
         | (i, (ruleDesc, rule))::xs ->
             if options.verbosityLevel >= ShowDFA then
                 let transitions, transformations = rule
+                printfn "\n********************************************************************************"
                 printfn "\nRule %d: %O" i ruleDesc
                 printfn "\nDFA:\n"
 
                 transitions
                 |> Seq.map (fun (pair: KeyValuePair<State * InputSymbol, State>) -> pair.Key, pair.Value)
-                |> Seq.mapi (fun j ((fromState, m), toState) ->
+                |> Seq.iteri (fun j ((fromState, m), toState) ->
                     let t = sprintf "(%O, %O)" fromState m
-                    sprintf "%d.\t%-35s-> %O" (j + 1) t toState)
-                |> String.concat "\n"
-                |> printfn "%s"
+                    printfn "%d.\t%-35s-> %O" (j + 1) t toState)
 
                 printfn "\ntransformations:"
                 transformations
@@ -88,9 +87,6 @@ let transform options rules word =
                     printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
-            if options.verbosityLevel > ShowDFA then
-                printfn "%50s" word
-
             let result = RuleMachine.transform (options.verbosityLevel > ShowDFA) rule word
             sw.Stop()
 
@@ -118,23 +114,21 @@ let main argv =
     if not (validateOptions options) then
         Environment.Exit(0)
 
-    let sets, features, rules =
+    let features, sets, rules =
         match parseRulesFile options.rulesFile with
-        | Ok (sets, features, rules) ->
-            sets, features, rules
+        | Ok (features, sets, rules) ->
+            features, sets, rules
         | Result.Error msg ->
             failwith msg
 
-    let totalCompileTime, rules = compileRules options sets features rules
+    let totalCompileTime, rules = compileRules options features sets rules
 
     if options.verbosityLevel > Normal then
         fprintfn stderr ""
 
-        rules
-        |> List.indexed
-        |> List.map (fun (i, (node, _)) -> sprintf "%2d. %O" (i + 1) node)
-        |> String.concat "\n"
-        |> printfn "%s"
+        List.iteri
+            (fun i (node, _) -> printfn "%2d. %O" (i + 1) node)
+            rules
 
         printfn "\nTotal compile time: %d ms" totalCompileTime
 

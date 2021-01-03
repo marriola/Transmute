@@ -34,6 +34,9 @@ type TokenType =
     /// A '->' token.
     | Arrow
 
+    /// A '∅' token.
+    | Empty
+
     /// A '_' token.
     | Placeholder
 
