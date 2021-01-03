@@ -35,7 +35,7 @@ e→a/χ(ˈ)_
 $LARYNGEAL→∅/#_
 $LARYNGEAL→∅/_(ˈ)$V
 
-; Homorganic vowels in hiatus -> long vowel
+; Homorganic vowels in hiatus → long vowel
 aa→aːː
 ee→eːː
 ii→iːː
@@ -179,65 +179,65 @@ $V {
 [$high] { i u }
 
 [$long] {
-    ɑ -> ɑː
-    a -> aː
-    e -> eː
-    i -> iː
-    o -> oː
-    u -> uː
+    ɑ → ɑː
+    a → aː
+    e → eː
+    i → iː
+    o → oː
+    u → uː
     ɔː 
-    ɑ̃ -> ɑ̃ː
-    ẽ -> ẽː
-    ĩ -> ĩː
-    õ -> õː
-    ũ -> ũː
+    ɑ̃ → ɑ̃ː
+    ẽ → ẽː
+    ĩ → ĩː
+    õ → õː
+    ũ → ũː
     ɔ̃ː
 }
 
 [$overlong] {
-    aː -> aːː
-    oː -> oːː    
+    aː → aːː
+    oː → oːː    
 }
 
 [$nasalized] {
-    ɑ -> ɑ̃
-    e -> ẽ
-    i -> ĩ
-    o -> õ
-    u -> ũ
-    ɑː -> ɑ̃ː
-    eː -> ẽː
-    iː -> ĩː
-    oː -> õː
-    uː -> ũː
-    ɑːː -> ɑ̃ːː
-    oːː -> õːː
+    ɑ → ɑ̃
+    e → ẽ
+    i → ĩ
+    o → õ
+    u → ũ
+    ɑː → ɑ̃ː
+    eː → ẽː
+    iː → ĩː
+    oː → õː
+    uː → ũː
+    ɑːː → ɑ̃ːː
+    oːː → õːː
 }
 
 [$stressed] {
-    a -> ˈa
-    aː -> ˈaː
-    ɑ -> ˈɑ
-    ɑː -> ˈɑː
-    e -> ˈe
-    eː -> ˈeː
-    i -> ˈi
-    iː -> ˈiː
-    o -> ˈo
-    oː -> ˈoː
-    ɔ -> ˈɔ
-    ɔː -> ˈɔː
-    u -> ˈu
-    uː -> ˈuː
-    ə -> ˈə
-    m -> 'm
-    n -> 'n
-    l -> 'l
-    r -> 'r
+    a → ˈa
+    aː → ˈaː
+    ɑ → ˈɑ
+    ɑː → ˈɑː
+    e → ˈe
+    eː → ˈeː
+    i → ˈi
+    iː → ˈiː
+    o → ˈo
+    oː → ˈoː
+    ɔ → ˈɔ
+    ɔː → ˈɔː
+    u → ˈu
+    uː → ˈuː
+    ə → ˈə
+    m → 'm
+    n → 'n
+    l → 'l
+    r → 'r
 }
 
 ; TODO map sets
-; $V -> &ː
+; $V → &ː
 ;   produces aː eː iː oː uː
 
 $C {
@@ -280,21 +280,21 @@ $STOP {
 }
 
 [$voiced] {
-    k -> g
+    k → g
     gʰ
-    x -> ɣ
-    xʷ -> ɣʷ
-    kʲ -> gʲ
+    x → ɣ
+    xʷ → ɣʷ
+    kʲ → gʲ
     gʲʰ
-    kʷ -> gʷ
+    kʷ → gʷ
     gʷʰ
-    p -> b
+    p → b
     bʰ
-    ɸ -> β
-    t -> d
-    s -> z
+    ɸ → β
+    t → d
+    s → z
     dʰ
-    θ -> ð
+    θ → ð
 }
 
 [$palatalized] {
@@ -318,6 +318,7 @@ $STOP {
 }
 
 [$fricative] {
+    k → x
     kʷ → xʷ
     p → ɸ
     t → θ
