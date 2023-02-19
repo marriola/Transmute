@@ -1,5 +1,6 @@
 ﻿namespace TransmuteLib
 
+open System.IO
 open TransmuteLib.Lexer
 open TransmuteLib.Node
 open TransmuteLib.Token
@@ -204,8 +205,14 @@ module RuleParser =
                 | OfType Utterance x::xs ->
                     let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
                     matchMemberListInternal tokens (utteranceOrTransformation :: out)
+                | OfType Id x::xs ->
+                    let id = Node.tag (SetIdentifierNode x.value) x.position
+                    matchMemberListInternal xs (id :: out)
                 | OfType RBrace _::xs ->
                     xs, List.rev out
+                | OfType LBrack x::xs ->
+                    let tokens, id = matchSetIdentifier xs x.position
+                    matchMemberListInternal tokens (id :: out)
                 | x::_ ->
                     unexpectedToken [Utterance] x
             matchMemberListInternal tokens []
@@ -421,9 +428,9 @@ module RuleParser =
                     Result.Error message
         parseInternal tokens []
 
-    let parseRulesFile path =
+    let parseRules content =
         let tokens =
-            match lex path with
+            match lex content with
             | FileError msg ->
                 Result.Error (sprintf "%s" msg)
             | SyntaxError (msg, row, col) ->
@@ -431,15 +438,18 @@ module RuleParser =
             | OK tokens ->
                 Result.Ok tokens
 
-        let nodes = Result.bind parse tokens
-        let nodes = Result.bind SyntaxAnalyzer.validate nodes
+        let nodes =
+            tokens
+            |> Result.bind parse
+            |> Result.bind SyntaxAnalyzer.validate
+            |> Result.bind (Node.untagAll >> Ok)
+
         let features = Result.bind (Node.getFeatures >> Ok) nodes
         let sets = Result.bind (Node.getSets >> Ok) nodes
 
         let rules =
             nodes
-            |> Result.bind (Ok << List.choose (fun x ->
-                match untag x with
+            |> Result.bind (Ok << List.choose (function
                 | RuleNode _ as x -> Some x
                 | _ -> None))
 
@@ -449,4 +459,22 @@ module RuleParser =
         | (Result.Error msg), _, _ ->
             Result.Error msg
         | (Ok features), (Ok sets), (Ok rules) ->
-            Ok (features, sets, rules)
+            // Resolve references to other sets and features
+            let resolvedFeatures =
+                features
+                |> Map.toList
+                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+                |> Map.ofList
+
+            let resolvedSets =
+                sets
+                |> Map.toList
+                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+                |> Map.ofList
+
+            Ok (resolvedFeatures, resolvedSets, rules)
+
+    let parseRulesFile (path: string) =
+        use stream = new StreamReader(path, true)
+        let content = stream.ReadToEnd()
+        parseRules content

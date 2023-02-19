@@ -140,74 +140,69 @@ module private Lexer =
           builder: char list
           acc: Token list }
 
-    let lex (filename: string) =
+    let lex (content: string) =
         let isFinal state = stateTokenTypes.ContainsKey state
         let accumulate (builder: char list) =
             System.String.Concat(builder |> List.rev |> Array.ofList).Trim()
 
-        try
-            use stream = new StreamReader(filename, true)
-            let content = stream.ReadToEnd()
-            stateMachineConfig()
-            |> withTransitions table
-            |> withStartState START
-            |> withErrorState ERROR
-            |> withInitialValue
-                { startPos = 1, 1
-                  pos = 1, 1
-                  mismatchAction = Restart
-                  builder = []
-                  acc = [] }
-            |> onError (fun _ inputSymbol _ ({ pos = row, col } as value) _ ->
-                match value.mismatchAction with
-                | MismatchAction.Restart ->
-                    ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
-                | MismatchAction.Stop ->
-                    (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, row, col)
-                    |> SyntaxError
-                    |> ErrorAction.Stop)
-            |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->
-                let inline incrRow (row, _) = (row + 1, 1)
-                let inline incrCol (row, col) = (row, col + 1)
-                let isNextFinal = isFinal nextState
-                let nextPos =
-                    if isEpsilonTransition then
-                        value.pos
-                    else if inputSymbol = '\n' then
-                        incrRow value.pos
-                    else
-                        incrCol value.pos
-                let builder =
-                    if not isEpsilonTransition
-                        then inputSymbol :: value.builder
-                        else value.builder
-                // Add token to output if on a final state
-                let nextAcc =
-                    match Map.tryFind nextState stateTokenTypes with
-                    | Some fn ->
-                        let v = accumulate builder
-                        let nextValue =
-                            Cata.bool
-                                (fun _ -> v)
-                                (fun _ -> v.Trim())
-                                (currentState = Q_Whitespace)
-                        (fn value.startPos nextValue) :: value.acc
-                    | None -> value.acc
-                let nextStartPos =
-                    // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
-                    if isNextFinal
-                        || (builder = []
-                            && currentState <> Q_Whitespace
-                            && System.Char.IsWhiteSpace(inputSymbol))
-                        then nextPos
-                        else value.startPos
-                { value with
-                      startPos = nextStartPos
-                      pos = nextPos
-                      mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
-                      builder = if isNextFinal then [] else builder
-                      acc = nextAcc })
-            |> onFinish (fun { acc = acc } ->  acc |> List.rev |> OK)
-            |> runStateMachine content
-        with
-            | ex -> FileError ex.Message
+        stateMachineConfig()
+        |> withTransitions table
+        |> withStartState START
+        |> withErrorState ERROR
+        |> withInitialValue
+            { startPos = 1, 1
+              pos = 1, 1
+              mismatchAction = Restart
+              builder = []
+              acc = [] }
+        |> onError (fun _ inputSymbol _ ({ pos = row, col } as value) _ ->
+            match value.mismatchAction with
+            | MismatchAction.Restart ->
+                ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
+            | MismatchAction.Stop ->
+                (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, row, col)
+                |> SyntaxError
+                |> ErrorAction.Stop)
+        |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->
+            let inline incrRow (row, _) = (row + 1, 1)
+            let inline incrCol (row, col) = (row, col + 1)
+            let isNextFinal = isFinal nextState
+            let nextPos =
+                if isEpsilonTransition then
+                    value.pos
+                else if inputSymbol = '\n' then
+                    incrRow value.pos
+                else
+                    incrCol value.pos
+            let builder =
+                if not isEpsilonTransition
+                    then inputSymbol :: value.builder
+                    else value.builder
+            // Add token to output if on a final state
+            let nextAcc =
+                match Map.tryFind nextState stateTokenTypes with
+                | Some fn ->
+                    let v = accumulate builder
+                    let nextValue =
+                        Cata.bool
+                            (fun _ -> v)
+                            (fun _ -> v.Trim())
+                            (currentState = Q_Whitespace)
+                    (fn value.startPos nextValue) :: value.acc
+                | None -> value.acc
+            let nextStartPos =
+                // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
+                if isNextFinal
+                    || (builder = []
+                        && currentState <> Q_Whitespace
+                        && System.Char.IsWhiteSpace(inputSymbol))
+                    then nextPos
+                    else value.startPos
+            { value with
+                    startPos = nextStartPos
+                    pos = nextPos
+                    mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
+                    builder = if isNextFinal then [] else builder
+                    acc = nextAcc })
+        |> onFinish (fun { acc = acc } ->  acc |> List.rev |> OK)
+        |> runStateMachine content

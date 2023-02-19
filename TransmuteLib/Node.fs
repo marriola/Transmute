@@ -52,16 +52,18 @@ type Node =
     override this.ToString() =
         let stringifyList = List.map string >> String.concat ""
         match this with
-        | TaggedNode (_, node) -> node.ToString()
+        | TaggedNode (_, node) ->
+            node.ToString()
         | PlaceholderNode -> "_"
         | BoundaryNode -> "#"
         | CommentNode text -> sprintf "; %s" text
         | UtteranceNode value
         | SetIdentifierNode value
-        | TermIdentifierNode value -> value
+        | TermIdentifierNode value ->
+            value
         | FeatureIdentifierNode (isPresent, name) ->
             let sign = if isPresent then "+" else "-"
-            sprintf "%s%s" sign name
+            sign + name
         | CompoundSetIdentifierNode terms ->
             terms
             |> List.map string
@@ -73,7 +75,7 @@ type Node =
             |> String.concat " "
             |> sprintf "%s { %s }" name
         | TransformationNode (input, output) ->
-            sprintf "%s => %s" (string input) (string output)
+            sprintf "%s → %s" (string input) (string output)
         | FeatureDefinitionNode (name, members) ->
             members 
             |> List.map string
@@ -96,7 +98,7 @@ type Node =
                 | _ -> sprintf "/%s" (stringifyList environment)
 
             sprintf "%s→%s%s"
-                (stringifyList input)
+                (if input = [] then "Ø" else stringifyList input)
                 // I know this technically isn't the empty set symbol, but the actual one doesn't display
                 // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
                 (if output = [] then "Ø" else stringifyList output)
@@ -127,6 +129,8 @@ module Node =
                 SetDefinitionNode (name, untagAll members)
             | FeatureDefinitionNode (name, members) ->
                 FeatureDefinitionNode (name, untagAll members)
+            | TransformationNode (input, output) ->
+                TransformationNode (untag input, untag output)
             | OptionalNode xs ->
                 OptionalNode (untagAll xs)
             | DisjunctNode xs ->
@@ -199,12 +203,10 @@ module Node =
     let getSets nodes =
         nodes
         |> List.choose
-            (fun x ->
-                match untag x with
-                | SetDefinitionNode (name, members) ->
-                    Some (name, SetDefinitionNode (name, members))
+            (function
+                | SetDefinitionNode (name, _) as node -> Some (name, node)
                 | _ -> None)
-        |> Map.ofSeq
+        |> Map.ofList
 
     /// <summary>
     /// Gets the members of the feature.
@@ -242,7 +244,7 @@ module Node =
             |> getMembers
             |> List.choose (fun m ->
                 match m with
-                | TaggedNode (_, TransformationNode (input, output)) ->
+                | TransformationNode (input, output) ->
                     let input = getStringValue input
                     let output = getStringValue output
                     Some [
@@ -272,11 +274,41 @@ module Node =
     let getSetMembers setNode =
         match untag setNode with
         | SetDefinitionNode (_, members) ->
-            List.map (fun x -> getStringValue x) members
+            members
+            |> List.choose (function
+                | UtteranceNode x -> Some x
+                | _ -> None)
+        | FeatureDefinitionNode (_, members) ->
+            members
+            |> List.choose (function
+                | UtteranceNode x -> Some x
+                | TransformationNode (_, UtteranceNode output) -> Some output
+                | _ -> None)
         | _ ->
             invalidArg "setNode" "Must be a set"
 
+    let getMemberNodes node =
+        match node with
+        | SetDefinitionNode (_, members)
+        | FeatureDefinitionNode (_, members) ->
+            members
+            |> List.choose (function
+                | SetIdentifierNode _ -> None
+                | n -> Some n)
+        | _ ->
+            invalidArg "node" "Must be a feature or a set"
+
     let getAlphabet features sets =
+        let features =
+            features
+            |> Map.toList
+            |> List.map snd
+        
+        let sets =
+            sets
+            |> Map.toList
+            |> List.map snd
+
         [ List.map (getFeatureMembers true) features
           List.map (getFeatureMembers false) features
           List.map getSetMembers sets ]
@@ -340,3 +372,73 @@ module Node =
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs nextSet
         inner setDescriptor alphabet |> List.ofSeq
+
+    /// <summary>
+    /// <para>Resolves references to other features/sets in a feature/set by adding their members to it.</para>
+    /// </summary>
+    /// <remarks>
+    /// <para>A reference may be a simple identifier, which will add the members of a set, or the outputs of
+    /// a feature's transformations, to the collection including it.</para>
+    /// <para>A reference may also be a compound set identifier in brackets, specifying a combination of sets
+    /// and features to add.</para>
+    /// </remarks>
+    /// <param name="features">foobaz</param>
+    let resolveReferences features sets node =
+        let alphabet = getAlphabet features sets
+        let rec resolveReferences' visited node =
+            let references, members =
+                match node with
+                | SetDefinitionNode (_, members)
+                | FeatureDefinitionNode (_, members) ->
+                    members
+                    |> List.partition (function
+                        | SetIdentifierNode _
+                        | CompoundSetIdentifierNode _ -> true
+                        | _ -> false)
+                | _ ->
+                    invalidArg "node" "Must be a set definition or a feature definition"
+            let identifiers =
+                references
+                |> List.choose (function
+                    | SetIdentifierNode id -> Some id
+                    | _ -> None)
+            let compoundIdentifiers =
+                references
+                |> List.choose (function
+                    | CompoundSetIdentifierNode setDesc -> Some setDesc
+                    | _ -> None)
+            let resolve (name, node) =
+                if Set.contains name visited
+                    then failwithf "Circular reference in '%s'" name
+                    else resolveReferences' (Set.add name visited) node |> getMemberNodes
+            let referenceMembers =
+                let setMembers =
+                    sets
+                    |> Map.toList
+                    |> List.filter (fun (name, _) -> List.contains name identifiers)
+                    |> List.collect resolve
+                let fixFeatureMemberNode =
+                    match node with
+                    | SetDefinitionNode _ -> (function
+                        | TransformationNode (_, output) -> output
+                        | n -> n)
+                    | FeatureDefinitionNode _ -> id
+                let featureMembers =
+                    features
+                    |> Map.toList
+                    |> List.filter (fun (name, _) -> List.contains name identifiers)
+                    |> List.collect resolve
+                    |> List.map fixFeatureMemberNode
+                let featureSets =
+                    compoundIdentifiers
+                    |> List.collect (setIntersection alphabet features sets)
+                    |> List.map UtteranceNode
+                (setMembers @ featureMembers @ featureSets)
+                |> Set.ofList
+                |> Set.toList
+            match node with
+            | SetDefinitionNode (name, _) ->
+                SetDefinitionNode (name, members @ referenceMembers)
+            | FeatureDefinitionNode (name, _) ->
+                FeatureDefinitionNode (name, members @ referenceMembers)
+        resolveReferences' Set.empty node

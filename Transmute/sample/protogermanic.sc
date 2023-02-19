@@ -20,10 +20,7 @@
 ; You can omit the environment segment for unconditional rules.
 [+$palatalized]→[-$palatalized]
 
-m→um/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
-n→un/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
-l→ul/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
-r→ur/(#|[$C-$LARYNGEAL])(ˈ)_(#|$C)
+∅→u/(#|[$C-$LARYNGEAL])(ˈ)_(m|n|l|r)(#|$C)
 
 [-$overlong]→[+$overlong]/_#
 
@@ -144,7 +141,7 @@ m→n/_$DENTAL
 ẽː→ɑ̃ː
 
 ; Stressed schwa becomes /a/
-ə→ɑ/#($C)($C)_
+ə→ɑ/#(s)($C)($C)_
 
 ; Unstressed schwa disappears between consonants
 ə→∅/$C_$C
@@ -159,7 +156,6 @@ t→∅/$V($C)($C)$V($C)_#
 
 ; Not really sure where this should go, so I'll just stick it at the end
 sr→str
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                  Sets and features                  ;;
@@ -230,42 +226,26 @@ $V {
     u → ˈu
     uː → ˈuː
     ə → ˈə
-    m → 'm
-    n → 'n
-    l → 'l
-    r → 'r
+    m → ˈm
+    n → ˈn
+    l → ˈl
+    r → ˈr
 }
 
 ; TODO map sets
 ; $V → &ː
 ;   produces aː eː iː oː uː
 
-$C {
+$STOP {
     k  kʲ  kʷ  p  t
     g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
-    x      xʷ  ɸ  θ
-    ɣ      ɣʷ  β  ð
-    s  z
-    ʔ  χ   χʷ
-    m  n
-    l  r
-    w  j
-}
-
-$OBSTRUENT {
-    k  kʲ  kʷ  p  t
-    g  gʲ  gʷ  b  d
-    gʰ gʲʰ gʷʰ bʰ dʰ
-    x      xʷ  ɸ  θ
-    ɣ      ɣʷ  β  ð
-    s  z
-    ʔ  χ   χʷ
 }
 
 $DENTAL { t d dʰ θ ð s z }
 $LABIAL { m p b bʰ ɸ β }
-$VELAR { k kʷ g gʷ x ɣ }
+$LABIOVELAR { kʷ gʷ gʷʰ xʷ ɣʷ }
+$VELAR { k g gʰ gʲʰ x ɣ $LABIOVELAR }
 $SONORANT { m n l r w j }
 $LIQUID { l r }
 $GLIDE { w j }
@@ -273,11 +253,8 @@ $NASAL { m n }
 $LARYNGEAL { ʔ χ χʷ }
 $SIBILANT { s }
 
-$STOP {
-    k  kʲ  kʷ  p  t
-    g  gʲ  gʷ  b  d
-    gʰ gʲʰ gʷʰ bʰ dʰ
-}
+$OBSTRUENT { $STOP $fricative }
+$C { $DENTAL $LABIAL $VELAR $SONORANT $LIQUID $GLIDE $NASAL $LARYNGEAL $SIBILANT }
 
 [$voiced] {
     k → g

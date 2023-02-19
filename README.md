@@ -4,13 +4,15 @@ A sound change applier for constructed languages. This application aims for flex
 
 ## Command line options
 
-| Switch                 |                                                                                                                             |
-| -----------------------|-----------------------------------------------------------------------------------------------------------------------------|
-| --rules FILE           | Load rules from FILE (required)                                                                                             |
-| --lexicon FILE         | Load lexicon from FILE (required)                                                                                           |
-| --test-rules N1,N2,... | Run the specified list of rules, rather than all rules.                                                                     |
-| --test-words N1,N2,... | Transform the specified list of words, rather than all words.                                                               |
-| --verbose/-v N         | Set verbosity level (0 = silent, 1 = normal, 2 = show transformations, 3 = show DFA, 4 = show NFA and transformation state) |
+| Switch                 | Abbreviation |                                                                                                                             |
+| -----------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------|
+| --rules FILE           | -r           | Load rules from FILE (required)                                                                                             |
+| --lexicon FILE         | -l           | Load lexicon from FILE (required)                                                                                           |
+| --test-rules N1,N2,... |              | Run only the rules listed.                                                                                                  |
+| --test-words N1,N2,... |              | Transform only the words listed.                                                                                            |
+| --verbose/-v N         | -v           | Set verbosity level (0 = silent, 1 = normal, 2 = show transformations, 3 = show DFA, 4 = show NFA and transformation state) |
+| --recompile            | -rc          | Recompile rules file instead of loading compiled rules.                                                                     |
+
 
 ## Rule files
 
@@ -47,6 +49,17 @@ Features have a similar syntax to sets. In a feature definition, the identifier 
     }
 
 Here, four phonemes are defined as having transformation from voiceless stops to fricatives. /s/ is just a fricative, and has no corresponding transformation.
+
+### Including sets in other sets
+
+Both sets and features allow you to include other sets or features in them:
+
+    $STOP { p t k }
+    $FRICATIVE { x f θ }
+    $NASAL { m n ŋ }
+    $C { $STOP $FRICATIVE $NASAL } ; p t k x f θ m n ŋ
+
+
 
 ### Defining rules
 

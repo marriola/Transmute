@@ -1,8 +1,5 @@
 ﻿namespace TransmuteLib
 
-open System.Collections.Generic
-open TransmuteLib
-
 type private PrefixTree =
     | Root of children:PrefixTree list
     | Node of prefix:string * value:char * children:PrefixTree list
@@ -18,10 +15,6 @@ module private PrefixTree =
     //    k        g    p  b  t  d
     // w / \ λ  w / \ λ
     //  kw  k    gw  g
-
-    let NUL = '\u2400'
-    let START_MATCH = '␂'
-    let END_MATCH = '␃'
 
     let private isEmpty = System.String.IsNullOrEmpty
 
@@ -46,21 +39,20 @@ module private PrefixTree =
             followSet @ final
         Root (inner set "")
 
-type private PrefixTree with
     /// <summary>
     /// Creates a prefix tree from the members of a feature
     /// </summary>
     /// <param name="feature"></param>
     /// <param name="isPresent"></param>
-    static member fromFeature feature isPresent =
-        PrefixTree.makeTree (Node.getFeatureMembers isPresent feature)
+    let fromFeature feature isPresent =
+        makeTree (Node.getFeatureMembers isPresent feature)
 
     /// <summary>
     /// Creates a prefix tree from the members of a set.
     /// </summary>
     /// <param name="set"></param>
-    static member fromSet set =
-        PrefixTree.makeTree (Node.getSetMembers set)
+    let fromSet set =
+        makeTree (Node.getSetMembers set)
 
     /// <summary>
     /// Creates a prefix tree from the intersection of a list of sets and features.
@@ -68,10 +60,8 @@ type private PrefixTree with
     /// <param name="sets">The available sets.</param>
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier">The CompoundSetIdentifierNode listing the sets and features to intersect.</param>
-    static member fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
-        let getVal (kvp: KeyValuePair<'a, 'b>) = kvp.Value
-        let alphabet =
-            Node.getAlphabet
-                (Seq.map getVal features |> List.ofSeq)
-                (Seq.map getVal sets |> List.ofSeq)
-        Node.setIntersection alphabet features sets setDescriptor |> PrefixTree.makeTree
+    let fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
+        let alphabet = Node.getAlphabet features sets
+        setDescriptor
+        |> Node.setIntersection alphabet features sets
+        |> makeTree

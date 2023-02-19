@@ -5,16 +5,32 @@ open TransmuteLib.StateMachine
 module RuleMachine =
     let private (|IsInput|_|) state =
         match state with
-        | State (_, InputSegment, _)
-        | MergedState (_, InputSegment) ->
+        | State (_, InputSegment, _, _)
+        | MergedState (_, InputSegment, _) ->
             Some state
         | _ ->
             None
 
     let private (|IsEnvironment|_|) state =
         match state with
-        | State (_, EnvironmentSegment, _)
-        | MergedState (_, EnvironmentSegment) ->
+        | State (_, EnvironmentSegment, _, _)
+        | MergedState (_, EnvironmentSegment, _) ->
+            Some state
+        | _ ->
+            None
+
+    let private (|IsInsert|_|) state =
+        match state with
+        | State (_, _, _, Insert)
+        | MergedState (_, _, Insert) ->
+            Some state
+        | _ ->
+            None
+
+    let private (|IsReplace|_|) state =
+        match state with
+        | State (_, _, _, Replace)
+        | MergedState (_, _, Replace) ->
             Some state
         | _ ->
             None
@@ -61,6 +77,12 @@ module RuleMachine =
                 specialSymbolCata
                     (fun () -> (FromEnvironment (string c, position)) :: xs)
                     c xs
+
+            /// Tags the input symbol as originating from the environment segment and adds it to xs.
+            static member addEnvironmentString position s xs =
+                specialSymbolCata
+                    (fun () -> (FromEnvironment (s, position)) :: xs)
+                    '!' xs
 
             /// Concatenates all inputs in s to xs.
             static member concatAll inputs xs =
@@ -197,6 +219,16 @@ module RuleMachine =
                 | true, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
                     [], nextProduction, EnvironmentString.concatEnvironment undo output
+                | false, IsInsert _, Some tf' ->
+                    let nextUndo = (FromEnvironment (string tf', position)) :: FromEnvironment (string symbol, position) :: undo
+                    nextUndo, production, output
+                | false, IsEnvironment _ & IsReplace _, Some tf' ->
+                    let nextUndo = EnvironmentString.addEnvironment position symbol undo
+                    let nextProduction =
+                        tf
+                        |> Option.map (fun s -> (s, position) :: production[1..])
+                        |> Option.defaultValue production
+                    nextUndo, nextProduction, output
                 // Partial match in environment segment.
                 // Add symbol to undo.
                 | false, IsEnvironment _, _ ->

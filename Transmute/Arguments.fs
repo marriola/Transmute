@@ -21,6 +21,7 @@ type Options =
       testRules: int list option
       testWords: int list option
       verbosityLevel: VerbosityLevel
+      recompile: bool
     }
 
 let defaultOptions =
@@ -29,6 +30,7 @@ let defaultOptions =
       testRules = None
       testWords = None
       verbosityLevel = Normal
+      recompile = false
     }
 
 let parse (argv: string[]) =
@@ -36,8 +38,10 @@ let parse (argv: string[]) =
         match args with
         | [] ->
             options
+        | "-l"::filename::xs
         | "--lexicon"::filename::xs ->
             parse' xs { options with lexiconFile = filename }
+        | "-r"::filename::xs
         | "--rules"::filename::xs ->
             parse' xs { options with rulesFile = filename }
         | "--test-rules"::ruleNumbers::xs ->
@@ -67,8 +71,21 @@ let parse (argv: string[]) =
             parse' xs { options with verbosityLevel = ShowDFA }
         | "--show-transformations"::xs ->
             parse' xs { options with verbosityLevel = ShowTransformations }
+        | "-rc"::xs
+        | "--recompile"::xs ->
+            parse' xs { options with recompile = true }
         | x::xs ->
             eprintfn "Unrecognized option '%s'" x
             parse' xs options
 
     parse' (Array.toList argv) defaultOptions
+
+let validate (options: Options) =
+    let mutable isValid = true
+    if options.lexiconFile = null then
+        printfn "Lexicon not specified"
+        isValid <- false
+    if options.rulesFile = null then
+        printfn "Rules file not specified"
+        isValid <- false
+    isValid

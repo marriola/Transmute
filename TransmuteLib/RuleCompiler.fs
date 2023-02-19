@@ -1,10 +1,15 @@
 ﻿// TODO: cleanup (make nested functions module-level and private)
 
 namespace TransmuteLib
+open MBrace.FsPickler
+open System
+open System.IO
+open Joveler.Compression.XZ
+open Microsoft.FSharp.Collections
 
 module RuleCompiler =
-    let START = State.make "S"
-    let ERROR = State.make "Error"
+    let internal START = State.make "S"
+    let internal ERROR = State.make "Error"
 
     type private InputPosition =
         | InputInitial
@@ -148,21 +153,33 @@ module RuleCompiler =
 
             /// Creates a series of states and transitions that match each character of an utterance.
             let matchUtterance utterance =
-                let rec matchUtterance' input output innerState =
-                    match input with
+                let rec matchUtterance' inputChars output innerState =
+                    match inputChars with
                     | [] ->
                         let outputNode, output = giveOutput output
                         let transformations = addUtteranceTransformation innerState.transformations (List.head innerState.transitions) outputNode utterance
+
                         { innerState with
                             output = output
                             transformations = transformations }
 
                     | c::xs ->
                         let nextNfaState, next = getNextState (List.isEmpty xs && areAllSubtreesFinal ()) innerState
+                        let next = if input = [] then State.makeInsert next else next
                         let transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
+                        //let transitionsToCurrent = List.filter (fun ((From _, _, To s) as t) -> s = innerState.current) transitions
+                        let insertion =
+                            if input = [] then
+                                let outputString = output |> List.map Node.getStringValue |> String.concat ""
+                                [ (From state.current, OnChar c, To next), outputString ]
+                                //List.map (fun t -> t, outputString) transitionsToCurrent
+                            else
+                                []
+
                         matchUtterance' xs output
                             { nextNfaState with
                                 transitions = transitions
+                                transformations = state.transformations @ insertion
                                 current = next }
 
                 matchUtterance' (List.ofSeq utterance) output state
@@ -324,12 +341,20 @@ module RuleCompiler =
                     |> List.tail
                     |> List.map (fun (_, _, _, _, subtreeFinal) -> From subtreeFinal, OnEpsilon, To terminator)
 
+                let insertions =
+                    if input = [] then
+                        let outputString = output |> List.map Node.getStringValue |> String.concat ""
+                        subtreeFinalToLastState
+                        |> List.map (fun (From subtreeFinal, _, _) -> (From state.current, OnEpsilon, To subtreeFinal), outputString)
+                    else
+                        []
+
                 { state with
                     current = terminator
                     states = states
                     output = output
                     transitions = subtreeFinalToLastState @ transitions
-                    transformations = transformations }
+                    transformations = transformations @ insertions }
 
             let generatorState =
                 match state.input with
@@ -362,23 +387,16 @@ module RuleCompiler =
                         inputPosition = InputNoninitial
                 }
 
-        let initialStates = Seq.initInfinite (sprintf "q%d" >> State.make)
-
-        let initialSubtreePosition =
-            match environment with
-            | [_] -> SubtreeFinal
-            | _ -> SubtreeNonfinal
-
         let initialState = {
             current = START
-            states = initialStates
+            states = Seq.initInfinite (sprintf "q%d" >> State.make)
             input = environment
             output = output
             transitions = List.empty
             transformations = List.empty
             inputNode = Environment
             inputPosition = InputInitial
-            subtreePosition = [initialSubtreePosition]
+            subtreePosition = [if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal]
         }
 
         let { transitions = transitions; transformations = transformations } = buildStateMachine' initialState
@@ -390,19 +408,20 @@ module RuleCompiler =
             |> List.choose (function
                 | t, Produces output -> Some (t, output)
                 | _, NoOutput -> None)
+            |> Map.ofList
 
         let dfaTransitionTable =
             dfa
-            |> Seq.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
-            |> Map.ofSeq
+            |> List.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
+            |> Map.ofList
 
-        dfaTransitionTable, (Map.ofSeq dfaTransformations)
+        dfaTransitionTable, dfaTransformations
 
     /// <summary>
     /// Compiles a Mealy machine from a phonological rule.
     /// The resulting state machine can be passed into <see cref="RuleMachine.transform" /> to apply the rule to a word.
     /// </summary>
-    let compile features sets rule showNfa =
+    let compile showNfa features sets rule =
         match Node.untag rule with
         | RuleNode (input, output, environment) ->
             let input = Node.untagAll input
@@ -411,3 +430,40 @@ module RuleCompiler =
             buildStateMachine features sets input output environment showNfa
         | _ ->
             invalidArg "rule" "Must be a RuleNode"
+
+    let compileRules showNfa features sets rules =
+        rules
+        |> List.map (fun rule -> compile showNfa features sets rule)
+
+    let compileRulesParallel showNfa features sets rules =
+        rules
+        |> PSeq.mapi (fun i rule -> compile showNfa features sets rule)
+        |> PSeq.toList
+        //|> List.sortBy fst
+        //|> List.map snd
+
+    let saveCompiledRules filename rules =
+        Utils.Lzma.init() |> ignore
+        use f = File.Open(filename, FileMode.Create, FileAccess.Write)
+        use xz = new XZStream(f, new XZCompressOptions())
+
+        let serializer = FsPickler.CreateBinarySerializer()
+        let pickle = serializer.Pickle(rules)
+
+        xz.Write(BitConverter.GetBytes(pickle.Length), 0, 4)
+        xz.Write(pickle, 0, pickle.Length)
+
+    let readCompiledRules filename =
+        Utils.Lzma.init() |> ignore
+        use f = File.Open(filename, FileMode.Open, FileAccess.Read)
+        use xz = new XZStream(f, new XZDecompressOptions())
+
+        let lengthBuffer: byte[] = Array.zeroCreate 4
+        xz.Read(lengthBuffer, 0, 4) |> ignore
+        let length = BitConverter.ToInt32(lengthBuffer, 0)
+
+        let buffer: byte[] = Array.zeroCreate length
+        xz.Read(buffer, 0, length) |> ignore
+
+        let serializer = FsPickler.CreateBinarySerializer()
+        serializer.UnPickle(buffer)

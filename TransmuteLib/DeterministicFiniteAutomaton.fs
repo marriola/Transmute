@@ -15,8 +15,8 @@ module private DeterministicFiniteAutomaton =
     let inline private ( <%> ) x y =
         match x, y with
         | _ when x = y -> true
-        | (State _ as s), MergedState (children, _)
-        | MergedState (children, _), (State _ as s) when List.contains s children -> true
+        | (State _ as s), MergedState (children, _, _)
+        | MergedState (children, _, _), (State _ as s) when List.contains s children -> true
         | _ -> false
 
     /// Matches the state or a merged state containing it
@@ -138,6 +138,8 @@ module private DeterministicFiniteAutomaton =
                                             | (Produces _ as r), NoOutput
                                             | NoOutput, (Produces _ as r) ->
                                                 r
+                                            | ((Produces _) as x), ((Produces _) as y) when x = y ->
+                                                x
                                             | NoOutput, NoOutput ->
                                                 NoOutput
                                             | Produces _, Produces _ ->

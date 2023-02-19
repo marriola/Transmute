@@ -1,37 +1,23 @@
-﻿open System
+﻿open Arguments
+open Microsoft.FSharp.Collections
+open System
+open System.Diagnostics
+open System.IO
 open TransmuteLib
 open TransmuteLib.RuleParser
-open System.Collections.Generic
-open System.Diagnostics
-open Arguments
-open Microsoft.FSharp.Collections
-
-let validateOptions (options: Options) =
-    let mutable isValid = true
-    if options.lexiconFile = null then
-        printfn "Lexicon not specified"
-        isValid <- false
-    if options.rulesFile = null then
-        printfn "Rules file not specified"
-        isValid <- false
-    isValid
 
 let trim (s: string) = s.Trim()
 
 let compileRules options features sets rules =
-    let indexedNodes =
-        rules
-        |> List.indexed
-        |> List.map (fun (i, n) -> (i + 1), n)
-
-    let selectedNodes =
+    let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
+    let selectedRules =
         match options.testRules with
         | Some ruleNumbers ->
             List.filter
                 (fun (i, _) -> List.contains i ruleNumbers)
-                indexedNodes
+                indexedRules
         | None ->
-            indexedNodes
+            indexedRules
 
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
@@ -41,15 +27,18 @@ let compileRules options features sets rules =
     outerStopwatch.Start()
 
     let rules =
-        selectedNodes
-        |> List.indexed
-        |> PSeq.map (fun (i, (_, node)) ->
-            let rule = RuleCompiler.compile features sets node showNfa
-            if options.verbosityLevel > Silent then
-                fprintf stderr "."
-            i, (node, rule))
-        |> PSeq.sortBy fst
-        |> PSeq.map snd
+        selectedRules
+#if DEBUG
+        |> List.map
+#else
+        |> PSeq.map
+#endif
+            (fun (i, node) ->
+                let rule = RuleCompiler.compile showNfa features sets node
+                if options.verbosityLevel > Silent then
+                    fprintf stderr "."
+                i, node, rule)
+        |> PSeq.sortBy (fun (i, _ ,_) -> i)
         |> List.ofSeq
 
     outerStopwatch.Stop()
@@ -65,8 +54,8 @@ let transform options rules word =
     let rec inner word totalTime rules =
         match rules with
         | [] ->
-            word, totalTime
-        | (i, (ruleDesc, rule))::xs ->
+            word, (float totalTime / 10000.0)
+        | (i, ruleDesc, rule)::xs ->
             if options.verbosityLevel >= ShowDFA then
                 let transitions, transformations = rule
                 printfn "\n********************************************************************************"
@@ -74,16 +63,15 @@ let transform options rules word =
                 printfn "\nDFA:\n"
 
                 transitions
-                |> Seq.map (fun (pair: KeyValuePair<State * InputSymbol, State>) -> pair.Key, pair.Value)
-                |> Seq.iteri (fun j ((fromState, m), toState) ->
+                |> Map.toList
+                |> List.iteri (fun j ((fromState, m), toState) ->
                     let t = sprintf "(%O, %O)" fromState m
                     printfn "%d.\t%-35s-> %O" (j + 1) t toState)
 
                 printfn "\ntransformations:"
                 transformations
-                |> Seq.iteri (fun j (pair: KeyValuePair<Transition<State>, string>) ->
-                    let (From origin, input, To dest) = pair.Key
-                    let result = pair.Value
+                |> Map.toList
+                |> List.iteri (fun j ((From origin, input, To dest), result) ->
                     printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
 
             sw.Restart()
@@ -95,10 +83,7 @@ let transform options rules word =
 
             inner result (totalTime + sw.ElapsedTicks) xs
 
-    rules
-    |> List.indexed
-    |> List.map (fun (i, r) -> (i + 1), r)
-    |> inner word 0L
+    inner word 0L rules
 
 [<EntryPoint>]
 let main argv =
@@ -111,23 +96,44 @@ let main argv =
 
     let options = Arguments.parse argv
 
-    if not (validateOptions options) then
+    if not (Arguments.validate options) then
         Environment.Exit(0)
 
-    let features, sets, rules =
-        match parseRulesFile options.rulesFile with
-        | Ok (features, sets, rules) ->
-            features, sets, rules
-        | Result.Error msg ->
-            failwith msg
+    let totalCompileTime, rules =
+        let compiledFile =
+            if Path.GetExtension(options.rulesFile) = ".sc"
+                then Path.Combine(Path.GetDirectoryName(options.rulesFile), Path.GetFileNameWithoutExtension(options.rulesFile)) + ".scc"
+                else options.rulesFile + ".scc"
 
-    let totalCompileTime, rules = compileRules options features sets rules
+        if options.recompile
+            || not (File.Exists(compiledFile))
+            || File.GetLastWriteTime(options.rulesFile) > File.GetLastWriteTime(compiledFile)
+            then
+                let features, sets, rules =
+                    match parseRulesFile options.rulesFile with
+                    | Ok (features, sets, rules) ->
+                        features, sets, rules
+                    | Result.Error msg ->
+                        failwith msg
+
+                let totalCompileTime, rules = compileRules options features sets rules
+                RuleCompiler.saveCompiledRules compiledFile rules |> ignore
+
+                totalCompileTime, rules
+            else
+                let sw = Stopwatch()
+                sw.Start()
+                let rules = RuleCompiler.readCompiledRules compiledFile
+                sw.Stop()
+
+                printfn "Reading rules..."
+                sw.ElapsedMilliseconds, rules
 
     if options.verbosityLevel > Normal then
         fprintfn stderr ""
 
-        List.iteri
-            (fun i (node, _) -> printfn "%2d. %O" (i + 1) node)
+        List.iter
+            (fun (i, node, _) -> printfn "%2d. %O" i node)
             rules
 
         printfn "\nTotal compile time: %d ms" totalCompileTime
@@ -139,16 +145,21 @@ let main argv =
         |> Array.choose (fun (i, word) ->
             match options.testWords with
             | None -> Some word
-            | Some x when List.contains (i + 1) x -> Some word
+            | Some testWords when List.contains (i + 1) testWords -> Some word
             | _ -> None)
 
-    for word in lexicon do
-        let result, totalTime = transform options rules word
-        let totalMilliseconds = (float totalTime / 10000.0)
+    let mutable totalMilliseconds = 0.0
 
-        if options.verbosityLevel > Normal then
-            printfn "[%5.2f ms] %15s -> %s" totalMilliseconds word result
-        else
+    for word in lexicon do
+        let result, milliseconds = transform options rules word
+        totalMilliseconds <- totalMilliseconds + milliseconds
+
+        if options.verbosityLevel = Normal then
             printfn "%s" result
+        else
+            printfn "[%5.2f ms] %15s -> %s" milliseconds word result
+
+    if options.verbosityLevel > Normal then
+        printf "\n%5.2f ms transform time\n" totalMilliseconds
 
     0 // return an integer exit code
