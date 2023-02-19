@@ -98,7 +98,7 @@ A deletion rule is written with the output segment either empty or containing on
 
 ##### Insertion rules
 
-Insertion rules are not yet supported, but when they are, will be written similarly with the input segment either empty or containing only `∅`. Insertion rules will be conditional only.
+An insertion rule is written similarly to a deletion rule, with the input segment either empty or containing only `∅`. Insertion rules are be conditional only.
 
     ∅→s/[$stop+$dental]_[$stop+$dental]
 

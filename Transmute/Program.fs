@@ -136,7 +136,7 @@ let main argv =
             (fun (i, node, _) -> printfn "%2d. %O" i node)
             rules
 
-        printfn "\nTotal compile time: %d ms" totalCompileTime
+        printfn "\nCompiled %d rules in %d ms (average %.1f ms)\n" rules.Length totalCompileTime (float totalCompileTime / float rules.Length)
 
     let lexicon =
         IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
@@ -160,6 +160,6 @@ let main argv =
             printfn "[%5.2f ms] %15s -> %s" milliseconds word result
 
     if options.verbosityLevel > Normal then
-        printf "\n%5.2f ms transform time\n" totalMilliseconds
+        printf "\nTransformed %d words in %.1f ms (average %.1f ms) \n" lexicon.Length totalMilliseconds (totalMilliseconds / float lexicon.Length)
 
     0 // return an integer exit code
