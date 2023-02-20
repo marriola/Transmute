@@ -4,6 +4,7 @@ bʰrˈeχteːr
 swˈesteːr
 suʔnˈus
 dʰuktˈeːr
+lˈegʰjeti
 ˈojnos
 ˈojneχ
 ˈojnom
@@ -17,15 +18,15 @@ okʲtˈoːw
 ʔnˈewnd
 dˈekʲmd
 kʲmtˈom
-χʷdˈonts
-χʷdˈontes
-χʷdˈontm
-χʷdˈontms
-χʷdntˈes
-χʷdntˈoʔom
-χʷdntˈej
-χʷdntmˈos
-χʷdntˈeʔ
+χʷdˈonts	; nom.sg.
+χʷdˈontes	; nom.pl.
+χʷdˈontm	; acc.sg.
+χʷdˈontms	; acc.pl.
+χʷdntˈes	; gen.sg.
+χʷdntˈoʔom	; gen.pl.
+χʷdntˈej	; dat.sg.
+χʷdntmˈos	; dat.pl.
+χʷdntˈeʔ	; inst.sg.
 widonom
 wˈojdχe
 wˈojdtχe

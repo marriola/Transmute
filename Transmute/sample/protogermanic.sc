@@ -60,11 +60,8 @@ $LARYNGEAL→ə
 ; Early PGmc ;
 ;;;;;;;;;;;;;;
 
-j→∅/_(e|a|o)#
-w→∅/_(e|a|o)#
-e→∅/_#
-a→∅/_#
-o→∅/_#
+(j|w)→∅/_(e|a|o)#
+(e|a|o)→∅/_#
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 [$STOP-$voiced]→[+$fricative]/(#|$V|$SONORANT)_
@@ -95,8 +92,7 @@ g→ɣ/(#|$LIQUID|[+$fricative])_
 [$STOP+$voiced]→[+$fricative]/($V|$GLIDE)_(#|$V|$GLIDE)
 
 ; Verner's law
-;[+$fricative-$voiced]→[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_(#|(ˈ)$V) ; Why does this one result in environment and input states being merged?
-[+$fricative-$voiced]→[+$voiced]/(#|$C)[-$stressed-$SONORANT]($C)_
+[+$fricative-$voiced]→[+$voiced]/[-$stressed-$SONORANT]($SONORANT)_($SONORANT)[+$stressed] ; Why does this one result in environment and input states being merged?
 
 ; Undo Verner's law after voiceless consonant
 [+$fricative+$voiced]→[-$voiced]/[-$voiced]_
@@ -111,7 +107,7 @@ g→ɣ/(#|$LIQUID|[+$fricative])_
 [+$stressed]→[-$stressed]
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
-s→z/$V_#
+s→z/$V(($NASAL|$LIQUID))_#
 
 gʷ→b/#_
 
@@ -120,15 +116,16 @@ ln→ll
 zm→mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
+(ei|ej)→iː
+e→i/$V($GLIDE)($C)($C)_(#|$C)
 e→i/$V($GLIDE)($C)($C)_(#|$C)
 ; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
+(iːi|iji)→iː
 ji→i/$V($C)($C)_(#|$C)
-ei→iː
-ej→iː
-ij→iː
+;ji→i/$V$C_(#|$C)
+;ji→i/$V$C$C_(#|$C)
 
-o→ɑ
-a→ɑ
+(o|a)→ɑ
 
 ;;;;;;;;;;;;;
 ; Late PGmc ;

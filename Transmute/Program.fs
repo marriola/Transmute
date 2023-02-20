@@ -1,12 +1,23 @@
 ﻿open Arguments
-open Microsoft.FSharp.Collections
 open System
-open System.Diagnostics
 open System.IO
 open TransmuteLib
 open TransmuteLib.RuleParser
 
-let trim (s: string) = s.Trim()
+let formatTime ms =
+    if ms > 1000.0 then
+        $"%.2f{ms / 1000.0} s"
+    else
+        $"%.1f{ms} ms"
+
+let trimWhitespace (s: string) = s.Trim()
+
+let time fn =
+    let start = DateTime.Now
+    let result = fn()
+    let stop = DateTime.Now
+    let milliseconds = (stop - start).TotalMilliseconds
+    result, milliseconds
 
 let compileRules options features sets rules =
     let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
@@ -23,67 +34,78 @@ let compileRules options features sets rules =
         fprintf stderr "Compiling"
 
     let showNfa = options.verbosityLevel = ShowNFA
-    let outerStopwatch = Stopwatch()
-    outerStopwatch.Start()
 
-    let rules =
-        selectedRules
+    let rules, elapsed =
+        time (fun () ->
+            selectedRules
 #if DEBUG
-        |> List.map
+            |> List.mapi
 #else
-        |> PSeq.map
+            |> Array.ofList
+            |> Array.Parallel.mapi
 #endif
-            (fun (i, node) ->
-                let rule = RuleCompiler.compile showNfa features sets node
-                if options.verbosityLevel > Silent then
-                    fprintf stderr "."
-                i, node, rule)
-        |> PSeq.sortBy (fun (i, _ ,_) -> i)
-        |> List.ofSeq
-
-    outerStopwatch.Stop()
+                (fun _ (i, node) ->
+                    let rule, elapsed = time (fun () -> RuleCompiler.compile showNfa features sets node)
+                    if options.verbosityLevel > Silent then
+                        fprintf stderr "."
+                    i, node, rule, elapsed)
+            |> List.ofSeq)
 
     if options.verbosityLevel > Silent then
         fprintfn stderr ""
 
-    outerStopwatch.ElapsedMilliseconds, rules
+    rules, elapsed
 
 let transform options rules word =
-    let sw = new Stopwatch()
-
-    let rec inner word totalTime rules =
+    let rec inner nextWord log totalTime rules =
         match rules with
         | [] ->
-            word, (float totalTime / 10000.0)
-        | (i, ruleDesc, rule)::xs ->
-            if options.verbosityLevel >= ShowDFA then
-                let transitions, transformations = rule
-                printfn "\n********************************************************************************"
-                printfn "\nRule %d: %O" i ruleDesc
-                printfn "\nDFA:\n"
+            word, nextWord, log, totalTime
+        | (i, ruleDesc, rule, _)::xs ->
+            let result, elapsed = time (fun () -> RuleMachine.transform (options.verbosityLevel >= ShowNFA) rule nextWord)
 
-                transitions
-                |> Map.toList
-                |> List.iteri (fun j ((fromState, m), toState) ->
-                    let t = sprintf "(%O, %O)" fromState m
-                    printfn "%d.\t%-35s-> %O" (j + 1) t toState)
+            let log =
+                if options.verbosityLevel >= ShowDFA then
+                    let transitions, transformations = rule
+                    log
+                    @ [ $"\nRule {i}: {ruleDesc}\n"
+                        "\nDFA:\n\n" ]
+                    @ (transitions
+                        |> Map.toList
+                        |> List.mapi (fun j ((fromState, m), toState) ->
+                            let t = $"({fromState}, {m})"
+                            $"{j+1}.\t%-35s{t}-> {toState}"))
+                    @ [ "\ntransformations:\n" ]
+                    @ (transformations
+                        |> Map.toList
+                        |> List.mapi (fun j ((From origin, input, To dest), result) ->
+                            $"{j+1}. ({origin}, {input}) -> {dest} => {result}"))
+                    @ [ "\n********************************************************************************" ]
+                else
+                    log
 
-                printfn "\ntransformations:"
-                transformations
-                |> Map.toList
-                |> List.iteri (fun j ((From origin, input, To dest), result) ->
-                    printfn "%d. (%O, %O) -> %O => %s" (j + 1) origin input dest result)
+            let log =
+                if options.verbosityLevel >= ShowTransformations && nextWord <> result then
+                    log @ [ $"%7d{i}. %15s{nextWord} -> {result}" ]
+                else
+                    log
 
-            sw.Restart()
-            let result = RuleMachine.transform (options.verbosityLevel > ShowDFA) rule word
-            sw.Stop()
+            inner result log (totalTime + elapsed) xs
 
-            if options.verbosityLevel >= ShowTransformations && word <> result then
-                printfn "%7d. %15s -> %s" i word result
+    inner word [] 0.0 rules
 
-            inner result (totalTime + sw.ElapsedTicks) xs
-
-    inner word 0L rules
+let transformLexicon options rules lexicon =
+    let result, elapsed =
+        time (fun () ->
+            lexicon
+#if DEBUG
+            |> Seq.mapi (fun i word -> transform options rules word)
+            |> Seq.toList)
+#else
+            |> Array.Parallel.mapi (fun i word -> transform options rules word)
+            |> Array.toList)
+#endif
+    result, elapsed
 
 [<EntryPoint>]
 let main argv =
@@ -99,7 +121,9 @@ let main argv =
     if not (Arguments.validate options) then
         Environment.Exit(0)
 
-    let totalCompileTime, rules =
+    // Compile rules if the compiled rules file is stale or not present, otherwise load the compiled rules file
+
+    let rules, compileTime =
         let compiledFile =
             if Path.GetExtension(options.rulesFile) = ".sc"
                 then Path.Combine(Path.GetDirectoryName(options.rulesFile), Path.GetFileNameWithoutExtension(options.rulesFile)) + ".scc"
@@ -116,31 +140,32 @@ let main argv =
                     | Result.Error msg ->
                         failwith msg
 
-                let totalCompileTime, rules = compileRules options features sets rules
+                let rules, compileTime = compileRules options features sets rules
                 RuleCompiler.saveCompiledRules compiledFile rules |> ignore
 
-                totalCompileTime, rules
+                rules, compileTime
             else
-                let sw = Stopwatch()
-                sw.Start()
-                let rules = RuleCompiler.readCompiledRules compiledFile
-                sw.Stop()
-
                 printfn "Reading rules..."
-                sw.ElapsedMilliseconds, rules
+                time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
     if options.verbosityLevel > Normal then
         fprintfn stderr ""
 
         List.iter
-            (fun (i, node, _) -> printfn "%2d. %O" i node)
+            (fun (i, node, _, milliseconds) ->
+                printfn $"[%8s{formatTime milliseconds}] %2d{i}. {node}")
             rules
 
-        printfn "\nCompiled %d rules in %d ms (average %.1f ms)\n" rules.Length totalCompileTime (float totalCompileTime / float rules.Length)
+    // Trim comments, filter to non-empty lines, and select lines if specified on command line
+
+    let trimComment (line: string) =
+        let commentIndex = line.IndexOf ";"
+        if commentIndex = -1 then line else line[..commentIndex - 1]
 
     let lexicon =
         IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
-        |> Array.map trim
+        |> Array.map (trimComment >> trimWhitespace)
+        |> Array.filter (fun ln -> ln.Length > 0 && not (ln.StartsWith ";"))
         |> Array.indexed
         |> Array.choose (fun (i, word) ->
             match options.testWords with
@@ -148,18 +173,33 @@ let main argv =
             | Some testWords when List.contains (i + 1) testWords -> Some word
             | _ -> None)
 
-    let mutable totalMilliseconds = 0.0
+    // Transform lexicon and report
 
-    for word in lexicon do
-        let result, milliseconds = transform options rules word
-        totalMilliseconds <- totalMilliseconds + milliseconds
+    let transformedLexicon, totalMilliseconds = transformLexicon options rules lexicon
 
+    for original, result, log, milliseconds in transformedLexicon do
         if options.verbosityLevel = Normal then
             printfn "%s" result
         else
-            printfn "[%5.2f ms] %15s -> %s" milliseconds word result
+            printfn "\n%s" (String.concat "\n" log)
+            printfn $"[%5.2f{milliseconds} ms] %15s{original} -> {result}"
 
     if options.verbosityLevel > Normal then
-        printf "\nTransformed %d words in %.1f ms (average %.1f ms) \n" lexicon.Length totalMilliseconds (totalMilliseconds / float lexicon.Length)
+        let totalTransformMilliseconds =
+            transformedLexicon
+            |> List.sumBy (fun (_, _, _, milliseconds) -> int milliseconds)
+            |> float
+
+        let totalCompileMilliseconds =
+            rules
+            |> List.sumBy (fun (_, _, _, milliseconds) -> milliseconds)
+
+        let numRules = float rules.Length
+        let numWords = float lexicon.Length
+
+        printfn $"\nCompiled {rules.Length} rules in {formatTime compileTime} (average {formatTime (compileTime / numRules)})"
+        printfn $"Total compile time {formatTime totalCompileMilliseconds} (average {formatTime (totalCompileMilliseconds / numRules)})"
+        printfn $"Transformed {lexicon.Length} words in {formatTime totalMilliseconds} (average {formatTime (totalMilliseconds / numWords)})"
+        printfn $"Total transform time {formatTime totalTransformMilliseconds} (average {formatTime (totalTransformMilliseconds / numWords)})"
 
     0 // return an integer exit code

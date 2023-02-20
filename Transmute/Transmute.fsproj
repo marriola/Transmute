@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <TargetFramework>net7.0</TargetFramework>
     <Platforms>AnyCPU;x86</Platforms>
   </PropertyGroup>
 
@@ -20,11 +20,12 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="sample\russian.sc" />
     <Content Include="sample\lexicon.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
     <None Include="sample\protogermanic.sc">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
     <Content Include="sample\test.sc">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -32,15 +33,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSPowerPack.Parallel.Seq.Community" Version="3.0.0" />
-  </ItemGroup>
-
-  <ItemGroup>
     <ProjectReference Include="..\TransmuteLib\TransmuteLib.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="4.7.2" />
+    <PackageReference Update="FSharp.Core" Version="7.0.200" />
   </ItemGroup>
 
 </Project>
