@@ -4,7 +4,7 @@ open System.IO
 open TransmuteLib.StateMachine
 open TransmuteLib.Utils
 
-module private Lexer =
+module internal Lexer =
     type Result =
         | OK of Token list
         | SyntaxError of string * int * int

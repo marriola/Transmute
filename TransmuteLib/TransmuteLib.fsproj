@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="Properties\AssemblyInfo.fs" />
     <Compile Include="Utils\Lzma.fs" />
     <Compile Include="Utils\Cata.fs" />
     <Compile Include="BoundedList.fs" />
@@ -33,7 +34,6 @@
 
   <ItemGroup>
     <PackageReference Include="FsPickler" Version="5.3.2" />
-    <PackageReference Include="FSPowerPack.Parallel.Seq.Community" Version="3.0.0" />
     <PackageReference Include="Joveler.Compression.XZ" Version="4.1.0" />
   </ItemGroup>
 

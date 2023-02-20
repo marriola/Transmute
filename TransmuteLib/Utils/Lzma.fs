@@ -1,6 +1,9 @@
 ﻿namespace TransmuteLib.Utils
 
 module Lzma =
+#if FABLE_COMPILER
+    ()
+#else
     open Joveler.Compression.XZ
     open System.IO
     open System.Runtime.InteropServices
@@ -42,3 +45,4 @@ module Lzma =
 
             XZInit.GlobalInit(libPath)
             didInit <- true
+#endif

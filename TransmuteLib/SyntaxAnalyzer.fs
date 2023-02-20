@@ -1,6 +1,6 @@
 ﻿namespace TransmuteLib
 
-module private SyntaxAnalyzer =
+module internal SyntaxAnalyzer =
     let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) result =
         match nodes with
         | [] -> Ok nodes

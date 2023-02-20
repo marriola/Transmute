@@ -3,6 +3,12 @@
 ##
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
+# Fable generated files
+.fable
+*.fs.js
+bundle.js
+temp/**
+
 # User-specific files
 *.suo
 *.user

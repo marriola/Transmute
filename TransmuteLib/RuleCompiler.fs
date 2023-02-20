@@ -1,16 +1,18 @@
 ﻿// TODO: cleanup (make nested functions module-level and private)
 
 namespace TransmuteLib
+
 open MBrace.FsPickler
 open System
 open System.IO
 open Joveler.Compression.XZ
-open Microsoft.FSharp.Collections
+
+type CompiledRule = TransitionTable<State> * Map<Transition<State>, string>
 
 module RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
-
+    
     type private InputPosition =
         | InputInitial
         | InputNoninitial
@@ -421,7 +423,7 @@ module RuleCompiler =
     /// Compiles a Mealy machine from a phonological rule.
     /// The resulting state machine can be passed into <see cref="RuleMachine.transform" /> to apply the rule to a word.
     /// </summary>
-    let compile showNfa features sets rule =
+    let compile showNfa features sets rule : CompiledRule =
         match Node.untag rule with
         | RuleNode (input, output, environment) ->
             let input = Node.untagAll input
@@ -437,11 +439,15 @@ module RuleCompiler =
 
     let compileRulesParallel showNfa features sets rules =
         rules
-        |> PSeq.mapi (fun i rule -> compile showNfa features sets rule)
-        |> PSeq.toList
-        //|> List.sortBy fst
-        //|> List.map snd
+        |> Array.ofList
+#if DEBUG
+        |> Array.mapi (fun i rule -> compile showNfa features sets rule)
+#else
+        |> Array.Parallel.mapi (fun i rule -> compile showNfa features sets rule)
+#endif
+        |> Array.toList
 
+#if !FABLE_COMPILER
     let saveCompiledRules filename rules =
         Utils.Lzma.init() |> ignore
         use f = File.Open(filename, FileMode.Create, FileAccess.Write)
@@ -467,3 +473,4 @@ module RuleCompiler =
 
         let serializer = FsPickler.CreateBinarySerializer()
         serializer.UnPickle(buffer)
+#endif

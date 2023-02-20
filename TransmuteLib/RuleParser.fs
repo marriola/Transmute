@@ -164,7 +164,7 @@ module RuleParser =
                 | OfType LBrack x::xs ->
                     let tokens, setIdentifier = matchSetIdentifier xs x.position
                     inner tokens (setIdentifier :: out)
-                | OfType LParen x::xs ->
+                | OfType LParen _::_ ->
                     let tokens, optional = matchOptional_Disjunct tokens
                     inner tokens (optional :: out)
                 | _ ->
@@ -396,8 +396,9 @@ module RuleParser =
                     nextInternal xs
                 | OfType Comment x::xs ->
                     Ok (xs, Node.tag (CommentNode x.value) x.position)
-                | OfType Empty x::xs
-                | OfType Utterance x::xs ->
+                | OfType Empty x::_
+                | OfType Utterance x::_
+                | OfType LParen x::_ ->
                     Ok (matchRule tokens x.position)
                 | OfType Id x::xs ->
                     Ok (matchSet_Rule xs x)
@@ -474,7 +475,9 @@ module RuleParser =
 
             Ok (resolvedFeatures, resolvedSets, rules)
 
+#if !FABLE_COMPILER
     let parseRulesFile (path: string) =
         use stream = new StreamReader(path, true)
         let content = stream.ReadToEnd()
         parseRules content
+#endif

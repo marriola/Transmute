@@ -1,11 +1,11 @@
 ﻿namespace TransmuteLib
 
-type private PrefixTree =
+type internal PrefixTree =
     | Root of children:PrefixTree list
     | Node of prefix:string * value:char * children:PrefixTree list
     | Leaf of utterance:string
 
-module private PrefixTree =
+module internal PrefixTree =
     // maketree [ "k"; "kw"; "g"; "gw"; "p"; "b"; "t"; "d" ]
 
     //                Ø

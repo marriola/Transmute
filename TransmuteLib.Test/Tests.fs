@@ -1,4 +1,4 @@
-﻿module Tests
+﻿module TransmuteLib.Test.Tests
 
 open TransmuteLib
 open Xunit
@@ -9,9 +9,9 @@ let testRule rules inputs expected =
         |> RuleParser.parseRules
         |> Result.map (fun (features, sets, rules) -> RuleCompiler.compile false features sets rules[0])
         |> Result.map (fun rule -> inputs |> List.map (RuleMachine.transform false rule))
-    Assert.Equal(Ok expected, actual)
+    Assert.Equal<string>(expected, Result.defaultWith List.singleton actual) 
 
-let testRules rules inputs expected =
+let testRules rules inputs (expected: string list) =
     let rules =
         rules
         |> RuleParser.parseRules
@@ -21,8 +21,10 @@ let testRules rules inputs expected =
         |> Result.map (fun rules ->
             (input, rules)
             ||> List.fold (fun input rule -> RuleMachine.transform false rule input))
-    let actual = inputs |> List.map transform
-    Assert.Equal<Result<string, string>>(List.map Result<string,string>.Ok expected, actual)
+    let actual =
+        inputs
+        |> List.map transform
+    Assert.Equal<string list>(expected, List.map (Result.defaultWith id) actual)
 
 [<Fact>]
 let ``Unconditional single phone transformation`` () =
@@ -41,6 +43,16 @@ let ``Unconditional set transformation`` () =
         }
 
         [-$voiced]/[+$voiced]/_
+        """
+    testRule rule input expected
+
+[<Fact>]
+let ``Unconditional disjunction transformation`` () =
+    let input = [ "ke"; "ko" ]
+    let expected = [ "ka"; "ka" ]
+    let rule =
+        """
+        (e|o)→a
         """
     testRule rule input expected
 
@@ -75,7 +87,7 @@ let ``Insertion`` () =
     testRule rule input expected
 
 [<Fact>]
-let ``Addition`` () =
+let ``Addition and replacement after an optional node`` () =
     let input = ["gʰˈlχʷtom"]
     let expected = ["gʰˈulχʷtom"]
     let rule =
@@ -129,7 +141,7 @@ let ``Compound sets`` () =
 
         [$STOP-$voiced]/[+$voiced]/_                ; ka -> ga
         [+$voiced-$fricative]/[+$fricative]/_       ; ga -> ɣa
-        ɣ//_                                        ; ɣa -> a
+        ɣ→∅                                         ; ɣa -> a
         """
     testRules rules input expected
 
