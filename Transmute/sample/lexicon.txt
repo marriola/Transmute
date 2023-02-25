@@ -5,9 +5,9 @@ swˈesteːr
 suʔnˈus
 dʰuktˈeːr
 lˈegʰjeti
-ˈojnos
-ˈojneχ
-ˈojnom
+ˈojnos		; masc.
+ˈojneχ		; fem.
+ˈojnom		; neut.
 dwˈoj
 trˈejes
 petwˈoːr
@@ -27,16 +27,16 @@ kʲmtˈom
 χʷdntˈej	; dat.sg.
 χʷdntmˈos	; dat.pl.
 χʷdntˈeʔ	; inst.sg.
-widonom
-wˈojdχe
-wˈojdtχe
-wˈojde
+widonom		; inf.
+wˈojdχe		; 1sg.
+wˈojdtχe	; 2sg.
+wˈojde		; 3sg.
 widtˈos
 plʔnˈos
 plʔnˈom
 plʔnˈeχ
-kʷekʷlˈom
-kʷˈekʷlom
+kʷˈekʷlom	; nom.sg.
+kʷekʷlˈeχ	; collective
 dʰrˈogʰonom
 sprˈegonom
 lipjˈonom

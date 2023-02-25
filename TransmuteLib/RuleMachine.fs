@@ -219,7 +219,7 @@ module RuleMachine =
                     [], nextProduction, nextOutput
 
                 | false, IsInsert _, Some tf' ->
-                    let nextUndo = (FromEnvironment (tf', position)) :: FromEnvironment (string symbol, position) :: undo
+                    let nextUndo = FromEnvironment (string symbol, position) :: (FromEnvironment (tf', position)) :: undo
                     nextUndo, production, output
 
                 | false, IsEnvironment _ & IsReplace _, Some tf' ->
