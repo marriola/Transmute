@@ -9,17 +9,14 @@
 ;   $SONORANT/u$SONORANT/$V_!$V
 ;   $SONORANT/u$SONORANT/!$V_$V
 
-
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
 ;;;;;;;;;;;;
 
-; TODO implement transformation of Ø, i.e. insertion
-; /u/#_$SONORANT$C
-
 ; You can omit the environment segment for unconditional rules.
 [+$palatalized]→[-$palatalized]
 
+; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
 ∅→u/(#|[$C-$LARYNGEAL])(ˈ)_(m|n|l|r)(#|$C)
 
 [-$overlong]→[+$overlong]/_#
@@ -116,14 +113,14 @@ ln→ll
 zm→mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
+e→i/$V($GLIDE)($C)($C)_(#|$C)
+e→i/$V($GLIDE)($C)($C)_(#|$C)
 (ei|ej)→iː
-e→i/$V($GLIDE)($C)($C)_(#|$C)
-e→i/$V($GLIDE)($C)($C)_(#|$C)
+i(j(i)|ːi)→iː
 ; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
-(iːi|iji)→iː
-ji→i/$V($C)($C)_(#|$C)
-;ji→i/$V$C_(#|$C)
-;ji→i/$V$C$C_(#|$C)
+ji→i/$V_(#|$C)
+ji→i/$V$C_(#|$C)
+ji→i/$V$C$C_(#|$C)
 
 (o|a)→ɑ
 
@@ -131,8 +128,7 @@ ji→i/$V($C)($C)_(#|$C)
 ; Late PGmc ;
 ;;;;;;;;;;;;;
 
-m→n/_#
-m→n/_$DENTAL
+m→n/_(#|$DENTAL)
 [-$nasalized]n→[+$nasalized]/_#
 
 ẽː→ɑ̃ː

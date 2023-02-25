@@ -1,3 +1,5 @@
 ﻿namespace TransmuteLib.Exceptions
 
-exception SyntaxError of string * int * int
+open TransmuteLib.Position
+
+exception SyntaxError of string * Offset * Line * Column

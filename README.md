@@ -2,6 +2,8 @@
 
 A sound change applier for constructed languages. This application aims for flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 66-rule protogermanic.sc file, most words take about 1-2 ms on an AMD Ryzen 7 4800H, or 100-200 ms on an Intel Core i5-6500T.
 
+
+
 ## Command line options
 
 | Switch                 | Abbreviation |                                                                                                                             |
@@ -98,7 +100,7 @@ A deletion rule is written with the output segment either empty or containing on
 
 ##### Insertion rules
 
-An insertion rule is written similarly to a deletion rule, with the input segment either empty or containing only `∅`. Insertion rules are be conditional only.
+An insertion rule is written similarly to a deletion rule, with the input segment either empty or containing only `∅`. Insertion rules are conditional only.
 
     ∅→s/[$stop+$dental]_[$stop+$dental]
 

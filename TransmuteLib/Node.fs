@@ -1,6 +1,7 @@
 ﻿namespace TransmuteLib
 
 open System.Collections.Generic
+open TransmuteLib.Position
 
 type Node =
     /// Represents a comment.
@@ -46,7 +47,7 @@ type Node =
     | DisjunctNode of Node list list
 
     /// Represents a node tagged with metadata.
-    | TaggedNode of pos:(int * int) * Node
+    | TaggedNode of pos: (Offset * Line * Column) * Node
 
     with
     override this.ToString() =
@@ -141,7 +142,7 @@ module Node =
     let (|Untag|_|) node =
         match node with
         | TaggedNode (position, inner) -> Some (inner, position)
-        | _ -> Some (node, (0, 0))
+        | _ -> Some (node, (Offset 0, Line 0, Column 0))
 
     /// Gets the left string value of a TransformationNode.
     let getLeft node =
@@ -330,7 +331,7 @@ module Node =
                 let msg = sprintf "'%s' '%s' not defined" kind name
                 match node with
                 | TaggedNode (pos, _) -> invalidSyntax msg pos
-                | _ -> invalidSyntax msg (1, 1)
+                | _ -> invalidSyntax msg (Offset 0, Line 1, Column 1)
 
     /// <summary>
     /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.

@@ -1,5 +1,7 @@
 ﻿namespace TransmuteLib
 
+open TransmuteLib.Position
+
 type TokenType =
     /// An error token.
     | Error
@@ -65,8 +67,8 @@ type TokenType =
     | Comment
 
 type Token =
-    { tokenType: TokenType;
-      position: int * int;
+    { tokenType: TokenType
+      position: Offset * Line * Column
       value: string
     }
 

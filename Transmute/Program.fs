@@ -4,6 +4,9 @@ open System.IO
 open TransmuteLib
 open TransmuteLib.RuleParser
 
+let RULES_EXTENSION = ".sc"
+let COMPILED_RULES_EXTENSION = ".scc"
+
 let formatTime ms =
     if ms > 1000.0 then
         $"%.2f{ms / 1000.0} s"
@@ -22,13 +25,9 @@ let time fn =
 let compileRules options features sets rules =
     let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
     let selectedRules =
-        match options.testRules with
-        | Some ruleNumbers ->
-            List.filter
-                (fun (i, _) -> List.contains i ruleNumbers)
-                indexedRules
-        | None ->
-            indexedRules
+        options.testRules
+        |> Option.map (fun ruleNumbers -> indexedRules |> List.filter (fun (i, _) -> List.contains i ruleNumbers))
+        |> Option.defaultValue indexedRules
 
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
@@ -57,32 +56,14 @@ let compileRules options features sets rules =
     rules, elapsed
 
 let transform options rules word =
+    let showNfa = options.verbosityLevel >= ShowNFA
+
     let rec inner nextWord log totalTime rules =
         match rules with
         | [] ->
             word, nextWord, log, totalTime
-        | (i, ruleDesc, rule, _)::xs ->
-            let result, elapsed = time (fun () -> RuleMachine.transform (options.verbosityLevel >= ShowNFA) rule nextWord)
-
-            let log =
-                if options.verbosityLevel >= ShowDFA then
-                    let transitions, transformations = rule
-                    log
-                    @ [ $"\nRule {i}: {ruleDesc}\n"
-                        "\nDFA:\n\n" ]
-                    @ (transitions
-                        |> Map.toList
-                        |> List.mapi (fun j ((fromState, m), toState) ->
-                            let t = $"({fromState}, {m})"
-                            $"{j+1}.\t%-35s{t}-> {toState}"))
-                    @ [ "\ntransformations:\n" ]
-                    @ (transformations
-                        |> Map.toList
-                        |> List.mapi (fun j ((From origin, input, To dest), result) ->
-                            $"{j+1}. ({origin}, {input}) -> {dest} => {result}"))
-                    @ [ "\n********************************************************************************" ]
-                else
-                    log
+        | (i, _, rule, _)::xs ->
+            let result, elapsed = time (fun () -> RuleMachine.transform showNfa rule nextWord)
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
@@ -125,9 +106,9 @@ let main argv =
 
     let rules, compileTime =
         let compiledFile =
-            if Path.GetExtension(options.rulesFile) = ".sc"
-                then Path.Combine(Path.GetDirectoryName(options.rulesFile), Path.GetFileNameWithoutExtension(options.rulesFile)) + ".scc"
-                else options.rulesFile + ".scc"
+            if Path.GetExtension(options.rulesFile) = RULES_EXTENSION
+                then Path.Combine(Path.GetDirectoryName(options.rulesFile), Path.GetFileNameWithoutExtension(options.rulesFile)) + COMPILED_RULES_EXTENSION
+                else options.rulesFile + COMPILED_RULES_EXTENSION
 
         if options.recompile
             || not (File.Exists(compiledFile))
@@ -138,23 +119,41 @@ let main argv =
                     | Ok (features, sets, rules) ->
                         features, sets, rules
                     | Result.Error msg ->
-                        failwith msg
+                        fprintfn stderr "%s" msg
+                        exit 1
 
                 let rules, compileTime = compileRules options features sets rules
                 RuleCompiler.saveCompiledRules compiledFile rules |> ignore
 
                 rules, compileTime
             else
-                printfn "Reading rules..."
                 time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
     if options.verbosityLevel > Normal then
         fprintfn stderr ""
 
-        List.iter
-            (fun (i, node, _, milliseconds) ->
-                printfn $"[%8s{formatTime milliseconds}] %2d{i}. {node}")
-            rules
+        rules
+        |> List.iter (fun (i, node, rule, milliseconds) ->
+            printfn $"[%8s{formatTime milliseconds}] %2d{i}. {node}"
+
+            if options.verbosityLevel >= ShowDFA then
+                let transitions, transformations = rule
+                printfn $"\nRule {i}: {node}"
+
+                transitions
+                |> Map.toList
+                |> List.iteri (fun j ((fromState, m), toState) ->
+                    let t = $"({fromState}, {m})"
+                    printfn $"{j+1}.\t%-35s{t}-> {toState}")
+
+                printfn "\ntransformations:"
+
+                transformations
+                |> Map.toList
+                |> List.iteri (fun j ((From origin, input, To dest), result) ->
+                    printfn $"{j+1}. ({origin}, {input}) -> {dest} => {result}")
+
+                printfn "\n********************************************************************************")
 
     // Trim comments, filter to non-empty lines, and select lines if specified on command line
 
@@ -178,11 +177,11 @@ let main argv =
     let transformedLexicon, totalMilliseconds = transformLexicon options rules lexicon
 
     for original, result, log, milliseconds in transformedLexicon do
-        if options.verbosityLevel = Normal then
-            printfn "%s" result
-        else
+        if options.verbosityLevel > Normal then
             printfn "\n%s" (String.concat "\n" log)
-            printfn $"[%5.2f{milliseconds} ms] %15s{original} -> {result}"
+            printf $"[%5.2f{milliseconds} ms] %15s{original} -> "
+        
+        printfn "%s" result
 
     if options.verbosityLevel > Normal then
         let totalTransformMilliseconds =

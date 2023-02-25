@@ -2,7 +2,7 @@
 
 open System.IO
 open TransmuteLib.Lexer
-open TransmuteLib.Node
+open TransmuteLib.Position
 open TransmuteLib.Token
 open TransmuteLib.Utils
 
@@ -13,7 +13,7 @@ module RuleParser =
     /// </summary>
     /// <param name="tokens">The list of tokens.</param>
     let private next tokens =
-        let mutable _position = (1, 1)
+        let mutable _position = Offset 0, Line 1, Column 1
 
         /// <summary>
         /// Matches a token to a specific type.
@@ -387,7 +387,7 @@ module RuleParser =
                 _position <-
                     match tokens with
                     | [] -> _position
-                    | x::_ -> x.position
+                    | x:: _ -> x.position
 
                 match tokens with
                 | [] ->
@@ -407,8 +407,8 @@ module RuleParser =
                 | x::_ ->
                     Result.Error (syntaxErrorMessage (sprintf "Unexpected token '%s'" x.value)  _position)
             with
-                Exceptions.SyntaxError (message, row, col) ->
-                    Result.Error (syntaxErrorMessage message (row, col))
+                Exceptions.SyntaxError (message, offset, row, col) ->
+                    Result.Error (syntaxErrorMessage message (offset, row, col))
    
         nextInternal tokens
 
@@ -434,8 +434,8 @@ module RuleParser =
             match lex content with
             | FileError msg ->
                 Result.Error (sprintf "%s" msg)
-            | SyntaxError (msg, row, col) ->
-                Result.Error (sprintf "Syntax error at row %d column %d: %s" row col msg)
+            | SyntaxError (msg, Offset offset, Line row, Column col) ->
+                Result.Error (sprintf "Syntax error at row %d column %d (offset %d): %s" row col offset msg)
             | OK tokens ->
                 Result.Ok tokens
 

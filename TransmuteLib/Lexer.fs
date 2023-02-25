@@ -1,13 +1,13 @@
 ﻿namespace TransmuteLib
 
-open System.IO
+open TransmuteLib.Position
 open TransmuteLib.StateMachine
 open TransmuteLib.Utils
 
 module internal Lexer =
     type Result =
         | OK of Token list
-        | SyntaxError of string * int * int
+        | SyntaxError of string * Offset * Line * Column
         | FileError of string
 
     type private State =
@@ -134,8 +134,8 @@ module internal Lexer =
     type MismatchAction = Restart | Stop
 
     type LexerValue =
-        { startPos: int * int
-          pos: int * int
+        { startPos: Offset * Line * Column
+          pos: Offset * Line * Column
           mismatchAction: MismatchAction
           builder: char list
           acc: Token list }
@@ -150,22 +150,22 @@ module internal Lexer =
         |> withStartState START
         |> withErrorState ERROR
         |> withInitialValue
-            { startPos = 1, 1
-              pos = 1, 1
+            { startPos = Offset 0, Line 1, Column 1
+              pos = Offset 0, Line 1, Column 1
               mismatchAction = Restart
               builder = []
               acc = [] }
-        |> onError (fun _ inputSymbol _ ({ pos = row, col } as value) _ ->
+        |> onError (fun _ inputSymbol _ ({ pos = offset, row, col } as value) _ ->
             match value.mismatchAction with
             | MismatchAction.Restart ->
                 ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
             | MismatchAction.Stop ->
-                (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, row, col)
+                (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, offset, row, col)
                 |> SyntaxError
                 |> ErrorAction.Stop)
         |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->
-            let inline incrRow (row, _) = (row + 1, 1)
-            let inline incrCol (row, col) = (row, col + 1)
+            let inline incrRow (Offset offset, Line row, _) = (Offset (offset + 1), Line (row + 1), Column 1)
+            let inline incrCol (Offset offset, Line row, Column col) = (Offset (offset + 1), Line row, Column (col + 1))
             let isNextFinal = isFinal nextState
             let nextPos =
                 if isEpsilonTransition then

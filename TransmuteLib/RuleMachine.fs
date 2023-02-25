@@ -45,7 +45,7 @@ module RuleMachine =
             fTransform()
 
     /// An input symbol tagged with the segment it came from and its position.
-    type private EnvironmentString =
+    type internal EnvironmentString =
         | FromInput of input: string * position: int
         | FromEnvironment of input: string * position: int
         with
@@ -55,41 +55,41 @@ module RuleMachine =
                 | FromInput (s, _) -> s
 
             /// Adds the input symbol c to xs.
-            static member add c xs =
+            static member addOutput c xs =
                 specialSymbolCata
                     (fun () -> string c :: xs)
                     c xs
 
             /// Tags the symbol c with its position and adds it to xs.
-            static member addWithPosition c position xs =
+            static member addProduction c position xs =
                 specialSymbolCata
                     (fun () -> (string c, position) :: xs)
                     c xs
 
             /// Tags the input symbol as originating from the input segment and adds it to xs.
-            static member addInput position c xs =
+            static member addFromInput position c xs =
                 specialSymbolCata
                     (fun () -> (FromInput (string c, position)) :: xs)
                     c xs
 
             /// Tags the input symbol as originating from the environment segment and adds it to xs.
-            static member addEnvironment position c xs =
+            static member addFromEnvironment position c xs =
                 specialSymbolCata
                     (fun () -> (FromEnvironment (string c, position)) :: xs)
                     c xs
 
             /// Tags the input symbol as originating from the environment segment and adds it to xs.
-            static member addEnvironmentString position s xs =
+            static member addStringFromEnvironment position s xs =
                 specialSymbolCata
                     (fun () -> (FromEnvironment (s, position)) :: xs)
                     '!' xs
 
             /// Concatenates all inputs in s to xs.
-            static member concatAll inputs xs =
+            static member concatAllToOutput inputs xs =
                 List.map EnvironmentString.get inputs @ xs
 
             /// Concatenates all environment segment inputs in s to xs.
-            static member concatEnvironment s xs =
+            static member concatEnvironmentToOutput s xs =
                 let environmentInputs =
                     s
                     |> List.choose (function
@@ -100,7 +100,7 @@ module RuleMachine =
                 environmentInputs @ xs
 
             /// Concatenates all position-tagged environment segment inputs to xs and sorts by position.
-            static member concatEnvironmentWithPosition s xs =
+            static member concatEnvironmentToProduction s xs =
                 let environmentInputs =
                     s
                     |> List.choose (function
@@ -129,23 +129,8 @@ module RuleMachine =
 
         /// The output buffer.
         output: string list
+    }
 
-        /// <summary>
-        /// The breakpoint.
-        /// </summary>
-        /// <remarks>
-        /// Whenever the state machine encounters an optional node or a disjunct node,
-        /// it may fail to match that branch of the rule, but still be able to back up
-        /// and visit a different branch. When the state machine is presented with such
-        /// a choice, it picks a branch and the remaining options are stored in the
-        /// breakpoint property
-        /// </remarks>
-        breakpoint: Breakpoint list
-    }
-    and private Breakpoint = {
-        input: char[]
-        state: RuleMachineState
-    }
 
     /// <summary>
     /// Applies a compiled rule to a word.
@@ -154,6 +139,15 @@ module RuleMachine =
     /// <param name="rule">The rule to apply.</param>
     /// <param name="word">The word to transform.</param>
     let transform verbose rule word =
+        // Debug output columns
+        //  is valid transition
+        //  position in word    
+        //  last output position
+        //  transition
+        //  production buffer
+        //  undo buffer
+        //  output buffer
+
         let transitions, transformations = rule
         stateMachineConfig()
         |> withTransitions transitions
@@ -166,29 +160,27 @@ module RuleMachine =
             production = []
             undo = []
             output = []
-            breakpoint = []
         }
         |> onError (fun position input current value _ ->
             let nextOutput =
                 match value.isPartialMatch, value.wasLastFinal with
                 // The rule failed to match
                 | true, false ->
-                    EnvironmentString.concatAll value.undo value.output
+                    EnvironmentString.concatAllToOutput value.undo value.output
                 // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
                 | true, true ->
                     // undo and production will never be populated at the same time
-                    (List.map fst value.production) @ EnvironmentString.concatAll value.undo value.output
+                    (List.map fst value.production) @ EnvironmentString.concatAllToOutput value.undo value.output
                 // The rule has not yet begun to match.
                 | false, _ ->
-                    EnvironmentString.add input value.output
+                    EnvironmentString.addOutput input value.output
             if verbose then
-                printf "  %2d %c %2s: " position input (if value.lastOutputOn = None then "" else string (Option.get value.lastOutputOn))
-                printfn "%-20s | %O %A %A %A"
-                    (sprintf "Error at %O" current)
-                    position
-                    []
-                    []
-                    nextOutput
+                let lastOutputPosition =
+                    value.lastOutputOn
+                    |> Option.map string
+                    |> Option.defaultValue ""
+                printf $"   %2d{position} %c{input} %2s{lastOutputPosition}: "
+                printfn $"Error at %-11O{current} | [] [] %A{nextOutput}"
             Restart {
                 value with
                     isPartialMatch = false
@@ -200,7 +192,11 @@ module RuleMachine =
         |> onTransition (fun position transition _ symbol current nextState value ->
             let { lastOutputOn = lastOutputOn; production = production; undo = undo; output = output } = value
             if verbose then
-                printf "• %2d %c %2s: " position symbol (if lastOutputOn = None then "" else string (Option.get lastOutputOn))
+                let lastOutputPosition =
+                    lastOutputOn
+                    |> Option.map string
+                    |> Option.defaultValue ""
+                printf $" • %2d{position} %c{symbol} %2s{lastOutputPosition}: "
             let isNextFinal = State.isFinal nextState
             let tf = Map.tryFind transition transformations
             let nextUndo, nextProduction, nextOutput =
@@ -210,51 +206,52 @@ module RuleMachine =
                 | true, IsEnvironment _, None ->
                     let nextProduction =
                         production
-                        |> EnvironmentString.addWithPosition symbol position
-                        |> EnvironmentString.concatEnvironmentWithPosition undo
+                        |> EnvironmentString.addProduction symbol position
+                        |> EnvironmentString.concatEnvironmentToProduction undo
                     [], nextProduction, output
+
                 // Completed match with a transformation.
                 // Set production to the output of the transformation and add undo to output.
                 | true, IsEnvironment _, Some tf'
                 | true, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
-                    [], nextProduction, EnvironmentString.concatEnvironment undo output
+                    let nextOutput = EnvironmentString.concatEnvironmentToOutput undo output
+                    [], nextProduction, nextOutput
+
                 | false, IsInsert _, Some tf' ->
-                    let nextUndo = (FromEnvironment (string tf', position)) :: FromEnvironment (string symbol, position) :: undo
+                    let nextUndo = (FromEnvironment (tf', position)) :: FromEnvironment (string symbol, position) :: undo
                     nextUndo, production, output
+
                 | false, IsEnvironment _ & IsReplace _, Some tf' ->
-                    let nextUndo = EnvironmentString.addEnvironment position symbol undo
-                    let nextProduction =
-                        tf
-                        |> Option.map (fun s -> (s, position) :: production[1..])
-                        |> Option.defaultValue production
+                    let nextUndo = EnvironmentString.addFromEnvironment position symbol undo
+                    let nextProduction = (tf', position) :: production[1..]
                     nextUndo, nextProduction, output
+
                 // Partial match in environment segment.
                 // Add symbol to undo.
                 | false, IsEnvironment _, _ ->
-                    let nextUndo = EnvironmentString.addEnvironment position symbol undo
+                    let nextUndo = EnvironmentString.addFromEnvironment position symbol undo
                     nextUndo, production, output
+
                 // Partial match in input segment with a transformation.
                 // Set production to the output of the transformation and add symbol to undo.
                 | false, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
-                    let nextUndo = EnvironmentString.addInput position symbol undo
+                    let nextUndo = EnvironmentString.addFromInput position symbol undo
                     nextUndo, nextProduction, output
+
                 // Partial match in input segment with no transformation.
                 // Add symbol to undo.
                 | false, IsInput _, None ->
-                    let nextUndo = EnvironmentString.addInput position symbol undo
+                    let nextUndo = EnvironmentString.addFromInput position symbol undo
                     nextUndo, production, output
+
                 | _ ->
                     undo, production, output
-            //let nextBuffer = Buffer (Some position, nextProduction, nextUndo, nextOutput)
+
             if verbose then
-                printfn "%-20s | %O %A %A %A"
-                    (sprintf "%O -> %O" current nextState)
-                    position
-                    nextProduction
-                    nextUndo
-                    nextOutput
+                let transition = $"{current} -> {nextState}"
+                printfn $"%-20s{transition} | %A{nextProduction} %A{nextUndo} %A{nextOutput}"
             { value with
                 isPartialMatch = true
                 wasLastFinal = isNextFinal

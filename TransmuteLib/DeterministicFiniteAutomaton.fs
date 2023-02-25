@@ -11,17 +11,19 @@ module internal DeterministicFiniteAutomaton =
         /// A transition with a destination state that either has deterministic transitions or just doesn't have any nondeterministic ones.
         | Deterministic of (Transition<'TState> * TransitionResult)
 
-    /// Returns true if both states are equal, or if one state is a merged state that contains the other.
-    let inline private ( <%> ) x y =
+    /// Returns true if the states X and Y are equivalent, or if state Y is a merged state containing state X
+    let inline private ( <% ) x y =
         match x, y with
-        | _ when x = y -> true
-        | (State _ as s), MergedState (children, _, _)
-        | MergedState (children, _, _), (State _ as s) when List.contains s children -> true
-        | _ -> false
+        | _ when x = y ->
+            true
+        | (State _ as s), MergedState (children, _, _) when List.contains s children ->
+            true
+        | _ ->
+            false
 
     /// Matches the state or a merged state containing it
     let private (|IsOrContains|_|) x y =
-        if x <%> y
+        if x <% y
             then Some x
             else None
 
@@ -79,7 +81,7 @@ module internal DeterministicFiniteAutomaton =
                     |> List.filter
                         (fun ((From origin, input, _), _) ->
                             input <> OnEpsilon
-                            && (origin <%> x
+                            && (origin <% x
                                 || Set.contains origin followStates))
                     |> List.map (fun ((_, input, To dest), result) -> input, dest, result)
                 let nextStates =
@@ -131,8 +133,8 @@ module internal DeterministicFiniteAutomaton =
                                 table
                                 |> List.choose (function
                                     | (From successor, OnEpsilon, To d2), uResult as u
-                                        //when successor <%> d && hasEpsilonTransition d2 ->
-                                        when successor <%> d ->
+                                        //when successor <% d && hasEpsilonTransition d2 ->
+                                        when successor <% d ->
                                         let result =
                                             match result, uResult with
                                             | (Produces _ as r), NoOutput
