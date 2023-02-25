@@ -6,6 +6,16 @@ A sound change applier for constructed languages. This application aims for flex
 
 ## Command line options
 
+    Transmute [OPTION...] -r FILE [FILE...]
+    Transmute [OPTION...] -l FILE [FILE...]
+    Transmute [OPTION...] -r FILE -l FILE
+
+Transmute processes the last rules file specified, and all lexicon files in the order specified.
+
+Files can be specified using switches, or without switches based on their file extensions. Files ending in `.sc` are treated as rules files, and all other files are treated as lexicon files.
+
+A filename of `-` stands for standard input.
+
 | Switch                 | Abbreviation |                                                                                                                             |
 | -----------------------|--------------|-----------------------------------------------------------------------------------------------------------------------------|
 | --rules FILE           | -r           | Load rules from FILE (required)                                                                                             |

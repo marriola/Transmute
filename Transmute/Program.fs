@@ -162,7 +162,7 @@ let main argv =
     let lexicon =
         options.lexiconFiles
         |> List.map (fun file ->
-            if file = "." then
+            if file = "-" then
                 Console.In
             else
                 new StreamReader(file))
