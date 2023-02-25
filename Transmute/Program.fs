@@ -80,11 +80,9 @@ let transformLexicon options rules lexicon =
         time (fun () ->
             lexicon
 #if DEBUG
-            |> Seq.mapi (fun i word -> transform options rules word)
-            |> Seq.toList)
+            |> Array.mapi (fun i word -> transform options rules word))
 #else
-            |> Array.Parallel.mapi (fun i word -> transform options rules word)
-            |> Array.toList)
+            |> Array.Parallel.mapi (fun i word -> transform options rules word))
 #endif
     result, elapsed
 
@@ -162,11 +160,17 @@ let main argv =
         if commentIndex = -1 then line else line[..commentIndex - 1]
 
     let lexicon =
-        IO.File.ReadAllText(options.lexiconFile).Trim().Split('\n')
-        |> Array.map (trimComment >> trimWhitespace)
-        |> Array.filter (fun ln -> ln.Length > 0 && not (ln.StartsWith ";"))
-        |> Array.indexed
-        |> Array.choose (fun (i, word) ->
+        options.lexiconFiles
+        |> List.map (fun file ->
+            if file = "." then
+                Console.In
+            else
+                new StreamReader(file))
+        |> List.collect (fun stream -> stream.ReadToEnd().Trim().Split('\n') |> List.ofArray)
+        |> List.map (trimComment >> trimWhitespace)
+        |> List.filter (fun ln -> ln.Length > 0 && not (ln.StartsWith ";"))
+        |> List.indexed
+        |> List.choose (fun (i, word) ->
             match options.testWords with
             | None -> Some word
             | Some testWords when List.contains (i + 1) testWords -> Some word
@@ -174,7 +178,7 @@ let main argv =
 
     // Transform lexicon and report
 
-    let transformedLexicon, totalMilliseconds = transformLexicon options rules lexicon
+    let transformedLexicon, totalMilliseconds = transformLexicon options rules (Array.ofList lexicon)
 
     for original, result, log, milliseconds in transformedLexicon do
         if options.verbosityLevel > Normal then
@@ -186,7 +190,7 @@ let main argv =
     if options.verbosityLevel > Normal then
         let totalTransformMilliseconds =
             transformedLexicon
-            |> List.sumBy (fun (_, _, _, milliseconds) -> int milliseconds)
+            |> Array.sumBy (fun (_, _, _, milliseconds) -> int milliseconds)
             |> float
 
         let totalCompileMilliseconds =

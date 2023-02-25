@@ -16,7 +16,7 @@ let verbosityLevels = dict [
 ]
 
 type Options =
-    { lexiconFile: string;
+    { lexiconFiles: string list
       rulesFile: string
       testRules: int list option
       testWords: int list option
@@ -25,7 +25,7 @@ type Options =
     }
 
 let defaultOptions =
-    { lexiconFile = null
+    { lexiconFiles = []
       rulesFile = null
       testRules = None
       testWords = None
@@ -37,10 +37,10 @@ let parse (argv: string[]) =
     let rec parse' args options =
         match args with
         | [] ->
-            options
+            { options with lexiconFiles = List.rev options.lexiconFiles }
         | "-l"::filename::xs
         | "--lexicon"::filename::xs ->
-            parse' xs { options with lexiconFile = filename }
+            parse' xs { options with lexiconFiles = filename :: options.lexiconFiles }
         | "-r"::filename::xs
         | "--rules"::filename::xs ->
             parse' xs { options with rulesFile = filename }
@@ -64,25 +64,28 @@ let parse (argv: string[]) =
                         |> Some
                 }
             parse' xs nextOptions
-        | "-v"::x::xs when verbosityLevels.ContainsKey(x) ->
-            parse' xs { options with verbosityLevel = verbosityLevels.[x] }
+        | "-v"::x::xs when verbosityLevels.ContainsKey x ->
+            parse' xs { options with verbosityLevel = verbosityLevels[x] }
+        // Alias for -v 2
+        | "--show-transformations"::xs ->
+            parse' xs { options with verbosityLevel = ShowTransformations }
+        // Alias for -v 3
         | "--verbose"::xs
         | "-v"::xs ->
             parse' xs { options with verbosityLevel = ShowDFA }
-        | "--show-transformations"::xs ->
-            parse' xs { options with verbosityLevel = ShowTransformations }
         | "-rc"::xs
         | "--recompile"::xs ->
             parse' xs { options with recompile = true }
-        | x::xs ->
-            eprintfn "Unrecognized option '%s'" x
-            parse' xs options
+        | filename::xs when filename.EndsWith ".sc" ->
+            parse' xs { options with rulesFile = filename }
+        | filename::xs ->
+            parse' xs { options with lexiconFiles = filename :: options.lexiconFiles }
 
     parse' (Array.toList argv) defaultOptions
 
 let validate (options: Options) =
     let mutable isValid = true
-    if options.lexiconFile = null then
+    if options.lexiconFiles.Length = 0 then
         printfn "Lexicon not specified"
         isValid <- false
     if options.rulesFile = null then
