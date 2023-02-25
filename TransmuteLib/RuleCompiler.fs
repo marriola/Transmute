@@ -2,10 +2,10 @@
 
 namespace TransmuteLib
 
+open ICSharpCode.SharpZipLib.GZip
 open MBrace.FsPickler
 open System
 open System.IO
-open Joveler.Compression.XZ
 
 type CompiledRule = TransitionTable<State> * Map<Transition<State>, string>
 
@@ -449,27 +449,26 @@ module RuleCompiler =
 
 #if !FABLE_COMPILER
     let saveCompiledRules filename rules =
-        Utils.Lzma.init() |> ignore
         use f = File.Open(filename, FileMode.Create, FileAccess.Write)
-        use xz = new XZStream(f, new XZCompressOptions())
+        use gzip = new GZipOutputStream(f)
+        gzip.SetLevel 9
 
         let serializer = FsPickler.CreateBinarySerializer()
         let pickle = serializer.Pickle(rules)
 
-        xz.Write(BitConverter.GetBytes(pickle.Length), 0, 4)
-        xz.Write(pickle, 0, pickle.Length)
+        gzip.Write(BitConverter.GetBytes(pickle.Length), 0, 4)
+        gzip.Write(pickle, 0, pickle.Length)
 
     let readCompiledRules filename =
-        Utils.Lzma.init() |> ignore
         use f = File.Open(filename, FileMode.Open, FileAccess.Read)
-        use xz = new XZStream(f, new XZDecompressOptions())
+        use gzip = new GZipInputStream(f)
 
         let lengthBuffer: byte[] = Array.zeroCreate 4
-        xz.Read(lengthBuffer, 0, 4) |> ignore
+        gzip.Read(lengthBuffer, 0, 4) |> ignore
         let length = BitConverter.ToInt32(lengthBuffer, 0)
 
         let buffer: byte[] = Array.zeroCreate length
-        xz.Read(buffer, 0, length) |> ignore
+        gzip.Read(buffer, 0, length) |> ignore
 
         let serializer = FsPickler.CreateBinarySerializer()
         serializer.UnPickle(buffer)
