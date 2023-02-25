@@ -7,7 +7,12 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute", "Transmute\Tran
 EndProject
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib", "TransmuteLib\TransmuteLib.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
 EndProject
-Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "TransmuteLib.Test", "TransmuteLib.Test\TransmuteLib.Test.fsproj", "{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib.Test", "TransmuteLib.Test\TransmuteLib.Test.fsproj", "{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{20BF81DB-D7B6-44C6-BD1F-F106ED66CE95}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

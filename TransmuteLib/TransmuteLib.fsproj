@@ -9,6 +9,7 @@
     <Compile Include="Properties\AssemblyInfo.fs" />
     <Compile Include="Utils\Cata.fs" />
     <Compile Include="BoundedList.fs" />
+    <Compile Include="Position.fs" />
     <Compile Include="SyntaxError.fs" />
     <Compile Include="Token.fs" />
     <Compile Include="Exceptions.fs" />
