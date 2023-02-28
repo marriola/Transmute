@@ -173,7 +173,8 @@ module RuleParser =
             inner tokens []
 
         /// <summary>
-        /// Matches either an <see cref="UtteranceNode" /> or a <see cref="TransformationNode" />.
+        /// Either matches an arrow and an utterance and produces a <see cref="TransformationNode" />, or produces an <see cref="UtteranceNode" />
+        /// with the utterance already parsed.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         /// <param name="utterance">The utterance already matched.</param>
@@ -204,10 +205,12 @@ module RuleParser =
                     matchMemberListInternal xs out
                 | OfType Utterance x::xs ->
                     let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
+                    let tokens, _ = tryMatchToken tokens Comma
                     matchMemberListInternal tokens (utteranceOrTransformation :: out)
                 | OfType Id x::xs ->
                     let id = Node.tag (SetIdentifierNode x.value) x.position
-                    matchMemberListInternal xs (id :: out)
+                    let tokens, _ = tryMatchToken xs Comma
+                    matchMemberListInternal tokens (id :: out)
                 | OfType RBrace _::xs ->
                     xs, List.rev out
                 | OfType LBrack x::xs ->
@@ -350,30 +353,27 @@ module RuleParser =
             | OfType Minus _::_ ->
                 let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
                 identifier
-                |> Cata.optional
-                    // '[' Id [ '+' | '-' ] -> RuleNode (id :: input, output, environment)
-                    (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (SetIdentifierNode i.value) i.position ])
-                    // '[' [ '+' | '-' ] -> RuleNode (...)
-                    (fun _ -> tokens, theSet)
+                // '[' Id [ '+' | '-' ] -> RuleNode (id :: input, output, environment)
+                |> Option.map (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (SetIdentifierNode i.value) i.position ])
+                // '[' [ '+' | '-' ] -> RuleNode (...)
+                |> Option.defaultWith (fun _ -> tokens, theSet)
             | OfType RBrack x::xs ->
                 identifier
-                |> Cata.optional
-                    // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
-                    (fun i -> matchFeature xs headPosition i)
-                    // '[' ']' -> syntax error
-                    (fun _ -> unexpectedToken [Id] x)
+                // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
+                |> Option.map (fun i -> matchFeature xs headPosition i)
+                // '[' ']' -> syntax error
+                |> Option.defaultWith (fun _ -> unexpectedToken [Id] x)
             | OfType Id x::xs ->
                 identifier
-                |> Cata.optional
-                    // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: input.Tail, output, environment)
-                    (fun i ->
-                        let tokens, ruleNode = matchRule tokens x.position
-                        tokens, prependToRule ruleNode headPosition
-                            [ Node.tag (SetIdentifierNode i.value) i.position
-                              Node.tag (SetIdentifierNode x.value) x.position
-                            ])
-                    // Store first identifier and see what we get next
-                    (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))
+                // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: input.Tail, output, environment)
+                |> Option.map (fun i ->
+                    let tokens, ruleNode = matchRule tokens x.position
+                    tokens, prependToRule ruleNode headPosition
+                        [ Node.tag (SetIdentifierNode i.value) i.position
+                          Node.tag (SetIdentifierNode x.value) x.position
+                        ])
+                // Store first identifier and see what we get next
+                |> Option.defaultWith (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))
             | x::_ ->
                 unexpectedToken [ Plus; Minus; Id ] x
 

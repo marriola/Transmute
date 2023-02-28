@@ -36,9 +36,16 @@ Sets and features are identified by a name consisting of alphanumeric characters
 
 ### Defining sets
 
-Sets define categories of sounds, e.g. consonants and vowels. Phonemes in a set are separated by whitespace and may be listed in any arrangement desired.
+Sets define categories of sounds, e.g. consonants and vowels.
 
-    $V { a e i o u }
+    $V { a, e, i, o, u }
+
+You can put phonemes of any length in a set.
+
+    $LABIOVELAR { kʷ, gʷ }
+    $OVERLONG { ɑːː, ɔːː }
+
+Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
     $C {
         p t k

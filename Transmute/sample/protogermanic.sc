@@ -147,6 +147,12 @@ t→∅/$V($C)($C)$V($C)_#
 ɑː→ɔː
 ɑ̃ː→ɔ̃ː
 
+e→i/_n$C
+
+[-$nasalized]→[+$nasalized]/_nx
+[-$long]→[+$long]/_nx
+n→∅/_x
+
 ; Not really sure where this should go, so I'll just stick it at the end
 sr→str
 
@@ -163,9 +169,9 @@ $V {
     ɑ̃ː ẽː ĩː õː ɔ̃ː ũː
 }
 
-[$mid] { e o }
-[$round] { o u }
-[$high] { i u }
+[$mid] { e, o }
+[$round] { o, u }
+[$high] { i, u }
 
 [$long] {
     ɑ → ɑː
@@ -235,19 +241,19 @@ $STOP {
     gʰ gʲʰ gʷʰ bʰ dʰ
 }
 
-$DENTAL { t d dʰ θ ð s z }
-$LABIAL { m p b bʰ ɸ β }
-$LABIOVELAR { kʷ gʷ gʷʰ xʷ ɣʷ }
-$VELAR { k g gʰ gʲʰ x ɣ $LABIOVELAR }
-$SONORANT { m n l r w j }
-$LIQUID { l r }
-$GLIDE { w j }
-$NASAL { m n }
-$LARYNGEAL { ʔ χ χʷ }
+$DENTAL { t, d, dʰ, θ, ð, s, z }
+$LABIAL { m, p, b, bʰ, ɸ, β }
+$LABIOVELAR { kʷ, gʷ, gʷʰ, xʷ, ɣʷ }
+$VELAR { k, g, gʰ, gʲʰ, x, ɣ, $LABIOVELAR }
+$SONORANT { m, n, l, r, w, j }
+$LIQUID { l, r }
+$GLIDE { w, j }
+$NASAL { m, n }
+$LARYNGEAL { ʔ, χ, χʷ }
 $SIBILANT { s }
 
-$OBSTRUENT { $STOP $fricative }
-$C { $DENTAL $LABIAL $VELAR $SONORANT $LIQUID $GLIDE $NASAL $LARYNGEAL $SIBILANT }
+$OBSTRUENT { $STOP, $fricative }
+$C { $DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, $GLIDE, $NASAL, $LARYNGEAL, $SIBILANT }
 
 [$voiced] {
     k → g

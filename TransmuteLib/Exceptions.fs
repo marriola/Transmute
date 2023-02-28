@@ -17,7 +17,8 @@ module ExceptionHelpers =
     /// <param name="got">The unexpected token that was encountered.</param>
     let unexpectedToken (expected: TokenType list) got =
         let message =
-            sprintf "Expected one of %s, got '%s'"
+            sprintf "Expected %s%s, got '%s'"
+                (if expected.Length > 1 then "one of " else "")
                 (expected |> List.map string |> String.concat ",")
                 (string got.tokenType)
         invalidSyntax message got.position

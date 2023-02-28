@@ -22,6 +22,7 @@ module internal Lexer =
         | Q_RBrace
         | Q_LParen
         | Q_RParen
+        | Q_Comma
         | Q_Divider
         | Q0
         | Q_Arrow
@@ -65,6 +66,7 @@ module internal Lexer =
 
               makeTransitions (From START)
                 [ To Q_Separator, OnChar '.'
+                  To Q_Comma, OnChar ','
                   To Q_LBrack, OnChar '['
                   To Q_RBrack, OnChar ']'
                   To Q_LBrace, OnChar '{'
@@ -110,6 +112,7 @@ module internal Lexer =
     let private stateTokenTypes =
         [ Q_WhitespaceFinal, Whitespace.id
           Q_Separator, Separator.id
+          Q_Comma, Comma.id
           Q_LBrack, LBrack.id
           Q_RBrack, RBrack.id
           Q_LBrace, LBrace.id
