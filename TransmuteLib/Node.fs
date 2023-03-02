@@ -19,6 +19,9 @@ type Node =
     /// Represents the presence or absence of a feature in a set identifier.
     | FeatureIdentifierNode of isPresent:bool * name:string
 
+    /// Represents the presence or absence of a phoneme in a set identifier.
+    | UtteranceIdentifierNode of isPresent:bool * utterance: string
+
     /// Represents an utterance.
     | UtteranceNode of string
 
@@ -62,7 +65,8 @@ type Node =
         | SetIdentifierNode value
         | TermIdentifierNode value ->
             value
-        | FeatureIdentifierNode (isPresent, name) ->
+        | FeatureIdentifierNode (isPresent, name)
+        | UtteranceIdentifierNode (isPresent, name) ->
             let sign = if isPresent then "+" else "-"
             sign + name
         | CompoundSetIdentifierNode terms ->
@@ -96,9 +100,9 @@ type Node =
             let environmentSegment =
                 match environment with
                 | [PlaceholderNode] -> ""
-                | _ -> sprintf "/%s" (stringifyList environment)
+                | _ -> sprintf " / %s" (stringifyList environment)
 
-            sprintf "%s→%s%s"
+            sprintf "%s → %s%s"
                 (if input = [] then "Ø" else stringifyList input)
                 // I know this technically isn't the empty set symbol, but the actual one doesn't display
                 // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
@@ -352,6 +356,10 @@ module Node =
             | x::xs ->
                 let nextSet =
                     match x with
+                    | Untag (UtteranceIdentifierNode (isPresent, utterance), _) ->
+                        if isPresent
+                            then Set.add utterance result
+                            else Set.remove utterance result
                     | Untag (TermIdentifierNode name, _)
                     | Untag (SetIdentifierNode name, _) ->
                         tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name

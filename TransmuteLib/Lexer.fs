@@ -44,6 +44,11 @@ module internal Lexer =
     /// Defines the transition table for the lexer.
     /// </summary>
     let private table =
+        let beginIdentifierTransitions =
+            onMany
+                [ seq { 'A'..'Z' } ]
+                Q_Identifier
+
         let identifierTransitions =
             onMany
                 [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' } ]
@@ -53,7 +58,7 @@ module internal Lexer =
             onMany
                 [ seq { 'a'..'z' }
                   seq { '\u0250'..'\u0341' }
-                  "æðøçɸβθχ" :> char seq
+                  "æœðøçɸβθχ" :> char seq
                 ]
                 Q_Utterance
 
@@ -88,7 +93,7 @@ module internal Lexer =
               makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
               makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
 
-              makeTransitions (From START) [ To Q_Identifier, OnChar '$' ]
+              makeTransitions (From START) beginIdentifierTransitions
               makeTransitions (From Q_Identifier) identifierTransitions
               makeTransitions (From Q_Identifier) [ To Q_IdentifierFinal, OnEpsilon ]
 
@@ -146,7 +151,7 @@ module internal Lexer =
     let lex (content: string) =
         let isFinal state = stateTokenTypes.ContainsKey state
         let accumulate (builder: char list) =
-            System.String.Concat(builder |> List.rev |> Array.ofList).Trim()
+            System.String.Concat(builder |> List.rev |> Array.ofList)
 
         stateMachineConfig()
         |> withTransitions table
@@ -185,13 +190,8 @@ module internal Lexer =
             let nextAcc =
                 match Map.tryFind nextState stateTokenTypes with
                 | Some fn ->
-                    let v = accumulate builder
-                    let nextValue =
-                        Cata.bool
-                            (fun _ -> v)
-                            (fun _ -> v.Trim())
-                            (currentState = Q_Whitespace)
-                    (fn value.startPos nextValue) :: value.acc
+                    let v = builder |> accumulate |> fn value.startPos
+                    v :: value.acc
                 | None -> value.acc
             let nextStartPos =
                 // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
@@ -207,5 +207,5 @@ module internal Lexer =
                     mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
                     builder = if isNextFinal then [] else builder
                     acc = nextAcc })
-        |> onFinish (fun { acc = acc } ->  acc |> List.rev |> OK)
-        |> runStateMachine content
+        |> onFinish (fun ({ acc = acc }) -> acc |> List.rev |> OK)
+        |> runStateMachine (content + "\n")

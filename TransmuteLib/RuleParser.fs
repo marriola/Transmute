@@ -60,8 +60,15 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let matchFeatureIdentifierTerm tokens =
             let tokens, presence = matchOneOf tokens [ Plus; Minus ]
-            let tokens, identifier = matchToken tokens Id
-            tokens, Node.tag (FeatureIdentifierNode (presence.tokenType = Plus, identifier.value)) presence.position
+            let tokens, term = matchOneOf tokens [ Id; Utterance ]
+            let isPresent = presence.tokenType = Plus
+            let node =
+                match term with
+                | { tokenType = Id } ->
+                    FeatureIdentifierNode (isPresent, term.value)
+                | { tokenType = Utterance } ->
+                    UtteranceIdentifierNode (isPresent, term.value)
+            tokens, Node.tag node presence.position
 
         /// <summary>
         /// Matches a <see cref="TermIdentifierNode" />.
@@ -78,7 +85,7 @@ module RuleParser =
         let matchSetOrFeatureIdentifierTerm tokens =
             match tokens with
             | [] ->
-                invalidSyntax "Expected identifier, '+' or '-', got end of file" _position
+                invalidSyntax "Expected '+', '-' or an identifier, got end of file" _position
             | OfType Id _::_ ->
                 matchSetIdentifierTerm tokens
             | OfType Plus _::_
@@ -95,7 +102,11 @@ module RuleParser =
             let rec matchSetIdentifierInternal tokens out =
                 match tokens with
                 | [] ->
-                    invalidSyntax "Expected ']', got end of file" _position
+                    invalidSyntax "Expected '+', '-' or an identifier, got end of file" _position
+                | NewlineWhitespace _::_ ->
+                    invalidSyntax "Expected '+', '-' or an identifier; got end of line" _position
+                | NonNewlineWhitespace _::xs ->
+                    matchSetIdentifierInternal xs out
                 | OfType RBrack _::xs ->
                     xs, Node.tag (CompoundSetIdentifierNode (List.rev out)) headPosition
                 | _ ->
@@ -117,7 +128,10 @@ module RuleParser =
             /// <param name="out">The contents of the node.</param>
             let rec matchDisjunct tokens startToken out =
                 match tokens with
-                | OfType Empty _::xs
+                | OfType Empty _::xs ->
+                    matchDisjunct xs startToken out
+                | NewlineWhitespace _::_ ->
+                    invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
                 | OfType Whitespace _::xs ->
                     matchDisjunct xs startToken out
                 | OfType RParen _::xs ->
@@ -125,7 +139,7 @@ module RuleParser =
                 | OfType Pipe _::xs ->
                     matchDisjunct xs startToken out
                 | _ ->
-                    let tokens, ruleSegment = matchRuleSegment tokens in
+                    let tokens, ruleSegment = matchRuleSegment tokens
                     ruleSegment :: out
                     |> matchDisjunct tokens startToken
 
@@ -137,6 +151,8 @@ module RuleParser =
                 let tokens, lparen = matchToken tokens LParen
                 let rec matchOptional_DisjunctInteral tokens out =
                     match tokens with
+                    | NewlineWhitespace _::_ ->
+                        invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
                     | OfType Whitespace _::xs ->
                         matchOptional_DisjunctInteral xs out
                     | OfType RParen _::xs ->
@@ -152,6 +168,8 @@ module RuleParser =
                 match tokens with
                 | OfType Empty _::xs
                 | OfType Separator _::xs ->
+                    inner xs out
+                | NonNewlineWhitespace _::xs ->
                     inner xs out
                 | OfType Id x::xs ->
                     inner xs (Node.tag (SetIdentifierNode x.value) x.position :: out)
@@ -349,6 +367,10 @@ module RuleParser =
             match tokens with
             | [] ->
                 invalidSyntax "Expected feature identifier term, identifier or ']'; got end of file" _position
+            | NewlineWhitespace _::_ ->
+                invalidSyntax "Expected '+', '-', ']' or an identifier; got end of line" _position
+            | NonNewlineWhitespace _::xs ->
+                matchFeature_SetIdentifier_Rule xs headPosition identifier
             | OfType Plus _::_
             | OfType Minus _::_ ->
                 let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition

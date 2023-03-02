@@ -32,22 +32,22 @@ A rule file consists of a list of sets, features and rules.
 
 ### Identifiers
 
-Sets and features are identified by a name consisting of alphanumeric characters prefixed by a dollar sign, e.g. `$C` or `$voiced`.
+Sets and features are identified by a name consisting of alphanumeric characters beginning with a capital letter, e.g. `C` or `Voiced`. If you need to use two identifiers in a row in a rule, you can separate them with spaces, as in `C C`.
 
 ### Defining sets
 
 Sets define categories of sounds, e.g. consonants and vowels.
 
-    $V { a, e, i, o, u }
+    V { a, e, i, o, u }
 
 You can put phonemes of any length in a set.
 
-    $LABIOVELAR { kʷ, gʷ }
-    $OVERLONG { ɑːː, ɔːː }
+    LABIOVELAR { kʷ, gʷ }
+    OVERLONG { ɑːː, ɔːː }
 
 Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
-    $C {
+    C {
         p t k
         b d g
         m n ŋ
@@ -55,11 +55,13 @@ Commas are optional. Whitespace is enough to separate phonemes, and you may list
           z
     }
 
+    LARYNGEAL { ʔ χ χʷ }
+
 ### Defining features
 
-Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. As in a set, a feature can also contain sounds with no transformation, only membership. Transformations may be defined either using `->` or the Unicode U+2192 `→` character.
+Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
 
-    [$fricative] {
+    [Fricative] {
         k → x
         kʷ → xʷ
         p → ɸ
@@ -73,16 +75,17 @@ Here, four phonemes are defined as having transformation from voiceless stops to
 
 Both sets and features allow you to include other sets or features in them:
 
-    $STOP { p t k }
-    $FRICATIVE { x f θ }
-    $NASAL { m n ŋ }
-    $C { $STOP $FRICATIVE $NASAL } ; p t k x f θ m n ŋ
+    STOP { p t k }
+    FRICATIVE { x f θ }
+    NASAL { m n ŋ }
+    C { STOP FRICATIVE NASAL } ; p t k x f θ m n ŋ
 
+    V { Long [-Long] Front [-Front] Overlong Nasalized }
 
 
 ### Defining rules
 
-Languages are subject to many changes in their phonology as natural variations in pronunciation become entrenched over long periods of time, and these sound changes are usually regular, i.e. almost universally applied to every applicable word. Such regular sound changes can be described using phonological rules, a somewhat informal standard from the field of linguistics. Defining the sounds of a language in terms of distinctive features allows us to define phonological rules in terms of their presence, absence, removal and addition, rather than explicitly designing a rule multiple times for each phoneme it may apply to. This allows writing expressive and declarative rules that more closely resemble what one may find in an academic paper.
+Languages are subject to many changes in their phonology as natural variations in pronunciation become entrenched over long periods of time, and these sound changes are usually regular, i.e. almost universally applied to every applicable word. Such regular sound changes can be described using phonological rules, a convention from the field of linguistics. Defining the sounds of a language in terms of distinctive features allows us to define phonological rules in terms of their presence, absence, removal and addition, rather than explicitly designing a rule multiple times for each phoneme it may apply to. This allows writing expressive and declarative rules that more closely resemble what one may find in an academic paper.
 
 #### Rule types
 
@@ -91,7 +94,7 @@ Languages are subject to many changes in their phonology as natural variations i
 A rule consists of at least two parts. An unconditional rule has only an **input** and an **output**, separated by either `->`, `→`, or `/`:
 
     a/ɑ                             ; a becomes ɑ
-    o→ɔ                             ; o becomes ɔ
+    o → ɔ                             ; o becomes ɔ
 
 ##### Conditional rules
 
@@ -104,47 +107,47 @@ A conditional rule has a third segment, the **environment** in which the rule ap
 
 For example, the rule
 
-    $laryngeal→ə/$C_$C              ; Laryngeal consonant becomes a schwa between consonants
+    LARYNGEAL → ə / C_C              ; Laryngeal consonant becomes a schwa between consonants
 
-will first match any consonant `$C`, then a `$laryngeal`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
+will first match any consonant `C`, then a `LARYNGEAL`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
 
 ##### Deletion rules
 
 A deletion rule is written with the output segment either empty or containing only `∅`, and can be either conditional or unconditional:
 
-    ə→∅
+    ə → ∅
     j//_(e|a|o)#
 
 ##### Insertion rules
 
 An insertion rule is written similarly to a deletion rule, with the input segment either empty or containing only `∅`. Insertion rules are conditional only.
 
-    ∅→s/[$stop+$dental]_[$stop+$dental]
+    ∅ → s / [Stop+Dental]_[Stop+Dental]
 
 #### Matching phonemes in a set
 
 In the simplest case, one phoneme out of a set can be matched using only its identifier:
 
-    $C→∅/_#                         ; Match any consonant and delete it
+    C → ∅ / _#                         ; Match any consonant and delete it
 
 #### Intersection of sets and features
 
 A compound set matches all phonemes that share all of the listed features. Whether to match the presence or absence of a feature is indicated by a `+` or a `-`, respectively. A few examples:
 
-| Compound set                 | Process                                                                                 | Matches                |
-|------------------------------|-----------------------------------------------------------------------------------------|------------------------|
-| `[$sonorant-$C]`             | Starts with all sonorants (vowels, liquids and nasals) and removes all consonants       | Vowels                 |
-| `[$stop-$voiced]`            | Starts with all stops and removes all voiced stops                                      | Voiceless stops        |
-| `[$stop+$voiced+$aspirated]` | Starts with all stops, removes all voiceless stops, and removes all non-aspirated stops | Voiced aspirated stops |
+| Compound set              | Process                                                                                 | Matches                |
+|---------------------------|-----------------------------------------------------------------------------------------|------------------------|
+| `[Sonorant-C]`            | Starts with all sonorants (vowels, liquids and nasals) and removes all consonants       | Vowels                 |
+| `[Stop-Voiced]`           | Starts with all stops and removes all voiced stops                                      | Voiceless stops        |
+| `[Stop+Voiced+Aspirated]` | Starts with all stops, removes all voiceless stops, and removes all non-aspirated stops | Voiced aspirated stops |
 
 More concretely, given the following sets and features
 
-    $stop {
+    Stop {
         p t k kʷ
         b d g gʷ
     }
     
-    [$voiced] {
+    [Voiced] {
         p → b
         t → d
         k → g
@@ -154,7 +157,7 @@ More concretely, given the following sets and features
         ŋ
     }
 
-    [$fricative] {
+    [Fricative] {
         p → ɸ
         t → θ
         k → x
@@ -162,24 +165,28 @@ More concretely, given the following sets and features
         s
     }
 
-By starting with the set `$stop` and removing all phonemes that are `$voiced` (/b d g gʷ/), we can write a rule that affects only the voiceless stops /p t k kʷ/ː
+By starting with the set `Stop` and removing all phonemes that are `Voiced` (/b d g gʷ/), we can write a rule that affects only the voiceless stops /p t k kʷ/ː
 
-    [$stop-$voiced]→[+$fricative]    ; Grimm's law for voiceless consonants
+    [Stop-Voiced] → [+Fricative]    ; Grimm's law for voiceless consonants
 
 #### Transforming a sound by changing a feature
 
-The same notation used to match either the presence or absence of a feature can also be used in the output segment of the rule. Currently only one feature may be changed. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[$fricative]`.
+The same notation used to match either the presence or absence of a feature can also be used in the output segment of the rule. Currently only one feature may be changed. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
 
 #### Optional matches
 
 Phonemes contained in parentheses may be matched if present, but may also be skipped over if necessary to make the rule match. For example, in this rule a schwa becomes /ɑ/ when preceded by the word boundary, an optional /s/, and up to two other consonants:
 
-    ə→ɑ/#(s)($C)($C)_
+    ə → ɑ / #(s)(C)(C)_
 
 #### Disjunction matches
 
 One of several different sequences of sounds can be matched by enclosing them in parentheses and separating them with `|`. For example, in the Germanic spirant law, stops followed by either a `t` or an `s` become fricatives:
 
-    [$stop+$labial]→ɸ/_(t|s)        ; Affects p b bʰ
-    [$stop+$dental]→ts/_(t|s)       ; Affects t d dʰ
-    [$stop+$velar]→x/_(t|s)         ; Affects k g gʰ
+    [Stop+Labial] → ɸ / _(t|s)        ; Affects p b bʰ
+    [Stop+Dental] → ts / _(t|s)       ; Affects t d dʰ
+    [Stop+Velar] → x / _(t|s)         ; Affects k g gʰ
+
+This type of match can also be used in the input segment:
+
+    (o|a) → ɑ

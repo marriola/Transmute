@@ -6,162 +6,163 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; TODO implement NOT nodes
-;   $SONORANT/u$SONORANT/$V_!$V
-;   $SONORANT/u$SONORANT/!$V_$V
+;   SONORANT/uSONORANT/V_!V
+;   SONORANT/uSONORANT/!V_V
 
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
 ;;;;;;;;;;;;
 
 ; You can omit the environment segment for unconditional rules.
-[+$palatalized]→[-$palatalized]
+[+Palatalized]/[-Palatalized]/_
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
-∅→u/(#|[$C-$LARYNGEAL])(ˈ)_(m|n|l|r)(#|$C)
+∅ → u / (#|[C-LARYNGEAL])(ˈ)_(m|n|l|r)(#|C)
 
-[-$overlong]→[+$overlong]/_#
+[-Overlong] → [+Overlong] / _#
 
-$LARYNGEAL→∅/#_$C
+LARYNGEAL → ∅ / #_C
 
 ; e-coloring and dropping of laryngeals in onset
-e→o/χʷ(ˈ)_
-e→a/χ(ˈ)_
-$LARYNGEAL→∅/#_
-$LARYNGEAL→∅/_(ˈ)$V
+e → o / χʷ(ˈ)_
+e → a / χ(ˈ)_
+LARYNGEAL → ∅ / #_
+LARYNGEAL → ∅ / _(ˈ)V
 
 ; Homorganic vowels in hiatus → long vowel
-aa→aːː
-ee→eːː
-ii→iːː
-oo→oːː
-uu→uːː
+aa → aːː
+ee → eːː
+ii → iːː
+oo → oːː
+uu → uːː
 
 ; e-coloring
-e→o/_(w|j)χʷ
-e→a/_(w|j)χ
-eχʷ→oː
-eχ→ɑː
+e → o / _(w|j)χʷ
+e → a / _(w|j)χ
+eχʷ → oː
+eχ → ɑː
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
-[-$long]→[+$long]/_$LARYNGEAL
-$LARYNGEAL→∅/($V|$SONORANT)_
+;[-Long]LARYNGEAL → [+Long] / _
+[-Long] → [+Long] / _LARYNGEAL
+LARYNGEAL → ∅ / (V|SONORANT)_
 
 ; Cowgill's law
-χʷ→g/($SONORANT)_w
+χʷ → g / (SONORANT)_w
 
 ; Vocalization of remaining laryngeals
-$LARYNGEAL→ə
+LARYNGEAL → ə
 
 
 ;;;;;;;;;;;;;;
 ; Early PGmc ;
 ;;;;;;;;;;;;;;
 
-(j|w)→∅/_(e|a|o)#
-(e|a|o)→∅/_#
+(j|w) → ∅ / _(e|a|o)#
+(e|a|o) → ∅ / _#
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
-[$STOP-$voiced]→[+$fricative]/(#|$V|$SONORANT)_
-;[$STOP-$voiced]→[+$fricative]/!($OBSTRUENT)_
+[STOP-Voiced] → [+Fricative] / (#|V|SONORANT)_
+;[STOP-Voiced] → [+Fricative] / !(OBSTRUENT)_
 
 ; Undo Grimm's law after s-
-[+$fricative-$voiced]→[-$fricative]/s_
+[+Fricative-Voiced] → [-Fricative] / s_
 
 ; Germanic spirant law
-[$STOP+$LABIAL]→ɸ/_(t|s) ;($C|$V)
-[$STOP+$DENTAL]→ts/_(t|s) ;($C|$V)
-tst→ss
-;tss→ss
-ss→s/_#
-[$STOP+$VELAR]→x/_(t|s)($C|$V)
+[STOP+LABIAL] → ɸ / _(t|s) ;(C|V)
+[STOP+DENTAL] → ts / _(t|s) ;(C|V)
+tst → ss
+;tss → ss
+ss → s / _#
+[STOP+VELAR] → x / _(t|s)(C|V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
 ; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
 ; Fix: identify features that have the sound as a prefix and transition on error
-; e.g. don't match b for [$STOP+$voiced-$aspirated] when it is followed by ʰ
-[$STOP+$voiced-$aspirated]→[-$voiced]/_(#|(ˈ)$V|$C)
+; e.g. don't match b for [STOP+Voiced-Aspirated] when it is followed by ʰ
+[STOP+Voiced-Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
 
 ; Grimm's law: aspirated stops become unaspirated
-[$STOP+$aspirated]→[-$aspirated]
-g→ɣ/(#|$LIQUID|[+$fricative])_
+[STOP+Aspirated] → [-Aspirated]
+g → ɣ / (#|LIQUID|[+Fricative])_
 
 ; Lenition of intervocalic voiced stops
-[$STOP+$voiced]→[+$fricative]/($V|$GLIDE)_(#|$V|$GLIDE)
+[STOP+Voiced] → [+Fricative] / (V|GLIDE)_(#|V|GLIDE)
 
 ; Verner's law
-[+$fricative-$voiced]→[+$voiced]/[-$stressed-$SONORANT]($SONORANT)_($SONORANT)[+$stressed] ; Why does this one result in environment and input states being merged?
+[+Fricative-Voiced] → [+Voiced] / [-Stressed-SONORANT](SONORANT)_(SONORANT)[+Stressed] ; Why does this one result in environment and input states being merged?
 
 ; Undo Verner's law after voiceless consonant
-[+$fricative+$voiced]→[-$voiced]/[-$voiced]_
+[+Fricative+Voiced] → [-Voiced] / [-Voiced]_
 
 ; Undo Verner's law before voiceless stops
-[+$fricative+$voiced]→[-$voiced]/_[$STOP-$voiced]
+[+Fricative+Voiced] → [-Voiced] / _[STOP-Voiced]
 
 ; Voiced fricatives resulting from Verner's law to stops after nasal
-[+$fricative+$voiced]→[-$fricative]/$NASAL_
+[+Fricative+Voiced] → [-Fricative] / NASAL_
 
-; Stress moves to initial syllable. Let's just stop marking it.
-[+$stressed]→[-$stressed]
+; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
+[+Stressed] → [-Stressed]
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
-s→z/$V(($NASAL|$LIQUID))_#
+s → z / V((NASAL|LIQUID))_#
 
-gʷ→b/#_
+gʷ → b / #_
 
-nw→nn
-ln→ll
-zm→mm
+nw → nn
+ln → ll
+zm → mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
-e→i/$V($GLIDE)($C)($C)_(#|$C)
-e→i/$V($GLIDE)($C)($C)_(#|$C)
-(ei|ej)→iː
-i(j(i)|ːi)→iː
-; TODO: on error, allow the machine to jump to another branch (e.g. from $C to _) if that one is capable of matching the input
-ji→i/$V_(#|$C)
-ji→i/$V$C_(#|$C)
-ji→i/$V$C$C_(#|$C)
+e → i / V(GLIDE)(C)(C)_(#|C)
+e → i / V(GLIDE)(C)(C)_(#|C)
+(ei|ej) → iː
+i(j(i)|ːi) → iː
+; TODO: on error, allow the machine to jump to another branch (e.g. from C to _) if that one is capable of matching the input
+ji → i / V_(#|C)
+ji → i / V C_(#|C)
+ji → i / V C C_(#|C)
 
-(o|a)→ɑ
+(o|a) → ɑ
 
 ;;;;;;;;;;;;;
 ; Late PGmc ;
 ;;;;;;;;;;;;;
 
-m→n/_(#|$DENTAL)
-[-$nasalized]n→[+$nasalized]/_#
+m → n / _(#|DENTAL)
+[-Nasalized]n → [+Nasalized] / _#
 
-ẽː→ɑ̃ː
+ẽː → ɑ̃ː
 
 ; Stressed schwa becomes /a/
-ə→ɑ/#(s)($C)($C)_
+ə → ɑ / #(s)(C)(C)_
 
 ; Unstressed schwa disappears between consonants
-ə→∅/$C_$C
-ə→ɑ
+ə → ∅ / C_C
+ə → ɑ
 
-;t→∅/$V$C($C)($C)$V($C)($C)_#
-t→∅/$V($C)($C)$V($C)_#
-ɣʷ→w
+;t → ∅ / V.C(C)(C)V(C)(C)_#
+t → ∅ / V(C)(C)V(C)_#
+ɣʷ → w
 
-ɑː→ɔː
-ɑ̃ː→ɔ̃ː
+ɑː → ɔː
+ɑ̃ː → ɔ̃ː
 
-e→i/_n$C
+e → i / _nC
 
-[-$nasalized]→[+$nasalized]/_nx
-[-$long]→[+$long]/_nx
-n→∅/_x
+[-Nasalized] → [+Nasalized] / _nx
+[-Long] → [+Long] / _nx
+n → ∅ / _x
 
 ; Not really sure where this should go, so I'll just stick it at the end
-sr→str
+sr → str
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                  Sets and features                  ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-$V {
+V {
     ə
     ɑ  a  e  i  o     u
     ɑː aː eː iː oː ɔː uː
@@ -169,11 +170,11 @@ $V {
     ɑ̃ː ẽː ĩː õː ɔ̃ː ũː
 }
 
-[$mid] { e, o }
-[$round] { o, u }
-[$high] { i, u }
+[Mid] { e, o }
+[Round] { o, u }
+[High] { i, u }
 
-[$long] {
+[Long] {
     ɑ → ɑː
     a → aː
     e → eː
@@ -189,12 +190,12 @@ $V {
     ɔ̃ː
 }
 
-[$overlong] {
+[Overlong] {
     aː → aːː
     oː → oːː    
 }
 
-[$nasalized] {
+[Nasalized] {
     ɑ → ɑ̃
     e → ẽ
     i → ĩ
@@ -209,7 +210,7 @@ $V {
     oːː → õːː
 }
 
-[$stressed] {
+[Stressed] {
     a → ˈa
     aː → ˈaː
     ɑ → ˈɑ
@@ -232,30 +233,30 @@ $V {
 }
 
 ; TODO map sets
-; $V → &ː
+; V → &ː
 ;   produces aː eː iː oː uː
 
-$STOP {
+STOP {
     k  kʲ  kʷ  p  t
     g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
 }
 
-$DENTAL { t, d, dʰ, θ, ð, s, z }
-$LABIAL { m, p, b, bʰ, ɸ, β }
-$LABIOVELAR { kʷ, gʷ, gʷʰ, xʷ, ɣʷ }
-$VELAR { k, g, gʰ, gʲʰ, x, ɣ, $LABIOVELAR }
-$SONORANT { m, n, l, r, w, j }
-$LIQUID { l, r }
-$GLIDE { w, j }
-$NASAL { m, n }
-$LARYNGEAL { ʔ, χ, χʷ }
-$SIBILANT { s }
+DENTAL { t, d, dʰ, θ, ð, s, z }
+LABIAL { m, p, b, bʰ, ɸ, β }
+LABIOVELAR { kʷ, gʷ, gʷʰ, xʷ, ɣʷ }
+VELAR { k, g, gʰ, gʲʰ, x, ɣ, LABIOVELAR }
+SONORANT { m, n, l, r, w, j }
+LIQUID { l, r }
+GLIDE { w, j }
+NASAL { m, n }
+LARYNGEAL { ʔ, χ, χʷ }
+SIBILANT { s }
 
-$OBSTRUENT { $STOP, $fricative }
-$C { $DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, $GLIDE, $NASAL, $LARYNGEAL, $SIBILANT }
+OBSTRUENT { STOP, Fricative }
+C { DENTAL, LABIAL, VELAR, SONORANT, LIQUID, GLIDE, NASAL, LARYNGEAL, SIBILANT }
 
-[$voiced] {
+[Voiced] {
     k → g
     gʰ
     x → ɣ
@@ -273,19 +274,19 @@ $C { $DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, $GLIDE, $NASAL, $LARYNGEAL, $
     θ → ð
 }
 
-[$palatalized] {
+[Palatalized] {
     k → kʲ
     g → gʲ
     gʰ → gʲʰ
 }
 
-[$labialized] {
+[Labialized] {
     k → kʷ
     g → gʷ
     gʰ → gʷʰ
 }
 
-[$aspirated] {
+[Aspirated] {
     g → gʰ
     gʲ → gʲʰ
     gʷ → gʷʰ
@@ -293,7 +294,7 @@ $C { $DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, $GLIDE, $NASAL, $LARYNGEAL, $
     d → dʰ
 }
 
-[$fricative] {
+[Fricative] {
     k → x
     kʷ → xʷ
     p → ɸ

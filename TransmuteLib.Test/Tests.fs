@@ -36,13 +36,13 @@ let ``Unconditional set transformation`` () =
     let expected = [ "ga"; "ba"; "da" ]
     let rule =
         """
-        [$voiced] {
+        [Voiced] {
             k -> g
             p -> b
             t -> d
         }
 
-        [-$voiced]/[+$voiced]/_
+        [-Voiced]/[+Voiced]/_
         """
     testRule rule input expected
 
@@ -62,13 +62,13 @@ let ``Unconditional set reverse transformation`` () =
     let expected = [ "ka"; "pa"; "ta" ]
     let rule =
         """
-        [$voiced] {
+        [Voiced] {
             k -> g
             p -> b
             t -> d
         }
 
-        [+$voiced]/[-$voiced]/_
+        [+Voiced]/[-Voiced]/_
         """
     testRule rule input expected
 
@@ -92,19 +92,19 @@ let ``Addition and replacement after an optional node`` () =
     let expected = ["gʰˈulχʷtom"]
     let rule =
         """
-        $DENTAL { t d dʰ θ ð s z }
-        $LABIAL { m p b bʰ ɸ β }
-        $LABIOVELAR { kʷ gʷ gʷʰ xʷ ɣʷ }
-        $VELAR { k g gʰ x ɣ $LABIOVELAR }
-        $SONORANT { m n l r w j }
-        $LIQUID { l r }
-        $GLIDE { w j }
-        $NASAL { m n }
-        $LARYNGEAL { ʔ χ χʷ }
-        $SIBILANT { s }
-        $C { $STOP $DENTAL $LABIAL $VELAR $SONORANT $LIQUID $GLIDE $NASAL $LARYNGEAL $SIBILANT }
-        $LARYNGEAL { ʔ χ χʷ }
-        ∅→u/(#|[$C-$LARYNGEAL])(ˈ)_(m|n|l|r)(#|$C)
+        DENTAL { t d dʰ θ ð s z }
+        LABIAL { m p b bʰ ɸ β }
+        LABIOVELAR { kʷ gʷ gʷʰ xʷ ɣʷ }
+        VELAR { k g gʰ x ɣ LABIOVELAR }
+        SONORANT { m n l r w j }
+        LIQUID { l r }
+        GLIDE { w j }
+        NASAL { m n }
+        LARYNGEAL { ʔ χ χʷ }
+        SIBILANT { s }
+        C { STOP DENTAL LABIAL VELAR SONORANT LIQUID GLIDE NASAL LARYNGEAL SIBILANT }
+        LARYNGEAL { ʔ χ χʷ }
+        ∅→u/(#|[C-LARYNGEAL])(ˈ)_(m|n|l|r)(#|C)
         """
     testRule rule input expected
 
@@ -121,8 +121,8 @@ let ``Compound sets`` () =
     let expected = ["a"]
     let rules =
         """
-        $STOP { k p t g b d }
-        [$fricative] {
+        STOP { k p t g b d }
+        [Fricative] {
             k -> x
             p -> ɸ
             t -> θ
@@ -130,7 +130,7 @@ let ``Compound sets`` () =
             b -> β
             d -> ð
         }
-        [$voiced] {
+        [Voiced] {
             k -> g
             p -> b
             t -> d
@@ -139,8 +139,8 @@ let ``Compound sets`` () =
             θ -> ð
         }
 
-        [$STOP-$voiced]/[+$voiced]/_                ; ka -> ga
-        [+$voiced-$fricative]/[+$fricative]/_       ; ga -> ɣa
+        [STOP-Voiced]/[+Voiced]/_                ; ka -> ga
+        [+Voiced-Fricative]/[+Fricative]/_       ; ga -> ɣa
         ɣ→∅                                         ; ɣa -> a
         """
     testRules rules input expected
@@ -151,16 +151,16 @@ let ``Multi-phoneme set transformations`` () =
     let expected = [ "ta"; "ta"; "tsa"; "da"; "da" ]
     let rules =
         """
-        [$labialized] {
+        [Labialized] {
             t -> tw
             d -> dw
         }
-        [$affricate] {
+        [Affricate] {
             s -> ts
         }
 
-        [+$labialized]/[-$labialized]/_
-        [-$affricate]/[+$affricate]/_
+        [+Labialized]/[-Labialized]/_
+        [-Affricate]/[+Affricate]/_
         """
     testRules rules input expected
 
@@ -177,13 +177,13 @@ let ``Repeat set replacement`` () =
     let expected = ["ɣʷaxʷ"]
     let rule =
         """
-        [$fricative] {
+        [Fricative] {
             k -> x
             kʷ -> xʷ
             g -> ɣ
             gʷ -> ɣʷ
         }
 
-        [-$fricative]/[+$fricative]/_
+        [-Fricative]/[+Fricative]/_
         """
     testRule rule input expected

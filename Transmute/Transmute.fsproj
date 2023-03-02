@@ -26,9 +26,9 @@
     <Content Include="sample\oldenglish.sc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-    <None Include="sample\westgermanic.sc">
+    <Content Include="sample\westgermanic.sc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
+    </Content>
     <Content Include="sample\pie.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

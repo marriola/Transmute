@@ -1,34 +1,43 @@
 ﻿; Ingvaeonic and Anglo-Frisian
 
 ; Nasal spirant law
-[-$long]→[+$long]/_n$FRICATIVE
-[-$nasalized]n→[+$nasalized]/_$FRICATIVE
+[-Long] → [+Long] / _nFRICATIVE
+[-Nasalized] → [+Nasalized] / _nFRICATIVE
+n → ∅ / [+Nasalized]_
+
 ɑ̃ː→ɔ̃ː
 
-ɑ(i|j)→ɑː
+ɑ(i|j) → ɑː
 
 ; Anglo-Frisian brightening
-ɑ→æ/_$C
-æ̃→ɑ̃
-æ→ɑ/_[+$geminate]
-æ→ɑ/_$C($C)($C)$BACK
+ɑ → æ / _C
+æ̃ → ɑ̃
+æ → ɑ / _[+Geminate]
+æ → ɑ / _C(C)(C)[V-Front]
 
-(æ|ɑ|ɑ̃)→∅/_#
+(æ|ɑ|ɑ̃) → ∅ / _#
 
 ; Old English
 
-[+$nasalized]→[-$nasalized]
-;∅→u/[+$front]_(x|w|(r|l)$C)
+[+Nasalized] → [-Nasalized]
+;∅→u/[+Front]_(x|w|(r|l)C)
+
+; Front vowel breaking
+[Broken] { ɑ → æɑ, e → eo, i → iu }
+[-Broken] → [+Broken] / _(x|w|rC|lC)
+
+ɑj → ɑː
 
 ; ...
 
-(i|u)→∅/(ː|$C)$C_#
+(i|u) → ∅ / (ː|C)C_#
 
-ø→e
-iu→eo
-ɣ→g/#_
+ø → e
+iu → eo
+ɣ → g / #_
 
-[$front] {
+
+[Front] {
 	ɑ → æ
 	ɑː → æː
 	e
@@ -41,7 +50,7 @@ iu→eo
 	uː → yː
 }
 
-[$long] {
+[Long] {
 	ɑ → ɑː
 	e → eː
 	i → iː
@@ -49,14 +58,14 @@ iu→eo
 	u → uː
 }
 
-[$overlong] {
+[Overlong] {
 	ɑː → ɑːː
 	ɑ̃ː → ɑ̃ːː
 	ɔː → ɔːː
 	ɔ̃ː → ɔ̃ːː
 }
 
-[$nasalized] {
+[Nasalized] {
 	ɑ → ɑ̃
 	ɑː → ɑ̃ː
 	ɑːː → ɑ̃ːː
@@ -66,15 +75,16 @@ iu→eo
 	ɔː → ɔ̃ː
 	ɔːː → ɔ̃ːː
 	u → ũ
+	uː → ũː
 }
 
-[$rounded] {
+[Rounded] {
 	k → kʷ
 	x → xʷ
 	ɣ → ɣʷ
 }
 
-[$geminate] {
+[Geminate] {
 	k → kk
 	p → pp
 	t → tt
@@ -87,12 +97,12 @@ iu→eo
 	l → ll
 }
 
-$BACK { ɑ ɔ o u }
+BACK { ɑ ɔ o u }
 
-$V { $short $long $overlong $nasalized }
-$STOP { k kʷ p t g b d }
-$LIQUID { r l }
-$NASAL { m n }
-$FRICATIVE { x xʷ f θ ɣ v ð s z }
-$SONORANT { $LIQUID $NASAL $V }
-$C { $STOP $LIQUID $NASAL $FRICATIVE }
+V { [+Long] [-Long] [+Front] [-Front] Overlong Nasalized }
+STOP { k kʷ p t g b d }
+LIQUID { r l }
+NASAL { m n }
+FRICATIVE { x xʷ f θ ɣ v ð s z }
+SONORANT { LIQUID NASAL V }
+C { STOP LIQUID NASAL FRICATIVE }

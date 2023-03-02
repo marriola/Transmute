@@ -16,16 +16,11 @@ module internal DeterministicFiniteAutomaton =
         match x, y with
         | _ when x = y ->
             true
-        | (State _ as s), MergedState (children, _, _) when List.contains s children ->
+        | (State _ as s), MergedState (children, _, _)
+        | MergedState (children, _, _), (State _ as s) when List.contains s children ->
             true
         | _ ->
             false
-
-    /// Matches the state or a merged state containing it
-    let private (|IsOrContains|_|) x y =
-        if x <% y
-            then Some x
-            else None
 
     /// Transition augmented with an optional transformation
     type private Transition' = Transition<State> * TransitionResult
@@ -49,10 +44,7 @@ module internal DeterministicFiniteAutomaton =
     let private transitionsFrom state transitions =
         transitions
         |> List.choose (fun (((From origin, _, _), _) as t) ->
-            match state with
-            | IsOrContains origin _ ->
-                Some t
-            | _ -> None)
+            if state <% origin then Some t else None)
 
     let inline private getDest (transition, _) = StateMachine.getDest transition
     let inline private getInput (transition, _) = StateMachine.getInput transition

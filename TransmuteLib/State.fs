@@ -107,8 +107,8 @@ type State =
                 false
 
         override this.ToString() =
-            if State.isFinal this
-                then State.name this |> sprintf "(%s)"
-                else State.name this |> sprintf "%s"
+            let leftParen, rightParen = if State.isFinal this then "(", ")" else "", ""
+            let indicator = if State.isEnvironment this then "ᴱ" else "ᴵ"
+            leftParen + State.name this + rightParen + indicator
 
 type Transformation = Transition<State> * string

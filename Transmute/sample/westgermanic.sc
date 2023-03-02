@@ -1,28 +1,26 @@
 ﻿; Northwest Gmc.
 
-[-$front]→[+$front]/_$C($C)($C)(i|j)
-u→o/_lθ[$V-$high]
-[-$short]→[+$short]/_#
-[+$overlong]→[-$overlong]
+[-Front] → [+Front] / _C(C)(C)(i|j)
+u → o / _[C-n](C)(C)[V-HIGH]
+[-Short] → [+Short] / _#
+[+Overlong] → [-Overlong]
 
 ; West Gmc.
 
-[+$rounded]/[-$rounded]/($C|$V)_
-(zw|ðw)→ww
-ð→d
-β→v
-ɸ→f
-z→∅/_#
-z→r/$SONORANT_
-s→∅/$C_#
-a→∅/$C($C)($C)_#
-[-$geminate]→[+$geminate]/_j
+[+Rounded] → [-Rounded] / (C|V)_
+(zw|ðw) → ww
+ð → d
+β → v
+ɸ → f
+z → ∅ / _#
+z → r / SONORANT_
+s → ∅ / C_#
+a → ∅ / C(C)(C)_#
+[-Geminate] → [+Geminate] / _j
 
-[$high] {
-	i iː y yː u uː
-}
+HIGH { i iː y yː u uː }
 
-[$front] {
+[Front] {
 	ɑ → æ
 	ɑː → æː
 	ɔ → ø
@@ -31,21 +29,22 @@ a→∅/$C($C)($C)_#
 	uː → yː
 }
 
-[$short] {
+[Short] {
 	eː → ɑ
+	iː → i
 	ɔːi → u
 	ɔːj → u
 	ɔː → u
 }
 
-[$overlong] {
+[Overlong] {
 	ɑː → ɑːː
 	ɑ̃ː → ɑ̃ːː
 	ɔː → ɔːː
 	ɔ̃ː → ɔ̃ːː
 }
 
-[$nasalized] {
+[Nasalized] {
 	ɑ → ɑ̃
 	ɑː → ɑ̃ː
 	ɑːː → ɑ̃ːː
@@ -57,13 +56,13 @@ a→∅/$C($C)($C)_#
 	u → ũ
 }
 
-[$rounded] {
+[Rounded] {
 	k → kʷ
 	x → xʷ
 	ɣ → ɣʷ
 }
 
-[$geminate] {
+[Geminate] {
 	k → kk
 	p → pp
 	t → tt
@@ -76,11 +75,11 @@ a→∅/$C($C)($C)_#
 	l → ll
 }
 
-$V { $short $long $overlong $nasalized }
-$STOP { k kʷ p t g b d }
-$LIQUID { r l }
-$NASAL { m n }
-$GLIDE { w j }
-$FRICATIVE { x xʷ ɸ f θ ɣ β v ð s z }
-$SONORANT { $LIQUID $NASAL $GLIDE $V }
-$C { $STOP $LIQUID $NASAL $FRICATIVE }
+V { Short Overlong Nasalized }
+STOP { k kʷ p t g b d }
+LIQUID { r l }
+NASAL { m n }
+GLIDE { w j }
+FRICATIVE { x xʷ ɸ f θ ɣ β v ð s z }
+SONORANT { LIQUID NASAL GLIDE V }
+C { STOP LIQUID NASAL FRICATIVE }

@@ -105,3 +105,15 @@ module Token =
             Some x
         | _ ->
             None
+
+    let (|NewlineWhitespace|_|) ({ tokenType = tokenType; value = value } as token) =
+        if tokenType = Whitespace && value.Contains "\n" then
+            Some token
+        else
+            None
+
+    let (|NonNewlineWhitespace|_|) ({ tokenType = tokenType; value = value } as token) =
+        if tokenType = Whitespace && not (value.Contains "\n") then
+            Some token
+        else
+            None
