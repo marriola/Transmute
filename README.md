@@ -32,7 +32,7 @@ A rule file consists of a list of sets, features and rules.
 
 ### Identifiers
 
-Sets and features are identified by a name consisting of alphanumeric characters beginning with a capital letter, e.g. `C` or `Voiced`. If you need to use two identifiers in a row in a rule, you can separate them with spaces, as in `C C`.
+Sets and features are identified by a name consisting of alphanumeric characters beginning with a capital letter, e.g. `C` or `Voiced`.
 
 ### Defining sets
 
@@ -71,7 +71,7 @@ Features have a similar syntax to sets. In a feature definition, the identifier 
 
 Here, four phonemes are defined as having transformation from voiceless stops to fricatives. /s/ is just a fricative, and has no corresponding transformation.
 
-### Including sets in other sets
+### Composing sets and features
 
 Both sets and features allow you to include other sets or features in them:
 
@@ -129,6 +129,8 @@ An insertion rule is written similarly to a deletion rule, with the input segmen
 In the simplest case, one phoneme out of a set can be matched using only its identifier:
 
     C → ∅ / _#                         ; Match any consonant and delete it
+
+If you need to use two identifiers in a row in a rule, you can separate them with spaces, as in `C C`.
 
 #### Intersection of sets and features
 
