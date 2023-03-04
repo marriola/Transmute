@@ -166,8 +166,7 @@ module RuleParser =
 
             let rec inner tokens out =
                 match tokens with
-                | OfType Empty _::xs
-                | OfType Separator _::xs ->
+                | OfType Empty _::xs ->
                     inner xs out
                 | NonNewlineWhitespace _::xs ->
                     inner xs out
@@ -498,8 +497,20 @@ module RuleParser =
             Ok (resolvedFeatures, resolvedSets, rules)
 
 #if !FABLE_COMPILER
-    let parseRulesFile (path: string) =
-        use stream = new StreamReader(path, true)
-        let content = stream.ReadToEnd()
+    let parseRulesStreamReader (reader: StreamReader) =
+        let content = reader.ReadToEnd()
         parseRules content
+
+    let parseRulesTextReader (reader: TextReader) =
+        let content = reader.ReadToEnd()
+        parseRules content
+
+    let parseRulesStream (stream: Stream) =
+        use reader = new StreamReader(stream)
+        let content = reader.ReadToEnd()
+        parseRules content
+
+    let parseRulesFile (path: string) =
+        use reader = new StreamReader(path, true)
+        parseRulesStreamReader reader
 #endif

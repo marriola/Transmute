@@ -12,7 +12,9 @@ let verbosityLevels = dict [
     "1", Normal
     "2", ShowTransformations
     "3", ShowDFA
+#if DEBUG
     "4", ShowNFA
+#endif
 ]
 
 type Options =
@@ -38,12 +40,15 @@ let parse (argv: string[]) =
         match args with
         | [] ->
             { options with lexiconFiles = List.rev options.lexiconFiles }
+
         | "-l"::filename::xs
         | "--lexicon"::filename::xs ->
             parse' xs { options with lexiconFiles = filename :: options.lexiconFiles }
+
         | "-r"::filename::xs
         | "--rules"::filename::xs ->
             parse' xs { options with rulesFile = filename }
+
         | "--test-rules"::ruleNumbers::xs ->
             let nextOptions =
                 { options with
@@ -54,6 +59,7 @@ let parse (argv: string[]) =
                         |> Some
                 }
             parse' xs nextOptions
+
         | "--test-words"::wordNumbers::xs ->
             let nextOptions =
                 { options with
@@ -64,20 +70,29 @@ let parse (argv: string[]) =
                         |> Some
                 }
             parse' xs nextOptions
-        | "-v"::x::xs when verbosityLevels.ContainsKey x ->
+
+        | "-v"::x::xs ->
+            if not (verbosityLevels.ContainsKey x) then
+                failwith $"Invalid verbosity level: {x}"
+            
             parse' xs { options with verbosityLevel = verbosityLevels[x] }
+
         // Alias for -v 2
         | "--show-transformations"::xs ->
             parse' xs { options with verbosityLevel = ShowTransformations }
+
         // Alias for -v 3
         | "--verbose"::xs
         | "-v"::xs ->
             parse' xs { options with verbosityLevel = ShowDFA }
+
         | "-rc"::xs
         | "--recompile"::xs ->
             parse' xs { options with recompile = true }
+
         | filename::xs when filename.EndsWith ".sc" ->
             parse' xs { options with rulesFile = filename }
+
         | filename::xs ->
             parse' xs { options with lexiconFiles = filename :: options.lexiconFiles }
 

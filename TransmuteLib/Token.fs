@@ -9,9 +9,6 @@ type TokenType =
     /// A whitespace token.
     | Whitespace
 
-    /// A '.' token.
-    | Separator
-
     /// A '[' token.
     | LBrack
 

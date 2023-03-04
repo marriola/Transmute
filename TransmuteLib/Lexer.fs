@@ -2,7 +2,6 @@
 
 open TransmuteLib.Position
 open TransmuteLib.StateMachine
-open TransmuteLib.Utils
 
 module internal Lexer =
     type Result =
@@ -15,7 +14,6 @@ module internal Lexer =
         | ERROR
         | Q_Whitespace
         | Q_WhitespaceFinal
-        | Q_Separator
         | Q_LBrack
         | Q_RBrack
         | Q_LBrace
@@ -51,7 +49,7 @@ module internal Lexer =
 
         let identifierTransitions =
             onMany
-                [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' } ]
+                [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' }; "." :> char seq ]
                 Q_Identifier
 
         let utteranceTransitions =
@@ -70,8 +68,7 @@ module internal Lexer =
               makeTransitions (From Q_Whitespace) [ To Q_WhitespaceFinal, OnEpsilon ]
 
               makeTransitions (From START)
-                [ To Q_Separator, OnChar '.'
-                  To Q_Comma, OnChar ','
+                [ To Q_Comma, OnChar ','
                   To Q_LBrack, OnChar '['
                   To Q_RBrack, OnChar ']'
                   To Q_LBrace, OnChar '{'
@@ -116,7 +113,6 @@ module internal Lexer =
     /// </summary>
     let private stateTokenTypes =
         [ Q_WhitespaceFinal, Whitespace.id
-          Q_Separator, Separator.id
           Q_Comma, Comma.id
           Q_LBrack, LBrack.id
           Q_RBrack, RBrack.id
