@@ -5,32 +5,16 @@ open TransmuteLib.StateMachine
 module RuleMachine =
     let private (|IsInput|_|) state =
         match state with
-        | State (_, InputSegment, _, _)
-        | MergedState (_, InputSegment, _) ->
+        | State (_, InputSegment, _)
+        | MergedState (_, InputSegment) ->
             Some state
         | _ ->
             None
 
     let private (|IsEnvironment|_|) state =
         match state with
-        | State (_, EnvironmentSegment, _, _)
-        | MergedState (_, EnvironmentSegment, _) ->
-            Some state
-        | _ ->
-            None
-
-    let private (|IsInsert|_|) state =
-        match state with
-        | State (_, _, _, Insert)
-        | MergedState (_, _, Insert) ->
-            Some state
-        | _ ->
-            None
-
-    let private (|IsReplace|_|) state =
-        match state with
-        | State (_, _, _, Replace)
-        | MergedState (_, _, Replace) ->
+        | State (_, EnvironmentSegment, _)
+        | MergedState (_, EnvironmentSegment) ->
             Some state
         | _ ->
             None
@@ -144,11 +128,13 @@ module RuleMachine =
         //  position in word    
         //  last output position
         //  transition
+        //  --------------------
+        //  output buffer
         //  production buffer
         //  undo buffer
-        //  output buffer
 
         let transitions, transformations = rule
+
         stateMachineConfig()
         |> withTransitions transitions
         |> withStartState RuleCompiler.START
@@ -180,7 +166,7 @@ module RuleMachine =
                     |> Option.map string
                     |> Option.defaultValue ""
                 printf $"   %2d{position} %c{input} %2s{lastOutputPosition}: "
-                printfn $"Error at %-11O{current} | [] [] %A{nextOutput}"
+                printfn $"Error at %-11O{current} | %A{nextOutput} [] []"
             Restart {
                 value with
                     isPartialMatch = false
@@ -212,17 +198,17 @@ module RuleMachine =
 
                 // Completed match with a transformation.
                 // Set production to the output of the transformation and add undo to output.
-                | true, IsEnvironment _, Some tf'
+                | true, IsEnvironment _, Some tf' ->
+                    let nextProduction = [tf' + string symbol, position]
+                    let nextOutput = EnvironmentString.concatEnvironmentToOutput undo output
+                    [], nextProduction, nextOutput
+
                 | true, IsInput _, Some tf' ->
                     let nextProduction = [tf', position]
                     let nextOutput = EnvironmentString.concatEnvironmentToOutput undo output
                     [], nextProduction, nextOutput
 
-                | false, IsInsert _, Some tf' ->
-                    let nextUndo = FromEnvironment (string symbol, position) :: (FromEnvironment (tf', position)) :: undo
-                    nextUndo, production, output
-
-                | false, IsEnvironment _ & IsReplace _, Some tf' ->
+                | false, IsEnvironment _, Some tf' ->
                     let nextUndo = EnvironmentString.addFromEnvironment position symbol undo
                     let nextProduction = (tf', position) :: production[1..]
                     nextUndo, nextProduction, output
@@ -251,7 +237,7 @@ module RuleMachine =
 
             if verbose then
                 let transition = $"{current} -> {nextState}"
-                printfn $"%-20s{transition} | %A{nextProduction} %A{nextUndo} %A{nextOutput}"
+                printfn $"%-20s{transition} | %A{nextOutput} %A{nextProduction} %A{nextUndo}"
             { value with
                 isPartialMatch = true
                 wasLastFinal = isNextFinal

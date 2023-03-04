@@ -100,10 +100,10 @@ A rule consists of at least two parts. An unconditional rule has only an **input
 
 A conditional rule has a third segment, the **environment** in which the rule applies, separated by a `/`. There are also two tokens that may appear only in the environment:
 
-| Token | Purpose                                                    |
-|-------|------------------------------------------------------------|
-| `_`   | Matches what is specified in the input segment             |
-| `#`   | Matches a word boundary, similar to `^` or `$` in a regex. |
+| Token | Purpose                                        |
+|-------|----------------------------------------------- |
+| `_`   | Matches what is specified in the input segment |
+| `#`   | Matches the beginning or end of the word       |
 
 For example, the rule
 

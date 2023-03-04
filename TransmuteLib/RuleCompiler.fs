@@ -12,14 +12,10 @@ type CompiledRule = TransitionTable<State> * Map<Transition<State>, string>
 module RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
-    
+
     type private InputPosition =
         | InputInitial
         | InputNoninitial
-
-    type private InputNode =
-        | Environment
-        | Placeholder
 
     type private SubtreePosition =
         | SubtreeNonfinal
@@ -45,7 +41,7 @@ module RuleCompiler =
         transformations: (Transition<State> * string) list
 
         /// Specifies the rule segment being compiled (environment or placeholder).
-        inputNode: InputNode
+        currentSegment: Segment
 
         /// Specifies the position in the input tokens list (initial or non-initial).
         inputPosition: InputPosition
@@ -88,12 +84,12 @@ module RuleCompiler =
             /// CompoundSetIdentifierNode, are taken from the output whole.
             /// </remarks>
             let giveOutput output =
-                match state.inputNode, output with
-                | Environment, _
-                | Placeholder, [] ->
-                    None, output
-                | Placeholder, node::xs ->
-                    Some node, xs
+                match state.currentSegment, output with
+                | EnvironmentSegment, _
+                | InputSegment, [] ->
+                    output, None
+                | InputSegment, node::xs ->
+                    xs, Some node
 
             let areAllSubtreesFinal () = not (List.contains SubtreeNonfinal state.subtreePosition)
 
@@ -104,8 +100,8 @@ module RuleCompiler =
                         then State.makeFinal nextState
                         else nextState
                 let nextState =
-                    match state.inputNode with
-                    | Environment -> State.makeEnvironment nextState
+                    match state.currentSegment with
+                    | EnvironmentSegment -> State.makeEnvironment nextState
                     | _ -> nextState
                 { state with states = states }, nextState
 
@@ -158,7 +154,7 @@ module RuleCompiler =
                 let rec matchUtterance' inputChars output innerState =
                     match inputChars with
                     | [] ->
-                        let outputNode, output = giveOutput output
+                        let output, outputNode = giveOutput output
                         let transformations = addUtteranceTransformation innerState.transformations (List.head innerState.transitions) outputNode utterance
 
                         { innerState with
@@ -167,14 +163,11 @@ module RuleCompiler =
 
                     | c::xs ->
                         let nextNfaState, next = getNextState (List.isEmpty xs && areAllSubtreesFinal ()) innerState
-                        let next = if input = [] then State.makeInsert next else next
                         let transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
-                        //let transitionsToCurrent = List.filter (fun ((From _, _, To s) as t) -> s = innerState.current) transitions
                         let insertion =
                             if input = [] then
                                 let outputString = output |> List.map Node.getStringValue |> String.concat ""
                                 [ (From state.current, OnChar c, To next), outputString ]
-                                //List.map (fun t -> t, outputString) transitionsToCurrent
                             else
                                 []
 
@@ -187,7 +180,7 @@ module RuleCompiler =
                 matchUtterance' (List.ofSeq utterance) output state
 
             let addSetTransformation value transition transformations output =
-                let outputNode, output = giveOutput output
+                let output, outputNode = giveOutput output
 
                 let transformations =
                     match outputNode with
@@ -278,11 +271,11 @@ module RuleCompiler =
                     buildStateMachine'
                         { state with
                             input = input
-                            inputNode = Placeholder
+                            currentSegment = InputSegment
                             inputPosition = InputNoninitial
                             subtreePosition = subtreePosition :: state.subtreePosition }
                 { nextState with
-                    inputNode = Environment
+                    currentSegment = EnvironmentSegment
                     subtreePosition = state.subtreePosition }
 
             /// Optionally match a sequence of nodes. Continue even if no match possible.
@@ -396,7 +389,7 @@ module RuleCompiler =
             output = output
             transitions = List.empty
             transformations = List.empty
-            inputNode = Environment
+            currentSegment = EnvironmentSegment
             inputPosition = InputInitial
             subtreePosition = [if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal]
         }

@@ -23,8 +23,10 @@ n → ∅ / [+Nasalized]_
 ;∅→u/[+Front]_(x|w|(r|l)C)
 
 ; Front vowel breaking
-[Broken] { ɑ → æɑ, e → eo, i → iu }
-[-Broken] → [+Broken] / _(x|w|rC|lC)
+[Broken] { ɑ → ɑu, e → eu, i → iu }
+[-Broken] → [+Broken] / _(x(V|#)|w(V|#)|rC|lC)
+(ɑu|ɑw) → æɑ
+(eu|ew) → eo
 
 ɑj → ɑː
 

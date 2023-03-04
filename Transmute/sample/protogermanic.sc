@@ -59,7 +59,7 @@ LARYNGEAL → ə
 ;;;;;;;;;;;;;;
 
 (j|w) → ∅ / _(e|a|o)#
-(e|a|o) → ∅ / _#
+(e|a|o) → ∅ / C_#
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 [STOP-Voiced] → [+Fricative] / (#|V|SONORANT)_
@@ -80,7 +80,7 @@ ss → s / _#
 ; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
 ; Fix: identify features that have the sound as a prefix and transition on error
 ; e.g. don't match b for [STOP+Voiced-Aspirated] when it is followed by ʰ
-[STOP+Voiced-Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
+[STOP +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
 
 ; Grimm's law: aspirated stops become unaspirated
 [STOP+Aspirated] → [-Aspirated]

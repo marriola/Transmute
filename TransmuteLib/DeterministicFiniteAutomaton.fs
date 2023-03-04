@@ -16,8 +16,8 @@ module internal DeterministicFiniteAutomaton =
         match x, y with
         | _ when x = y ->
             true
-        | (State _ as s), MergedState (children, _, _)
-        | MergedState (children, _, _), (State _ as s) when List.contains s children ->
+        | (State _ as s), MergedState (children, _)
+        | MergedState (children, _), (State _ as s) when List.contains s children ->
             true
         | _ ->
             false
