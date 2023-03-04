@@ -2,7 +2,6 @@
 open System
 open System.IO
 open TransmuteLib
-open TransmuteLib.RuleParser
 
 let RULES_EXTENSION = ".sc"
 let COMPILED_RULES_EXTENSION = ".scc"
@@ -104,16 +103,24 @@ let main argv =
 
     let rules, compileTime =
         let compiledFile =
-            if Path.GetExtension(options.rulesFile) = RULES_EXTENSION
-                then Path.Combine(Path.GetDirectoryName(options.rulesFile), Path.GetFileNameWithoutExtension(options.rulesFile)) + COMPILED_RULES_EXTENSION
+            if Path.GetExtension options.rulesFile = RULES_EXTENSION
+                then Path.Combine(Path.GetDirectoryName options.rulesFile, Path.GetFileNameWithoutExtension options.rulesFile) + COMPILED_RULES_EXTENSION
                 else options.rulesFile + COMPILED_RULES_EXTENSION
 
         if options.recompile
-            || not (File.Exists(compiledFile))
-            || File.GetLastWriteTime(options.rulesFile) > File.GetLastWriteTime(compiledFile)
+            || options.rulesFile = "-"
+            || not (File.Exists compiledFile)
+            || File.GetLastWriteTime options.rulesFile > File.GetLastWriteTime compiledFile
             then
+                let result =
+                    if options.rulesFile = "-" then
+                        let text = Console.In.ReadToEnd().Replace("\r", "\n")
+                        RuleParser.parseRules text
+                    else
+                        RuleParser.parseRulesFile options.rulesFile
+
                 let features, sets, rules =
-                    match parseRulesFile options.rulesFile with
+                    match result with
                     | Ok (features, sets, rules) ->
                         features, sets, rules
                     | Result.Error msg ->
@@ -121,7 +128,9 @@ let main argv =
                         exit 1
 
                 let rules, compileTime = compileRules options features sets rules
-                RuleCompiler.saveCompiledRules compiledFile rules |> ignore
+
+                if options.rulesFile <> "-" then
+                    RuleCompiler.saveCompiledRules compiledFile rules |> ignore
 
                 rules, compileTime
             else
@@ -131,6 +140,10 @@ let main argv =
         fprintfn stderr ""
 
         rules
+        |> List.filter (fun (i, _, _, _) ->
+            match options.testRules with
+            | Some testRules -> List.contains i testRules
+            | None -> true)
         |> List.iter (fun (i, node, rule, milliseconds) ->
             printfn $"[%8s{formatTime milliseconds}] %2d{i}. {node}"
 
