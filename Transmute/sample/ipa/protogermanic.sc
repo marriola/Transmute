@@ -73,7 +73,7 @@ LARYNGEAL → ə
 
 ; Sievers' law
 
-∅ → i / [V-Long][C-j][C-j]([C-j])_j    ; /i/ is getting inserted after /j/. is the transformation being applied to the right transition?
+;∅ → i / [V-Long][C-j][C-j]([C-j])_j    ; /i/ is getting inserted after /j/. is the transformation being applied to the right transition?
 ;∅ → i / [V+Long]C(C)(C)_j
 
 (j|w) → ∅ / _(e|a|o)#
@@ -98,7 +98,6 @@ ss → s / _#
 [STOP+VELAR] → x / _(t|s)(C|V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
-
 ; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
 ; Fix: identify features that have the sound as a prefix and transition on error
 ; e.g. don't match b for [STOP+Voiced-Aspirated] when it is followed by ʰ
@@ -122,6 +121,9 @@ g → ɣ / (#|LIQUID|[+Fricative])_
 ; Undo Verner's law after voiceless consonants and before voiceless stops
 
 [+Fricative+Voiced] → [-Voiced] / [-Voiced]_
+
+; Undo Verner's law before voiceless stops
+
 [+Fricative+Voiced] → [-Voiced] / _[STOP-Voiced]
 
 ; Voiced fricatives resulting from Verner's law become stops after a nasal
