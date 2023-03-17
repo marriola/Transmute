@@ -77,6 +77,7 @@ module RuleMachine =
                     | _ ->
                         None)
 
+            /// Drops the last N symbols from the buffer and adds a combined symbol
             static member coalesce n xs =
                 let n = min n (List.length xs)
                 if n < 2 then
@@ -116,7 +117,7 @@ module RuleMachine =
     let transform verbose rule word =
         // Debug output columns
         //  is valid transition
-        //  position in word    
+        //  position in word
         //  last output position
         //  transition
         //  --------------------
@@ -139,25 +140,23 @@ module RuleMachine =
         |> onError (fun position input current value _ ->
             let nextOutput =
                 match value.isPartialMatch, value.wasLastFinal with
-                // The rule failed to match
                 | true, false ->
+                    // The rule failed to match
                     BufferString.undo value.production @ value.output
-                // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
                 | true, true ->
+                    // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
                     BufferString.apply value.production @ value.output
-                // The rule has not yet begun to match.
                 | false, _ ->
+                    // The rule has not yet begun to match.
                     if input = Special.START || input = Special.END then
                         value.output
                     else
                         string input :: value.output
             if verbose then
-                let lastOutputPosition =
-                    value.lastOutputOn
-                    |> Option.map string
-                    |> Option.defaultValue ""
+                let lastOutputPosition = value.lastOutputOn |> Option.map string |> Option.defaultValue ""
+                let nextOutputStr = nextOutput |> List.rev |> List.map string |> String.concat ""
                 printf $"   %2d{position} %c{input} %2s{lastOutputPosition}: "
-                printfn $"Error at %-15O{current} | %A{nextOutput} [] []"
+                printfn $"Error at %-25O{current} | %-15s{nextOutputStr}"
             Restart {
                 value with
                     isPartialMatch = false
@@ -185,7 +184,9 @@ module RuleMachine =
 
             if verbose then
                 let transition = $"{current} -> {nextState}"
-                printfn $"%-24s{transition} | %A{output} %A{nextProduction}"
+                let nextOutputStr = output |> List.rev |> List.map string |> String.concat ""
+                let nextProductionStr = nextProduction |> List.rev |> List.map string |> String.concat " "
+                printfn $"%-34s{transition} | %-15s{nextOutputStr} {nextProductionStr}"
             { value with
                 isPartialMatch = true
                 wasLastFinal = isNextFinal
@@ -195,11 +196,10 @@ module RuleMachine =
         |> onFinish (fun value ->
             // Flush last production
             let nextOutput =
-                match value.wasLastFinal, value.production with
-                | false, _ -> value.output
-                //| true, [] -> BufferString.undo value.production @ value.output
-                //| true, _ -> (List.map BufferString.getText value.production) @ value.output
-                | true, _ -> BufferString.apply value.production @ value.output
+                if value.wasLastFinal then
+                    BufferString.apply value.production @ value.output
+                else
+                    value.output
             nextOutput
             |> List.rev
             |> String.concat "")

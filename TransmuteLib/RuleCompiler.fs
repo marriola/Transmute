@@ -130,12 +130,13 @@ module RuleCompiler =
                     |> List.exists (function OptionalNode _ -> false | _ -> true)
                     |> not
 
-            let addFeatureTransformations transition transformations features depth originalValue =
-                let rec addFeatureTransformations' transformations features value =
+            /// Takes a segment, applies a series of transformations to it, and finally adds a transformation to the given transition.
+            let addFeatureTransformations transition transformations features depth originalSegment =
+                let rec addFeatureTransformations' transformations features segment =
                     match features with
                     | [] ->
-                        if value <> originalValue then
-                            (transition, ReplacesWith (depth, value)) :: transformations
+                        if segment <> originalSegment then
+                            (transition, ReplacesWith (depth, segment)) :: transformations
                         else
                             transformations
 
@@ -144,13 +145,13 @@ module RuleCompiler =
                         let searchMap = if isPresent then additions else removals
 
                         let nextValue =
-                            match Map.tryFind value searchMap with
+                            match Map.tryFind segment searchMap with
                             | Some output -> output
-                            | None -> value
+                            | None -> segment
 
                         addFeatureTransformations' transformations rest nextValue
 
-                addFeatureTransformations' transformations features originalValue
+                addFeatureTransformations' transformations features originalSegment
 
             /// Creates a series of states and transitions that match each character of an utterance.
             let matchUtterance rest isPlaceholderNext (utterance: string) =

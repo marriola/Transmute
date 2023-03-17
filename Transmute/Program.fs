@@ -66,7 +66,7 @@ let transform options rules word =
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
-                    log @ [ $"%7d{i}. %15s{nextWord} -> {result}" ]
+                    log @ [ $"%7d{i}. %25s{nextWord} -> {result}" ]
                 else
                     log
 
@@ -75,15 +75,16 @@ let transform options rules word =
     inner word [] 0.0 rules
 
 let transformLexicon options rules lexicon =
-    let result, elapsed =
-        time (fun () ->
-            lexicon
+    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transform options rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transform options rules word)
+
 #if DEBUG
-            |> Array.mapi (fun i word -> transform options rules word))
+    let fTransform = transformSerial
 #else
-            |> Array.Parallel.mapi (fun i word -> transform options rules word))
+    let fTransform = if options.verbosityLevel = ShowNFA && Array.length lexicon > 1 then transformSerial else transformParallel
 #endif
-    result, elapsed
+
+    time fTransform
 
 [<EntryPoint>]
 let main argv =
@@ -136,7 +137,7 @@ let main argv =
             else
                 time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
-    if options.verbosityLevel > Normal then
+    if options.verbosityLevel >= ShowTimings then
         fprintfn stderr ""
 
         rules
@@ -166,6 +167,8 @@ let main argv =
 
                 printfn "\n********************************************************************************")
 
+        printfn ""
+
     // Trim comments, filter to non-empty lines, and select lines if specified on command line
 
     let trimComment (line: string) =
@@ -193,13 +196,20 @@ let main argv =
     let transformedLexicon, totalMilliseconds = transformLexicon options rules (Array.ofList lexicon)
 
     for original, result, log, milliseconds in transformedLexicon do
-        if options.verbosityLevel > Normal then
-            printfn "\n%s" (String.concat "\n" log)
-            printf $"[%5.2f{milliseconds} ms] %15s{original} -> "
-        
-        printfn "%s" result
+        if options.verbosityLevel <= Normal then
+            printfn "%s" result
+        else
+            if options.verbosityLevel >= ShowTimings then
+                printf $"[%5.2f{milliseconds} ms] %23s{original} -> {result}\n"
+            else
+                printfn $"%34s{original} -> {result}"
 
-    if options.verbosityLevel > Normal then
+            for line in log do
+                printfn "%s" line
+
+            printfn ""
+
+    if options.verbosityLevel >= ShowTimings then
         let totalTransformMilliseconds =
             transformedLexicon
             |> Array.sumBy (fun (_, _, _, milliseconds) -> int milliseconds)

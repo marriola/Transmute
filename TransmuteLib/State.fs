@@ -25,7 +25,7 @@ type State =
             | MergedState states ->
                 states
                 |> Seq.map State.name
-                |> String.concat (string Special.JOINER)
+                |> String.concat ""
 
         /// Returns the ordinal part of a state's name (e.g. "q5" -> 5), -1 if the state name contains no ordinal part,
         /// or throws an exception if given a merged state.

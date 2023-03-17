@@ -6,6 +6,7 @@ type VerbosityLevel =
     | Silent
     | Normal
     | ShowTransformations
+    | ShowTimings
     | ShowDFA
     | ShowNFA
 
@@ -13,10 +14,9 @@ let verbosityLevels = dict [
     "0", Silent
     "1", Normal
     "2", ShowTransformations
-    "3", ShowDFA
-#if DEBUG
-    "4", ShowNFA
-#endif
+    "3", ShowTimings
+    "4", ShowDFA
+    "5", ShowNFA
 ]
 
 type Options =
@@ -78,7 +78,7 @@ let parse (argv: string[]) =
         | "-v"::x::xs ->
             if not (verbosityLevels.ContainsKey x) then
                 failwith $"Invalid verbosity level: {x}"
-            
+
             parse' xs { options with verbosityLevel = verbosityLevels[x] }
 
         // Alias for -v 2

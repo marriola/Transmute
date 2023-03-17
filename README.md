@@ -6,9 +6,9 @@ A sound change applier for constructed languages. Transmute aims for expressiven
 
 ## Command line options
 
-    Transmute [OPTION...] -r FILE [FILE...]
-    Transmute [OPTION...] -l FILE [FILE...]
-    Transmute [OPTION...] -r FILE -l FILE
+    transmute [OPTION...] -r FILE [FILE...]
+    transmute [OPTION...] -l FILE [FILE...]
+    transmute [OPTION...] -r FILE -l FILE
 
 Transmute processes the last rules file specified, and all lexicon files in the order specified.
 
@@ -16,16 +16,26 @@ Files can be specified using switches, or without switches based on their file e
 
 A filename of `-` stands for standard input.
 
-| Switch                 | Short form | Description                                                                          |
-| -----------------------|------------|--------------------------------------------------------------------------------------|
-| --lexicon FILE         | -l         | Load lexicon from FILE.                                                              |
-| --rules FILE           | -r         | Load rules from FILE.                                                                |
-| --recompile            | -rc        | Recompile rules file instead of loading compiled rules.                              |
-| --test-rules N1,N2,... |            | Run only the rules listed.                                                           |
-| --test-words N1,N2,... |            | Transform only the words listed.                                                     |
-| --verbose N            | -v         | Set verbosity level (0 = silent, 1 = normal, 2 = show transformations, 3 = show DFA) |
-| --x-sampa              | -x         | Use X-SAMPA instead of IPA.                                                          |
+| Switch                 | Short form | Description                                              |
+| -----------------------|------------|----------------------------------------------------------|
+| --lexicon FILE         | -l         | Load lexicon from FILE.                                  |
+| --rules FILE           | -r         | Load rules from FILE.                                    |
+| --recompile            | -rc        | Recompile rules file instead of loading compiled rules.  |
+| --show-transformations | -v 2       | Shows the result of each rule that applies to each word. |
+| --test-rules N1,N2,... |            | Run only the rules listed.                               |
+| --test-words N1,N2,... |            | Transform only the words listed.                         |
+| --verbose N            | -v         | Set verbosity level                                      |
+| --x-sampa              | -x         | Use X-SAMPA instead of IPA.                              |
 
+### Verbosity levels
+
+0. Silent (don't show compilation progress)
+1. Normal
+2. Show transformations
+3. Show rule compilation and transformation times
+4. Show DFA
+5. Show NFA and rule machine state
+    - These last three verbosity levels are really for debugging purposes. They're cumulative, so this last one absolutely floods the console if you have a lot of rules. Though if you pick a single word to transform, the rule machine state is kind of entertaining to look over.
 
 ## Rule files
 
@@ -207,7 +217,7 @@ More than one feature can be changed. In the following rule, /n/ is deleted afte
 
     [-Nasalized]n → [+Nasalized +Long] / _x
 
-    ; brɑnxtɑz -> brãːxtɑz
+    ; brɑnxtɑz -> brɑ̃ːxtɑz
 
 #### Optional matches
 
