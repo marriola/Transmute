@@ -3,18 +3,18 @@
 open TransmuteLib
 open Xunit
 
-let testRule rules inputs expected =
+let testRule format rules inputs expected =
     let actual =
         rules
-        |> RuleParser.parseRules
+        |> RuleParser.parseRules format
         |> Result.map (fun (features, sets, rules) -> RuleCompiler.compile false features sets rules[0])
         |> Result.map (fun rule -> inputs |> List.map (RuleMachine.transform false rule))
     Assert.Equal<string>(expected, Result.defaultWith List.singleton actual) 
 
-let testRules rules inputs (expected: string list) =
+let testRules format rules inputs (expected: string list) =
     let rules =
         rules
-        |> RuleParser.parseRules
+        |> RuleParser.parseRules format
         |> Result.map (fun (features, sets, rules) -> RuleCompiler.compileRulesParallel false features sets rules)
     let transform input =
         rules
@@ -28,7 +28,7 @@ let testRules rules inputs (expected: string list) =
 
 [<Fact>]
 let ``Unconditional single phone transformation`` () =
-    testRule "k/t/_" ["ka"] ["ta"]
+    testRule IPA "k/t/_" ["ka"] ["ta"]
 
 [<Fact>]
 let ``Unconditional set transformation`` () =
@@ -44,7 +44,7 @@ let ``Unconditional set transformation`` () =
 
         [-Voiced]/[+Voiced]/_
         """
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Unconditional disjunction transformation`` () =
@@ -54,7 +54,7 @@ let ``Unconditional disjunction transformation`` () =
         """
         (e|o)→a
         """
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Unconditional set reverse transformation`` () =
@@ -70,21 +70,21 @@ let ``Unconditional set reverse transformation`` () =
 
         [+Voiced]/[-Voiced]/_
         """
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Deletion`` () =
     let input = ["ha"]
     let expected = ["a"]
     let rule = "h//_"
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Insertion`` () =
     let input = ["ot"]
     let expected = ["oit"]
     let rule = "∅/i/o_t"
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Addition and replacement after an optional node`` () =
@@ -106,14 +106,14 @@ let ``Addition and replacement after an optional node`` () =
         LARYNGEAL { ʔ χ χʷ }
         ∅→u/(#|[C-LARYNGEAL])(ˈ)_(m|n|l|r)(#|C)
         """
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Disjunct node`` () =
     let input = [ "la"; "ra" ]
     let expected = [ "lo"; "ro" ]
     let rule = "a/o/(l|r)_"
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Compound sets`` () =
@@ -143,7 +143,7 @@ let ``Compound sets`` () =
         [+Voiced-Fricative]/[+Fricative]/_       ; ga -> ɣa
         ɣ→∅                                         ; ɣa -> a
         """
-    testRules rules input expected
+    testRules IPA rules input expected
 
 [<Fact>]
 let ``Multi-phoneme set transformations`` () =
@@ -162,14 +162,14 @@ let ``Multi-phoneme set transformations`` () =
         [+Labialized]/[-Labialized]/_
         [-Affricate]/[+Affricate]/_
         """
-    testRules rules input expected
+    testRules IPA rules input expected
 
 [<Fact>]
 let ``Repeat simple replacement`` () =
     let input = ["kak"]
     let expected = ["xax"]
     let rule = "k/x/_"
-    testRule rule input expected
+    testRule IPA rule input expected
 
 [<Fact>]
 let ``Repeat set replacement`` () =
@@ -186,4 +186,37 @@ let ``Repeat set replacement`` () =
 
         [-Fricative]/[+Fricative]/_
         """
-    testRule rule input expected
+    testRule IPA rule input expected
+
+[<Fact>]
+let ``X-SAMPA works`` () =
+    let input = ["pater"]
+    let expected = ["p\\aTer"]
+    let rule =
+        """
+        [$Fricative] (
+            k -> x
+            p -> p\
+            t -> T
+        )
+
+        [-$Fricative]/[+$Fricative]/_
+        """
+    testRule X_SAMPA rule input expected
+
+[<Fact>]
+let ``X-SAMPA diacritics work`` () =
+    let input = ["k_walos"]
+    let expected = ["x_walos"]
+    let rule =
+        """
+        [$Fricative] (
+            k -> x
+            k_w -> x_w
+            p -> p\
+            t -> T
+        )
+
+        [-$Fricative]/[+$Fricative]/_
+        """
+    testRule X_SAMPA rule input expected

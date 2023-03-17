@@ -115,12 +115,12 @@ module RuleParser =
             matchSetIdentifierInternal tokens []
 
         /// <summary>
-        /// Matches a rule segment, i.e. a list of <see cref="SetIdentifierNode" />, <see cref="UtteranceNode" />,
+        /// Matches a rule section, i.e. a list of <see cref="SetIdentifierNode" />, <see cref="UtteranceNode" />,
         /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="CompoundSetIdentifierNode" />,
         /// <see cref="OptionalNode" /> or <see cref="DisjunctNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let rec matchRuleSegment tokens =
+        let rec matchRuleSection tokens =
             /// <summary>
             /// Matches a <see cref="DisjunctNode" />.
             /// </summary>
@@ -139,8 +139,8 @@ module RuleParser =
                 | OfType Pipe _::xs ->
                     matchDisjunct xs startToken out
                 | _ ->
-                    let tokens, ruleSegment = matchRuleSegment tokens
-                    ruleSegment :: out
+                    let tokens, ruleSection = matchRuleSection tokens
+                    ruleSection :: out
                     |> matchDisjunct tokens startToken
 
             /// <summary>
@@ -160,8 +160,8 @@ module RuleParser =
                     | OfType Pipe _::xs ->
                         matchDisjunct xs lparen [out]
                     | _ ->
-                        let tokens, ruleSegment = matchRuleSegment tokens
-                        matchOptional_DisjunctInteral tokens (ruleSegment @ out)
+                        let tokens, ruleSection = matchRuleSection tokens
+                        matchOptional_DisjunctInteral tokens (ruleSection @ out)
                 matchOptional_DisjunctInteral tokens []
 
             let rec inner tokens out =
@@ -176,8 +176,8 @@ module RuleParser =
                     inner xs (Node.tag (UtteranceNode x.value) x.position :: out)
                 | OfType Placeholder x::xs ->
                     inner xs (Node.tag PlaceholderNode x.position :: out)
-                | OfType Boundary x::xs ->
-                    inner xs (Node.tag BoundaryNode x.position :: out)
+                | OfType WordBoundary x::xs ->
+                    inner xs (Node.tag WordBoundaryNode x.position :: out)
                 | OfType LBrack x::xs ->
                     let tokens, setIdentifier = matchSetIdentifier xs x.position
                     inner tokens (setIdentifier :: out)
@@ -212,7 +212,7 @@ module RuleParser =
         /// <see cref="TransformationNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let matchMemberList tokens =
+        let matchMemberList closeToken tokens =
             let rec matchMemberListInternal tokens out =
                 match tokens with
                 | [] ->
@@ -228,7 +228,7 @@ module RuleParser =
                     let id = Node.tag (SetIdentifierNode x.value) x.position
                     let tokens, _ = tryMatchToken xs Comma
                     matchMemberListInternal tokens (id :: out)
-                | OfType RBrace _::xs ->
+                | x::xs when x.tokenType = closeToken ->
                     xs, List.rev out
                 | OfType LBrack x::xs ->
                     let tokens, id = matchSetIdentifier xs x.position
@@ -242,14 +242,14 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchRule tokens headPosition =
-            let tokens, input = matchRuleSegment tokens
+            let tokens, input = matchRuleSection tokens
             let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
-            let tokens, output = matchRuleSegment tokens
+            let tokens, output = matchRuleSection tokens
             let tokens, divider = tryMatchToken tokens Divider
             let tokens, environment =
                 match divider with
                 | Some _ ->
-                    let tokens, environment = matchRuleSegment tokens
+                    let tokens, environment = matchRuleSection tokens
                     tokens, environment
                 | None ->
                     tokens, [PlaceholderNode]
@@ -282,9 +282,11 @@ module RuleParser =
             match tokens with
             | OfType Whitespace _::xs ->
                 matchSet_Rule xs identifier
-            | OfType LBrace _::xs ->
+            | OfType LParen openToken::xs
+            | OfType LBrace openToken::xs ->
                 // TODO: include members of other sets
-                let tokens, members = matchMemberList xs
+                let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
+                let tokens, members = matchMemberList closeToken xs
                 tokens, Node.tag (SetDefinitionNode (identifier.value, members)) identifier.position
             | OfType Arrow _::xs
             | OfType Divider _::xs ->
@@ -312,7 +314,7 @@ module RuleParser =
                 invalidSyntax "Expected a rule" _position
 
         /// <summary>
-        /// Prepends a node list to the input segment of a RuleNode.
+        /// Prepends a node list to the input section of a RuleNode.
         /// </summary>
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/>
         /// is not a <see cref="RuleNode" />.</exception>
@@ -324,10 +326,10 @@ module RuleParser =
                 invalidArg "rule" "Must be a RuleNode"
 
         /// <summary>
-        /// Prepends a node list to the initial CompoundSetIdentifierNode of the input segment of a RuleNode.
+        /// Prepends a node list to the initial CompoundSetIdentifierNode of the input section of a RuleNode.
         /// </summary>
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
-        /// or when the first element of the input segment is not a <see cref="CompoundSetIdentifierNode" />.</exception>
+        /// or when the first element of the input section is not a <see cref="CompoundSetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule headPosition nodes =
             match Node.untag rule with
             | RuleNode (input, output, environment) ->
@@ -340,7 +342,7 @@ module RuleParser =
                             environment))
                         headPosition
                 | _ ->
-                    invalidArg "rule" "First element of the input segment must be a CompoundSetIdentifierNode"
+                    invalidArg "rule" "First element of the input section must be a CompoundSetIdentifierNode"
             | _ ->
                 invalidArg "rule" "Must be a RuleNode"
                     
@@ -349,8 +351,9 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchFeature tokens headPosition identifier =
-            let tokens, _ = matchToken tokens LBrace
-            let tokens, memberList = matchMemberList tokens
+            let tokens, openToken = matchOneOf tokens [ LBrace; LParen ]
+            let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
+            let tokens, memberList = matchMemberList closeToken tokens
             tokens, Node.tag (FeatureDefinitionNode (identifier.value, memberList)) headPosition
 
 
@@ -418,6 +421,7 @@ module RuleParser =
                 | OfType Comment x::xs ->
                     Ok (xs, Node.tag (CommentNode x.value) x.position)
                 | OfType Empty x::_
+                | OfType Divider x::_
                 | OfType Utterance x::_
                 | OfType LParen x::_ ->
                     Ok (matchRule tokens x.position)
@@ -450,9 +454,9 @@ module RuleParser =
                     Result.Error message
         parseInternal tokens []
 
-    let parseRules content =
+    let parseRules inputFormat content =
         let tokens =
-            match lex content with
+            match lex inputFormat content with
             | FileError msg ->
                 Result.Error (sprintf "%s" msg)
             | SyntaxError (msg, Offset offset, Line row, Column col) ->
@@ -466,8 +470,8 @@ module RuleParser =
             |> Result.bind SyntaxAnalyzer.validate
             |> Result.bind (Node.untagAll >> Ok)
 
-        let features = Result.bind (Node.getFeatures >> Ok) nodes
-        let sets = Result.bind (Node.getSets >> Ok) nodes
+        let features = Result.map Node.getFeatures nodes
+        let sets = Result.map Node.getSets nodes
 
         let rules =
             nodes
@@ -497,20 +501,20 @@ module RuleParser =
             Ok (resolvedFeatures, resolvedSets, rules)
 
 #if !FABLE_COMPILER
-    let parseRulesStreamReader (reader: StreamReader) =
+    let parseRulesStreamReader inputFormat (reader: StreamReader) =
         let content = reader.ReadToEnd()
-        parseRules content
+        parseRules inputFormat content
 
-    let parseRulesTextReader (reader: TextReader) =
+    let parseRulesTextReader inputFormat (reader: TextReader) =
         let content = reader.ReadToEnd()
-        parseRules content
+        parseRules inputFormat content
 
-    let parseRulesStream (stream: Stream) =
+    let parseRulesStream inputFormat (stream: Stream) =
         use reader = new StreamReader(stream)
         let content = reader.ReadToEnd()
-        parseRules content
+        parseRules inputFormat content
 
-    let parseRulesFile (path: string) =
+    let parseRulesFile inputFormat (path: string) =
         use reader = new StreamReader(path, true)
-        parseRulesStreamReader reader
+        parseRulesStreamReader inputFormat reader
 #endif

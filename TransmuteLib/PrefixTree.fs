@@ -1,9 +1,9 @@
 ﻿namespace TransmuteLib
 
 type internal PrefixTree =
-    | Root of children:PrefixTree list
-    | Node of prefix:string * value:char * children:PrefixTree list
-    | Leaf of utterance:string
+    | Root of children: PrefixTree list
+    | Node of prefix: string * value: char * children: PrefixTree list
+    | Leaf of utterance: string * depth: int
 
 module internal PrefixTree =
     // maketree [ "k"; "kw"; "g"; "gw"; "p"; "b"; "t"; "d" ]
@@ -23,10 +23,10 @@ module internal PrefixTree =
     /// </summary>
     /// <param name="set">The set of utterances.</param>
     let makeTree set =
-        let rec inner set acc =
+        let rec inner depth set acc =
             let final =
                 if List.exists isEmpty set
-                    then [ Leaf acc ]
+                    then [ Leaf (acc, depth - 1) ]
                     else List.empty
             let followSet =
                 set
@@ -35,9 +35,9 @@ module internal PrefixTree =
                 |> List.map (fun (prefixChar, subset) ->
                     let subset = subset |> List.map (fun s -> s.[1..])
                     let nextAcc = acc + (string prefixChar)
-                    Node (nextAcc, prefixChar, inner subset nextAcc))
+                    Node (nextAcc, prefixChar, inner (depth + 1) subset nextAcc))
             followSet @ final
-        Root (inner set "")
+        Root (inner 0 set "")
 
     /// <summary>
     /// Creates a prefix tree from the members of a feature

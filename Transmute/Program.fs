@@ -115,9 +115,9 @@ let main argv =
                 let result =
                     if options.rulesFile = "-" then
                         let text = Console.In.ReadToEnd().Replace("\r", "\n")
-                        RuleParser.parseRules text
+                        RuleParser.parseRules options.format text
                     else
-                        RuleParser.parseRulesFile options.rulesFile
+                        RuleParser.parseRulesFile options.format options.rulesFile
 
                 let features, sets, rules =
                     match result with
@@ -174,12 +174,11 @@ let main argv =
 
     let lexicon =
         options.lexiconFiles
-        |> List.map (fun file ->
+        |> List.collect (fun file ->
             if file = "-" then
-                Console.In
+                Console.In.ReadToEnd().Trim().Replace("\r", "\n").Split('\n') |> List.ofArray
             else
-                new StreamReader(file))
-        |> List.collect (fun stream -> stream.ReadToEnd().Trim().Split('\n') |> List.ofArray)
+                (new StreamReader(file)).ReadToEnd().Trim().Split('\n') |> List.ofArray)
         |> List.map (trimComment >> trimWhitespace)
         |> List.filter (fun ln -> ln.Length > 0 && not (ln.StartsWith ";"))
         |> List.indexed

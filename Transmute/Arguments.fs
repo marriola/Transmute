@@ -1,5 +1,7 @@
 ﻿module Arguments
 
+open TransmuteLib
+
 type VerbosityLevel =
     | Silent
     | Normal
@@ -18,21 +20,23 @@ let verbosityLevels = dict [
 ]
 
 type Options =
-    { lexiconFiles: string list
+    { format: InputFormat
+      lexiconFiles: string list
+      recompile: bool
       rulesFile: string
+      verbosityLevel: VerbosityLevel
       testRules: int list option
       testWords: int list option
-      verbosityLevel: VerbosityLevel
-      recompile: bool
     }
 
 let defaultOptions =
-    { lexiconFiles = []
+    { format = IPA
+      lexiconFiles = []
+      recompile = false
       rulesFile = null
+      verbosityLevel = Normal
       testRules = None
       testWords = None
-      verbosityLevel = Normal
-      recompile = false
     }
 
 let parse (argv: string[]) =
@@ -89,6 +93,10 @@ let parse (argv: string[]) =
         | "-rc"::xs
         | "--recompile"::xs ->
             parse' xs { options with recompile = true }
+
+        | "-x"::xs
+        | "--x-sampa"::xs ->
+            parse' xs { options with format = X_SAMPA }
 
         | filename::xs when filename.EndsWith ".sc" ->
             parse' xs { options with rulesFile = filename }

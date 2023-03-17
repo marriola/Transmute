@@ -5,15 +5,15 @@ module internal SyntaxAnalyzer =
         match nodes with
         | [] -> Ok result
         | Node.Untag (PlaceholderNode, position)::_ ->
-            Result.Error (syntaxErrorMessage (sprintf "%s segment cannot contain placeholder" kind) position)
+            Result.Error (syntaxErrorMessage (sprintf "%s section cannot contain placeholder" kind) position)
         | _::xs ->
             onlyEnvironmentMayContainPlaceholderNode kind xs result
 
     let rec private onlyEnvironmentMayContainBoundaryNode kind (nodes: Node List) result =
         match nodes with
         | [] -> Ok result
-        | Node.Untag (BoundaryNode, position)::_ ->
-            Result.Error (syntaxErrorMessage (sprintf "%s segment cannot contain boundary" kind) position)
+        | Node.Untag (WordBoundaryNode, position)::_ ->
+            Result.Error (syntaxErrorMessage (sprintf "%s section cannot contain boundary" kind) position)
         | _::xs ->
             onlyEnvironmentMayContainBoundaryNode kind xs result
 
@@ -26,20 +26,20 @@ module internal SyntaxAnalyzer =
                 match xsHead with
                 // BoundaryNode at beginning is OK.
                 // Skip over it because we already know about it.
-                | Item (TaggedNode (_, BoundaryNode)) ->
+                | Item (TaggedNode (_, WordBoundaryNode)) ->
                     xsRest
                 // Everything else is OK.
                 | _ ->
                     xs
             boundaryMayOnlyAppearAtEnds rest result
-        | Item (TaggedNode (position, BoundaryNode))::xsHead::_ ->
+        | Item (TaggedNode (position, WordBoundaryNode))::xsHead::_ ->
             match xsHead with
             // BoundaryNode at end is OK.
             | End ->
                 Ok result
             // BoundaryNode in the middle is an error.
             | _ ->
-                Result.Error (syntaxErrorMessage "Boundary may only appear at beginning or end of the environment segment" position)
+                Result.Error (syntaxErrorMessage "Boundary may only appear at beginning or end of the environment section" position)
         | _::xs ->
             boundaryMayOnlyAppearAtEnds xs result
 

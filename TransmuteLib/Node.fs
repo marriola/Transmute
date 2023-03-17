@@ -25,11 +25,11 @@ type Node =
     /// Represents an utterance.
     | UtteranceNode of string
 
-    /// Represents the placeholder for the input segment in the environment segment.
+    /// Represents the placeholder for the input section in the environment section.
     | PlaceholderNode
 
-    /// Represents a word boundary in the environment segment.
-    | BoundaryNode
+    /// Represents a word boundary in the environment section.
+    | WordBoundaryNode
 
     /// Represents a phonological rule.
     | RuleNode of input:Node list * output:Node list * environment:Node list
@@ -59,7 +59,7 @@ type Node =
         | TaggedNode (_, node) ->
             node.ToString()
         | PlaceholderNode -> "_"
-        | BoundaryNode -> "#"
+        | WordBoundaryNode -> "#"
         | CommentNode text -> sprintf "; %s" text
         | UtteranceNode value
         | SetIdentifierNode value
@@ -97,7 +97,7 @@ type Node =
             |> String.concat "|"
             |> sprintf "(%s)"
         | RuleNode (input, output, environment) ->
-            let environmentSegment =
+            let environmentSection =
                 match environment with
                 | [PlaceholderNode] -> ""
                 | _ -> sprintf " / %s" (stringifyList environment)
@@ -107,7 +107,7 @@ type Node =
                 // I know this technically isn't the empty set symbol, but the actual one doesn't display
                 // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
                 (if output = [] then "Ø" else stringifyList output)
-                environmentSegment
+                environmentSection
 
 /// Provides functions on the Node type.
 module Node =
@@ -380,7 +380,18 @@ module Node =
                     | Untag (node, position) ->
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs nextSet
-        inner setDescriptor alphabet |> List.ofSeq
+        
+        let segmentsOnly =
+            setDescriptor
+            |> List.exists (function TermIdentifierNode _ | SetIdentifierNode _ | FeatureIdentifierNode _ -> true | _ -> false)
+            |> not
+
+        if segmentsOnly then
+            setDescriptor
+            |> List.choose (function UtteranceIdentifierNode (isPresent, utterance) -> if isPresent then Some utterance else None)
+            |> List.distinct
+        else
+            inner setDescriptor alphabet |> List.ofSeq
 
     /// <summary>
     /// <para>Resolves references to other features/sets in a feature/set by adding their members to it.</para>

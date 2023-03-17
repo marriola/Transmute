@@ -30,9 +30,9 @@ type StateTransition<'TState> =
     }
 
 module internal StateMachine =
-    let getOrigin (From origin, _, _) = origin
-    let getInput (_, on, _) = on
-    let getDest (_, _, To dest) = dest
+    let inline getOrigin (From origin, _, _) = origin
+    let inline getInput (_, on, _) = on
+    let inline getDest (_, _, To dest) = dest
 
     /// <summary>
     /// Creates a transition table.

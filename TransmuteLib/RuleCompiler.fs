@@ -1,17 +1,15 @@
-﻿// TODO: cleanup (make nested functions module-level and private)
-
-namespace TransmuteLib
+﻿namespace TransmuteLib
 
 open ICSharpCode.SharpZipLib.GZip
 open MBrace.FsPickler
 open System
 open System.IO
 
-type CompiledRule = TransitionTable<State> * Map<Transition<State>, string>
-
 module RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
+
+    type CompiledRule = TransitionTable<State> * Map<Transition<State>, TransitionResult>
 
     type private InputPosition =
         | InputInitial
@@ -21,6 +19,10 @@ module RuleCompiler =
         | SubtreeNonfinal
         | SubtreeFinal
 
+    type private RuleSection =
+        | InputSection
+        | EnvironmentSection
+
     type private NFAState = {
         /// The current state from which transitions will be created.
         current: State
@@ -28,26 +30,29 @@ module RuleCompiler =
         /// An infinite sequence of states.
         states: State seq
 
-        /// The tokens from the segment currently being processed.
+        /// The tokens from the section currently being processed.
         input: Node list
 
-        /// The tokens from the output segment.
+        /// The tokens from the output section.
         output: Node list
 
         /// Accumulates key-value pairs that will create the transition table.
         transitions: Transition<State> list
 
         /// Accumulates transformations produced by matching transitions.
-        transformations: (Transition<State> * string) list
+        transformations: (Transition<State> * TransitionResult) list
 
-        /// Specifies the rule segment being compiled (environment or placeholder).
-        currentSegment: Segment
+        /// Specifies the rule section being compiled (environment or placeholder).
+        currentSection: RuleSection
 
         /// Specifies the position in the input tokens list (initial or non-initial).
         inputPosition: InputPosition
 
         /// Specifies the position in the subtree being built (final or non-final).
         subtreePosition: SubtreePosition list
+
+        /// Indicates whether the placeholder is the next node that will be processed after exiting the subtree
+        isPlaceholderNext: bool
     }
 
     type private RuleGeneratorState =
@@ -74,22 +79,18 @@ module RuleCompiler =
                         | [] -> failwith "Subtree position stack empty" }
 
             /// <summary>
-            /// When visiting output nodes, consumes a single symbol and returns a node representing it.
-            /// When visiting environment nodes or when there is no output left to give, consumes nothing and gives nothing.
+            /// When visiting input nodes, and when visiting environment nodes when the input is empty and the last required
+            /// node before the placeholder has been consumed, consumes a single symbol and returns a node representing it.
+            /// Otherwise consumes nothing and gives nothing.
             /// </summary>
-            /// <remarks>
-            /// Utterance nodes are consumed one symbol at a time by returning an UtteranceNode containing the first
-            /// character in the utterance, and replacing the head output node with an UtteranceNode containing the
-            /// remainder. The only other nodes allowed in the output section, SetIdentifierNode and
-            /// CompoundSetIdentifierNode, are taken from the output whole.
-            /// </remarks>
-            let giveOutput output =
-                match state.currentSegment, output with
-                | EnvironmentSegment, _
-                | InputSegment, [] ->
-                    output, None
-                | InputSegment, node::xs ->
+            let giveOutput isPlaceholderNext output =
+                match state.currentSection, output, input with
+                | InputSection, node::xs, _ ->
                     xs, Some node
+                | _, node::xs, [] when isPlaceholderNext ->
+                    xs, Some node
+                | _ ->
+                    output, None
 
             let areAllSubtreesFinal () = not (List.contains SubtreeNonfinal state.subtreePosition)
 
@@ -99,10 +100,6 @@ module RuleCompiler =
                     if isFinal
                         then State.makeFinal nextState
                         else nextState
-                let nextState =
-                    match state.currentSegment with
-                    | EnvironmentSegment -> State.makeEnvironment nextState
-                    | _ -> nextState
                 { state with states = states }, nextState
 
             /// Creates a transition to a new state that matches an input symbol.
@@ -124,38 +121,68 @@ module RuleCompiler =
                     | InputNoninitial -> Special.END
                 matchCharacter boundaryChar
 
-            /// <summary>
-            /// If possible, adds a transformation for an utterance.
-            /// </summary>
-            /// <param name="transformations">The accumulated transformations so far.</param>
-            /// <param name="t">The transition producing the transformation.</param>
-            /// <param nmae="maybeOutput">The next node from the output segment. If none is available, then its value should be None.</param>
-            /// <param name="utterance">The utterance to transform.</param>
-            let addUtteranceTransformation transformations t maybeOutput utterance =
-                match maybeOutput with
-                // replace with another utterance
-                | Some (UtteranceNode s) ->
-                    (t, s) :: transformations
+            let hasNoMoreRequiredNodes xs =
+                if state.currentSection = InputSection then
+                    false
+                else
+                    xs
+                    |> List.takeWhile (function PlaceholderNode _ -> false | _ -> true)
+                    |> List.exists (function OptionalNode _ -> false | _ -> true)
+                    |> not
 
-                // transform by flipping one feature
-                | Some (CompoundSetIdentifierNode [FeatureIdentifierNode (isPresent, name)]) ->
-                    let additions, removals = featureTransformations.[name]
-                    let searchMap = if isPresent then additions else removals
+            let addFeatureTransformations transition transformations features depth originalValue =
+                let rec addFeatureTransformations' transformations features value =
+                    match features with
+                    | [] ->
+                        if value <> originalValue then
+                            (transition, ReplacesWith (depth, value)) :: transformations
+                        else
+                            transformations
 
-                    match Map.tryFind utterance searchMap with
-                    | Some output -> (t, output) :: transformations
-                    | None -> transformations
+                    | FeatureIdentifierNode (isPresent, name)::rest ->
+                        let additions, removals = featureTransformations.[name]
+                        let searchMap = if isPresent then additions else removals
 
-                | _ ->
-                    transformations
+                        let nextValue =
+                            match Map.tryFind value searchMap with
+                            | Some output -> output
+                            | None -> value
+
+                        addFeatureTransformations' transformations rest nextValue
+
+                addFeatureTransformations' transformations features originalValue
 
             /// Creates a series of states and transitions that match each character of an utterance.
-            let matchUtterance utterance =
+            let matchUtterance rest isPlaceholderNext (utterance: string) =
+                // If possible, adds a transformation for an utterance.
+
                 let rec matchUtterance' inputChars output innerState =
                     match inputChars with
                     | [] ->
-                        let output, outputNode = giveOutput output
-                        let transformations = addUtteranceTransformation innerState.transformations (List.head innerState.transitions) outputNode utterance
+                        let output, outputNode = giveOutput (isPlaceholderNext || innerState.isPlaceholderNext) output
+                        let depth = max 0 (utterance.Length - 1)
+                        let t = List.head innerState.transitions
+
+                        let transformations =
+                            match outputNode with
+                            | Some (UtteranceNode s) ->
+                                let shouldInsert = hasNoMoreRequiredNodes rest && (isPlaceholderNext || state.isPlaceholderNext)
+
+                                if shouldInsert then
+                                    (t, Inserts s) :: innerState.transformations
+                                elif state.currentSection = InputSection then
+                                    (t, ReplacesWith (depth, s)) :: innerState.transformations
+                                else
+                                    innerState.transformations
+
+                            | Some (CompoundSetIdentifierNode features) ->
+                                addFeatureTransformations t innerState.transformations features depth utterance
+
+                            | _ ->
+                                if state.currentSection = InputSection then
+                                    (t, Deletes (utterance.Length, utterance)) :: innerState.transformations
+                                else
+                                    innerState.transformations
 
                         { innerState with
                             output = output
@@ -164,56 +191,26 @@ module RuleCompiler =
                     | c::xs ->
                         let nextNfaState, next = getNextState (List.isEmpty xs && areAllSubtreesFinal ()) innerState
                         let transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
-                        let insertion =
-                            if input = [] then
-                                let outputString = output |> List.map Node.getStringValue |> String.concat ""
-                                [ (From state.current, OnChar c, To next), outputString ]
-                            else
-                                []
 
                         matchUtterance' xs output
                             { nextNfaState with
                                 transitions = transitions
-                                transformations = state.transformations @ insertion
                                 current = next }
 
-                matchUtterance' (List.ofSeq utterance) output state
-
-            let addSetTransformation value transition transformations output =
-                let output, outputNode = giveOutput output
-
-                let transformations =
-                    match outputNode with
-                    | Some (UtteranceNode utterance) ->
-                        (transition, utterance) :: transformations
-
-                    | Some (CompoundSetIdentifierNode (FeatureIdentifierNode (isPresent, name)::[])) ->
-                        let additions, removals = featureTransformations.[name]
-                        let searchMap = if isPresent then additions else removals
-                        match Map.tryFind value searchMap with
-                        | Some output ->
-                            (transition, output) :: transformations
-                        | None ->
-                            // If no transformation is defined for this sound, just "transform" it to itself.
-                            (transition, value) :: transformations
-
-                    | Some (CompoundSetIdentifierNode _) ->
-                        failwith "Only one feature may be transformed at a time"
-
-                    | _ ->
-                        transformations
-
-                transformations, output
+                matchUtterance' (List.ofSeq utterance) state.output state
 
             /// Computes the intersection of a list of feature and set identifiers, and creates a
             /// tree of states and transitions that match each member of the resulting set.
             /// If any categories specify transformations that match the output of the rule,
             /// these will be added to the transformation list.
-            let matchSet setDesc =
+            let matchSet rest isPlaceholderNext setDesc =
                 let state, terminator = getNextState (areAllSubtreesFinal ()) state
 
                 let rec matchSet' state tree =
                     match tree with
+                    | PrefixTree.Leaf _ ->
+                        state
+
                     | PrefixTree.Root children
                     | PrefixTree.Node (_, _, children) ->
                         // Create states for each child and transitions to them
@@ -238,15 +235,34 @@ module RuleCompiler =
                                             transitions = nextInnerState.transitions
                                             transformations = nextInnerState.transformations }
 
-                                    | PrefixTree.Leaf value ->
-                                        // We have reached a leaf node and now have a complete sound to transform.
+                                    | PrefixTree.Leaf (value, depth) ->
+                                        // We have reached a leaf node and now have a complete segment to transform.
                                         // Add the transformation and a transition to the terminator state.
                                         let t = From state.current, OnEpsilon, To terminator
-                                        let nextTransformations, nextOutput = addSetTransformation value t innerState.transformations innerState.output
-                                        let nextTransitions = t :: innerState.transitions
+                                        let nextOutput, outputNode = giveOutput (isPlaceholderNext || state.isPlaceholderNext) innerState.output
+
+                                        let nextTransformations =
+                                            match outputNode with
+                                            | Some (UtteranceNode utterance) ->
+                                                let shouldInsert = hasNoMoreRequiredNodes rest && (isPlaceholderNext || state.isPlaceholderNext)
+
+                                                if shouldInsert then
+                                                    (t, Inserts utterance) :: innerState.transformations
+                                                else
+                                                    (t, ReplacesWith (depth, utterance)) :: innerState.transformations
+
+                                            | Some (CompoundSetIdentifierNode features) ->
+                                                addFeatureTransformations t innerState.transformations features depth value
+
+                                            | _ ->
+                                                if state.currentSection = InputSection then
+                                                    (t, Deletes (value.Length, value)) :: innerState.transformations
+                                                else
+                                                    innerState.transformations
+
                                         { innerState with
                                             output = nextOutput
-                                            transitions = nextTransitions
+                                            transitions = t :: innerState.transitions
                                             transformations = nextTransformations }
 
                                     | PrefixTree.Root _ ->
@@ -254,14 +270,19 @@ module RuleCompiler =
 
                         { nextState with current = terminator }
 
-                    | PrefixTree.Leaf _ ->
-                        state
+                let nextState =
+                    setDesc
+                    |> PrefixTree.fromSetIntersection features sets
+                    |> matchSet' state
 
-                setDesc
-                |> PrefixTree.fromSetIntersection features sets
-                |> matchSet' state
+                { nextState with
+                    output =
+                        if state.currentSection = InputSection then
+                            nextState.output[1..]
+                        else
+                            nextState.output }
 
-            /// Match the input segment.
+            /// Match the input section.
             let matchInput () =
                 let subtreePosition =
                     match areAllSubtreesFinal () with
@@ -271,21 +292,22 @@ module RuleCompiler =
                     buildStateMachine'
                         { state with
                             input = input
-                            currentSegment = InputSegment
+                            currentSection = InputSection
                             inputPosition = InputNoninitial
                             subtreePosition = subtreePosition :: state.subtreePosition }
                 { nextState with
-                    currentSegment = EnvironmentSegment
+                    currentSection = EnvironmentSection
                     subtreePosition = state.subtreePosition }
 
             /// Optionally match a sequence of nodes. Continue even if no match possible.
-            let matchOptional nodes =
+            let matchOptional rest isPlaceholderNext nodes =
                 let state, terminator = getNextState (areAllSubtreesFinal ()) state
                 let nextState = buildStateMachine' {
                     state with
                         input = nodes
                         inputPosition = InputNoninitial
                         subtreePosition = SubtreeNonfinal :: state.subtreePosition
+                        isPlaceholderNext = isPlaceholderNext
                 }
                 let transitions =
                     [ From state.current, OnEpsilon, To terminator
@@ -296,32 +318,32 @@ module RuleCompiler =
                     current = terminator
                     subtreePosition = state.subtreePosition }
 
-            let matchDisjunctBranch nodes ((states, output, transitions, transformations, _)::_ as acc) = 
+            let matchDisjunctBranch isPlaceholderNext nodes ((states, output, transitions, transformations, _)::_ as acc) = 
                 let innerSubtreePosition =
                     match state.subtreePosition with
                     | SubtreeFinal::_ when areAllSubtreesFinal () -> SubtreeFinal
                     | _ -> SubtreeNonfinal
-                let { current = current; states = states; output = output; transitions = transitions; transformations = transformations } =
+                let { current = current; states = states; transitions = transitions; transformations = transformations } =
                     buildStateMachine'
                         { state with
                             current = state.current
                             states = states
                             input = nodes
-                            output = output
                             transitions = transitions
                             transformations = transformations
-                            subtreePosition = innerSubtreePosition :: state.subtreePosition }
+                            subtreePosition = innerSubtreePosition :: state.subtreePosition
+                            isPlaceholderNext = isPlaceholderNext }
                 (states, output, transitions, transformations, current) :: acc
 
             /// Match exactly one of many sequences of nodes.
-            let matchDisjunct branches =
+            let matchDisjunct rest isPlaceholderNext branches =
                 // Create a common exit point for all subtrees
                 let state, terminator = getNextState (areAllSubtreesFinal ()) state
 
                 // Build a subtree for each branch
                 let out =
                     List.foldBack
-                        matchDisjunctBranch
+                        (matchDisjunctBranch isPlaceholderNext)
                         branches
                         [state.states, state.output, state.transitions, state.transformations, state.current]
 
@@ -340,7 +362,7 @@ module RuleCompiler =
                     if input = [] then
                         let outputString = output |> List.map Node.getStringValue |> String.concat ""
                         subtreeFinalToLastState
-                        |> List.map (fun (From subtreeFinal, _, _) -> (From state.current, OnEpsilon, To subtreeFinal), outputString)
+                        |> List.map (fun (From subtreeFinal, _, _) -> (From state.current, OnEpsilon, To subtreeFinal), Inserts outputString)
                     else
                         []
 
@@ -352,23 +374,33 @@ module RuleCompiler =
                     transformations = transformations @ insertions }
 
             let generatorState =
+                let isPlaceholderNext =
+                    match state.input with
+                    | [ PlaceholderNode _ ] ->
+                        false
+                    | _ ->
+                        state.input
+                        |> Seq.skip (min 1 state.input.Length)
+                        |> Seq.takeWhile (function PlaceholderNode _ -> false | _ -> true)
+                        |> Seq.filter (function OptionalNode _ -> false | _ -> true)
+                        |> Seq.isEmpty
                 match state.input with
                 | [] ->
                     Done
-                | BoundaryNode::_ ->
+                | WordBoundaryNode::_ ->
                     HasNext (matchBoundary ())
-                | (UtteranceNode utterance)::_ ->
-                    HasNext (matchUtterance utterance)
-                | (CompoundSetIdentifierNode setDesc)::_ ->
-                    HasNext (matchSet setDesc)
-                | (SetIdentifierNode _ as id)::_ ->
-                    HasNext (matchSet [ id ])
+                | (UtteranceNode utterance)::rest ->
+                    HasNext (matchUtterance rest isPlaceholderNext utterance)
+                | (CompoundSetIdentifierNode setDesc)::rest  ->
+                    HasNext (matchSet rest isPlaceholderNext setDesc)
+                | (SetIdentifierNode _ as id)::rest ->
+                    HasNext (matchSet rest isPlaceholderNext [ id ])
                 | PlaceholderNode::_ ->
                     HasNext (matchInput ())
-                | (OptionalNode children)::_ ->
-                    HasNext (matchOptional children)
-                | (DisjunctNode branches)::_ ->
-                    HasNext (matchDisjunct branches)
+                | (OptionalNode children)::rest ->
+                    HasNext (matchOptional rest isPlaceholderNext children)
+                | (DisjunctNode branches)::rest ->
+                    HasNext (matchDisjunct rest isPlaceholderNext branches)
                 | _ ->
                     failwithf "Unexpected '%s'" (string state.input.Head)
 
@@ -389,9 +421,10 @@ module RuleCompiler =
             output = output
             transitions = List.empty
             transformations = List.empty
-            currentSegment = EnvironmentSegment
+            currentSection = EnvironmentSection
             inputPosition = InputInitial
             subtreePosition = [if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal]
+            isPlaceholderNext = false
         }
 
         let { transitions = transitions; transformations = transformations } = buildStateMachine' initialState
@@ -401,8 +434,8 @@ module RuleCompiler =
         let dfaTransformations =
             dfa
             |> List.choose (function
-                | t, Produces output -> Some (t, output)
-                | _, NoOutput -> None)
+                | _, OutputDefault -> None
+                | t, output -> Some (t, output))
             |> Map.ofList
 
         let dfaTransitionTable =

@@ -15,7 +15,8 @@ u → o / _[C-n](C)(C)[V-HIGH]
 z → ∅ / _#
 z → r / SONORANT_
 s → ∅ / C_#
-a → ∅ / C(C)(C)_#
+;(ɑ|ɑ̃) → 0 / V C(C)(C)_#
+[ +ɑ +ɑ̃ ] → ∅ / V C(C)(C)_#
 [-Geminate] → [+Geminate] / _j
 
 HIGH { i iː y yː u uː }
@@ -35,6 +36,16 @@ HIGH { i iː y yː u uː }
 	ɔːi → u
 	ɔːj → u
 	ɔː → u
+}
+
+[Long] {
+	ɑ → ɑː
+	e → eː
+	i → iː
+	ɔ → ɔː
+	ø → øː
+	u → uː
+	y → yː
 }
 
 [Overlong] {
@@ -75,11 +86,11 @@ HIGH { i iː y yː u uː }
 	l → ll
 }
 
-V { Short Overlong Nasalized }
+V { Long [-Long] Overlong Nasalized }
 STOP { k kʷ p t g b d }
 LIQUID { r l }
 NASAL { m n }
 GLIDE { w j }
 FRICATIVE { x xʷ ɸ f θ ɣ β v ð s z }
 SONORANT { LIQUID NASAL GLIDE V }
-C { STOP LIQUID NASAL FRICATIVE }
+C { STOP LIQUID NASAL FRICATIVE GLIDE }

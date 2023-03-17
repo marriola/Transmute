@@ -43,7 +43,10 @@ type TokenType =
     | Placeholder
 
     /// A '#' token.
-    | Boundary
+    | WordBoundary
+
+    /// A '$' token.
+    | SyllableBoundary
 
     /// A '+' token.
     | Plus

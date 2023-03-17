@@ -3,6 +3,10 @@
 open TransmuteLib.Position
 open TransmuteLib.StateMachine
 
+type InputFormat =
+    | IPA
+    | X_SAMPA
+
 module internal Lexer =
     type Result =
         | OK of Token list
@@ -26,7 +30,9 @@ module internal Lexer =
         | Q_Arrow
         | Q_Empty
         | Q_Placeholder
-        | Q_Boundary
+        | Q_WordBoundary
+        | Q_SyllableBoundary
+        | Q_SyllableBoundaryFinal
         | Q_Plus
         | Q_Minus
         | Q_Pipe
@@ -39,101 +45,13 @@ module internal Lexer =
         | Q_CommentFinal
 
     /// <summary>
-    /// Defines the transition table for the lexer.
-    /// </summary>
-    let private table =
-        let beginIdentifierTransitions =
-            onMany
-                [ seq { 'A'..'Z' } ]
-                Q_Identifier
-
-        let identifierTransitions =
-            onMany
-                [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' }; "." :> char seq ]
-                Q_Identifier
-
-        let utteranceTransitions =
-            onMany
-                [ seq { 'a'..'z' }
-                  seq { '\u0250'..'\u0341' }
-                  "æœðøçɸβθχ" :> char seq
-                ]
-                Q_Utterance
-
-        let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
-
-        createTransitionTableFromClasses
-            [ makeTransitions (From START) whitespaceTransitions
-              makeTransitions (From Q_Whitespace) whitespaceTransitions
-              makeTransitions (From Q_Whitespace) [ To Q_WhitespaceFinal, OnEpsilon ]
-
-              makeTransitions (From START)
-                [ To Q_Comma, OnChar ','
-                  To Q_LBrack, OnChar '['
-                  To Q_RBrack, OnChar ']'
-                  To Q_LBrace, OnChar '{'
-                  To Q_RBrace, OnChar '}'
-                  To Q_LParen, OnChar '('
-                  To Q_RParen, OnChar ')'
-                  To Q_Divider, OnChar '/'
-                  To Q_Arrow, OnChar '→'
-                  To Q_Empty, OnChar '∅'
-                  To Q_Empty, OnChar 'Ø'
-                  To Q_Placeholder, OnChar '_'
-                  To Q_Boundary, OnChar '#'
-                  To Q_Plus, OnChar '+'
-                  To Q_Pipe, OnChar '|'
-                  To Q_Not, OnChar '!'
-              ]
-
-              makeTransitions (From START) [ To Q0, OnChar '-' ]
-              makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
-              makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
-
-              makeTransitions (From START) beginIdentifierTransitions
-              makeTransitions (From Q_Identifier) identifierTransitions
-              makeTransitions (From Q_Identifier) [ To Q_IdentifierFinal, OnEpsilon ]
-
-              makeTransitions (From START) utteranceTransitions
-              makeTransitions (From Q_Utterance) utteranceTransitions
-              makeTransitions (From Q_Utterance) [ To Q_UtteranceFinal, OnEpsilon ]
-              makeTransitions (From START) [ To Q_Comment, OnChar ';' ]
-              makeTransitions (From Q_Comment) [ To Q_Comment, OnAny ]
-              makeTransitions (From Q_Comment) [ To Q_CommentFinal, OnChar '\n' ]
-            ]
-
-    /// <summary>
     /// Removes the initial semicolon from the comment and trims whitespace.
     /// </summary>
     /// <param name="token">The comment token.</param>
     let trimComment token = { token with value = token.value.[1..].Trim() }
 
-    /// <summary>
-    /// Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
-    /// </summary>
-    let private stateTokenTypes =
-        [ Q_WhitespaceFinal, Whitespace.id
-          Q_Comma, Comma.id
-          Q_LBrack, LBrack.id
-          Q_RBrack, RBrack.id
-          Q_LBrace, LBrace.id
-          Q_RBrace, RBrace.id
-          Q_LParen, LParen.id
-          Q_RParen, RParen.id
-          Q_Divider, Divider.id
-          Q_Arrow, Arrow.id
-          Q_Empty, Empty.id
-          Q_Placeholder, Placeholder.id
-          Q_Boundary, Boundary.id
-          Q_Plus, Plus.id
-          Q_Minus, Minus.id
-          Q_Pipe, Pipe.id
-          Q_Not, Not.id
-          Q_IdentifierFinal, Id.id
-          Q_UtteranceFinal, Utterance.id
-          Q_CommentFinal, Comment.apply trimComment
-        ]
-        |> Map.ofSeq
+    /// Removes the initial sigil from a token if it has one.
+    let trimSigil sigil token = { token with value = if token.value.Length > 0 && token.value[0] = sigil then token.value[1..] else token.value }
 
     type MismatchAction = Restart | Stop
 
@@ -144,7 +62,126 @@ module internal Lexer =
           builder: char list
           acc: Token list }
 
-    let lex (content: string) =
+    let lex inputFormat (content: string) =
+        // Defines the transition table for the lexer.
+        let table =
+            let beginIdentifierTransitions =
+                if inputFormat = IPA then
+                    onMany [ seq { 'A'..'Z' } ] Q_Identifier
+                else
+                    [ To Q_Identifier, OnChar '$' ]
+
+            let identifierTransitions =
+                onMany
+                    [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' }; "." :> char seq ]
+                    Q_Identifier
+
+            let utteranceTransitions =
+                if inputFormat = IPA then
+                    onMany
+                        [ seq { 'a'..'z' }
+                          seq { '\u0250'..'\u0341' }
+                          "æœðøçɸβθχ" :> char seq
+                        ]
+                        Q_Utterance
+                else
+                    onMany
+                        [ seq { 'a'..'z' }
+                          seq { 'A'..'Z' }
+                          seq { '0'..'9' }
+                          @"?&@{}""%:_\<>`'~" :> char seq
+                        ]
+                        Q_Utterance
+
+            let beginUtteranceTransitions =
+                if inputFormat = IPA then
+                    utteranceTransitions
+                else
+                    onMany
+                        [ seq { 'a'..'z' }
+                          seq { 'A'..'Z' }
+                          seq { '0'..'9' }
+                          @".?&@{}""%" :> char seq
+                        ]
+                        Q_Utterance
+
+            let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
+
+            createTransitionTableFromClasses
+                [ makeTransitions (From START) whitespaceTransitions
+                  makeTransitions (From Q_Whitespace) whitespaceTransitions
+                  makeTransitions (From Q_Whitespace) [ To Q_WhitespaceFinal, OnEpsilon ]
+
+                  makeTransitions (From START)
+                    [ To Q_Comma, OnChar ','
+                      To Q_LBrack, OnChar '['
+                      To Q_RBrack, OnChar ']'
+                      To Q_LBrace, OnChar '{'
+                      To Q_RBrace, OnChar '}'
+                      To Q_LParen, OnChar '('
+                      To Q_RParen, OnChar ')'
+                      To Q_Divider, OnChar '/'
+                      To Q_Arrow, OnChar '→'
+                      To Q_Empty, OnChar '∅'
+                      To Q_Empty, OnChar 'Ø'
+                      To Q_Placeholder, OnChar '_'
+                      To Q_WordBoundary, OnChar '#'
+                      To Q_Plus, OnChar '+'
+                      To Q_Pipe, OnChar '|'
+                      To Q_Not, OnChar '!'
+                  ]
+
+                  makeTransitions (From START) [ To Q0, OnChar '-' ]
+                  makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
+                  makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
+
+                  makeTransitions (From START) [ To Q_SyllableBoundary, OnChar '$' ]
+                  makeTransitions (From Q_SyllableBoundary) identifierTransitions
+                  makeTransitions (From Q_SyllableBoundary) [ To Q_SyllableBoundaryFinal, OnEpsilon ]
+
+                  if inputFormat = X_SAMPA then
+                      makeTransitions (From Q_LBrack) identifierTransitions
+                      makeTransitions (From Q_Plus) identifierTransitions
+                      makeTransitions (From Q_Minus) identifierTransitions
+
+                  makeTransitions (From START) beginIdentifierTransitions
+                  makeTransitions (From Q_Identifier) identifierTransitions
+                  makeTransitions (From Q_Identifier) [ To Q_IdentifierFinal, OnEpsilon ]
+
+                  makeTransitions (From START) beginUtteranceTransitions
+                  makeTransitions (From Q_Utterance) utteranceTransitions
+                  makeTransitions (From Q_Utterance) [ To Q_UtteranceFinal, OnEpsilon ]
+                  makeTransitions (From START) [ To Q_Comment, OnChar ';' ]
+                  makeTransitions (From Q_Comment) [ To Q_Comment, OnAny ]
+                  makeTransitions (From Q_Comment) [ To Q_CommentFinal, OnChar '\n' ]
+                ]
+
+        // Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
+        let stateTokenTypes =
+            [ Q_WhitespaceFinal, Whitespace.id
+              Q_Comma, Comma.id
+              Q_LBrack, LBrack.id
+              Q_RBrack, RBrack.id
+              Q_LBrace, LBrace.id
+              Q_RBrace, RBrace.id
+              Q_LParen, LParen.id
+              Q_RParen, RParen.id
+              Q_Divider, Divider.id
+              Q_Arrow, Arrow.id
+              Q_Empty, Empty.id
+              Q_Placeholder, Placeholder.id
+              Q_WordBoundary, WordBoundary.id
+              Q_SyllableBoundaryFinal, SyllableBoundary.id
+              Q_Plus, Plus.id
+              Q_Minus, Minus.id
+              Q_Pipe, Pipe.id
+              Q_Not, Not.id
+              Q_IdentifierFinal, Id.apply (trimSigil '$')
+              Q_UtteranceFinal, Utterance.apply (trimSigil '.')
+              Q_CommentFinal, Comment.apply trimComment
+            ]
+            |> Map.ofSeq
+
         let isFinal state = stateTokenTypes.ContainsKey state
         let accumulate (builder: char list) =
             System.String.Concat(builder |> List.rev |> Array.ofList)
@@ -203,5 +240,6 @@ module internal Lexer =
                     mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
                     builder = if isNextFinal then [] else builder
                     acc = nextAcc })
-        |> onFinish (fun ({ acc = acc }) -> acc |> List.rev |> OK)
+        |> onFinish (fun ({ acc = acc }) ->
+            acc |> List.rev |> OK)
         |> runStateMachine (content + "\n")

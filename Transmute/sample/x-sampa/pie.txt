@@ -1,0 +1,70 @@
+﻿akt
+pXt"e:r
+meXt"e:r
+b_hr"eXte:r
+sw"este:r
+su?n"us
+d_hukt"e:r
+l"eg_hjeti
+"ojnos		; masc.
+"ojneX		; fem.
+"ojnom		; neut.
+dw"oj
+tr"ejes
+petw"o:r
+p"empe
+s"ek's
+sep"md
+ok't"o:w
+?n"ewnd
+d"ek'md
+k'mt"om
+X_wd"onts	; nom.sg.
+X_wd"ontes	; nom.pl.
+X_wd"ontm	; acc.sg.
+X_wd"ontms	; acc.pl.
+X_wdnt"es	; gen.sg.
+X_wdnt"o?om	; gen.pl.
+X_wdnt"ej	; dat.sg.
+X_wdntm"os	; dat.pl.
+X_wdnt"e?	; inst.sg.
+widonom		; inf.
+w"ojdXe		; 1sg.
+w"ojdtXe	; 2sg.
+w"ojde		; 3sg.
+widt"os
+pl?n"os
+pl?n"om
+pl?n"eX
+k_w"ek_wlom	; nom.sg.
+k_wek_wl"eX	; collective
+su?r"os
+w"rmis
+d_hr"og_honom
+spr"egonom
+lipj"onom
+Xk'Xowsj"onom
+b_h"end_honom
+XpX_w"el?nonom
+dng'_hw"eXn
+b_holg'_his
+g'_h"lX_wtom
+b_hr"onk'tos
+g_w_h"iXb_hX
+song_w_hos
+d_h"ed_he?m
+p"o:ds
+p"o:des
+p"ek'u
+Xent"i
+X"enXts
+k'rXn"om
+?n"rtros
+sX"untros
+X"ewsros
+b_h"erg'tos
+g_h"ostejes
+s"e?mo:
+d_hews"om
+Xok'j"eX
+

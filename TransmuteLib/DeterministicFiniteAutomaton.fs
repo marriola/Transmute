@@ -1,8 +1,6 @@
 ﻿namespace TransmuteLib
 
-type internal TransitionResult =
-    | NoOutput
-    | Produces of string
+type Transformation = Transition<State> * TransitionResult
 
 module internal DeterministicFiniteAutomaton =
     type private TransitionType<'TState> =
@@ -16,8 +14,8 @@ module internal DeterministicFiniteAutomaton =
         match x, y with
         | _ when x = y ->
             true
-        | (State _ as s), MergedState (children, _)
-        | MergedState (children, _), (State _ as s) when List.contains s children ->
+        | (State _ as s), MergedState children
+        | MergedState children, (State _ as s) when List.contains s children ->
             true
         | _ ->
             false
@@ -36,8 +34,8 @@ module internal DeterministicFiniteAutomaton =
         |> List.map (fun t ->
             let transformation =
                 match Map.tryFind t transformationsByTransition with
-                | None -> NoOutput
-                | Some [tf] -> Produces tf
+                | None -> OutputDefault
+                | Some [tf] -> tf
                 | Some tfs -> failwithf "Transition %O has %d transformations; it should have 0 or 1" t tfs.Length
             t, transformation)
 
@@ -46,6 +44,7 @@ module internal DeterministicFiniteAutomaton =
         |> List.choose (fun (((From origin, _, _), _) as t) ->
             if state <% origin then Some t else None)
 
+    let inline private getOrigin (transition, _) = StateMachine.getOrigin transition
     let inline private getDest (transition, _) = StateMachine.getDest transition
     let inline private getInput (transition, _) = StateMachine.getInput transition
 
@@ -86,6 +85,73 @@ module internal DeterministicFiniteAutomaton =
                     |> List.ofSeq
                 inner transitions (nextStates @ xs) (followTransitions @ result)
         inner transitions [state] []
+
+    let printNfa table =
+        printf "NFA:\n\n"
+        table
+        |> List.sortBy (fun ((From origin, input, dest), result) -> (State.ord origin, input, dest), result)
+        |> List.indexed
+        |> List.map (fun (i, ((From origin, input, To dest), result)) ->
+            let t = sprintf "(%O, %O)" origin input
+            sprintf "%d.\t%-25s-> %O, %O" i t dest result)
+        |> String.concat "\n"
+        |> System.Console.WriteLine
+
+    let fromNfaOld startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
+        let table = augment table transformations
+        let rec fromNfa' stack dfaTransitions =
+            match stack with
+            | [] ->
+                Set.toList dfaTransitions
+            | top::rest when top = errorState ->
+                fromNfa' rest dfaTransitions
+            | top::rest ->
+                let deterministicTransitions, nondeterministicTransitions =
+                    table
+                    |> List.filter (getOrigin >> (<%) top)
+                    |> List.partition (getInput >> (<>) OnEpsilon)
+                let mergeTargets = nondeterministicTransitions |> List.map (fst >> StateMachine.getDest)
+                let isMerged, nextOrigin =
+                    if List.isEmpty mergeTargets then
+                        false, top
+                    elif List.isEmpty deterministicTransitions then
+                        true, State.merge mergeTargets
+                    else
+                        true, State.merge (top :: mergeTargets)
+                let followedEpsilonTransitions =
+                    table
+                    |> List.filter (fun ((From origin, _, _), _) -> List.contains origin mergeTargets)
+                let nextTransitions =
+                    (deterministicTransitions @ followedEpsilonTransitions)
+                    |> List.map (fun ((_, input, dest), result) -> (From nextOrigin, input, dest), result)
+                    |> Set.ofList
+                if Seq.exists (getInput >> (=) OnEpsilon) nextTransitions then
+                    fromNfa' (nextOrigin :: rest) dfaTransitions
+                else
+                    let retargetedDfaTransitions =
+                        if isMerged then
+                            let transformation = nondeterministicTransitions |> List.map snd |> List.head 
+                            dfaTransitions
+                            |> Seq.map (fun ((origin, input, To dest), result as t) ->
+                                if dest = top then
+                                    let production = transformation
+                                        //match transformation, result with
+                                        //| NoOutput, (Produces _ as p)
+                                        //| (Produces _ as p), NoOutput -> p
+                                        //| NoOutput, NoOutput -> NoOutput
+                                        //| Produces _, Produces _ -> failwith "Oops! All productions"
+                                    (origin, input, To nextOrigin), production
+                                else
+                                    t)
+                            |> Set.ofSeq
+                        else
+                            dfaTransitions
+                    let visitNext = nextTransitions |> Seq.map (fst >> StateMachine.getDest) |> List.ofSeq
+                    fromNfa' (rest @ visitNext) (Set.union retargetedDfaTransitions nextTransitions)
+
+        if showNfa then printNfa table
+
+        fromNfa' [startState] Set.empty
 
     /// Converts an NFA into an equivalent DFA.
     let fromNfa startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
@@ -129,14 +195,20 @@ module internal DeterministicFiniteAutomaton =
                                         when successor <% d ->
                                         let result =
                                             match result, uResult with
-                                            | (Produces _ as r), NoOutput
-                                            | NoOutput, (Produces _ as r) ->
-                                                r
-                                            | ((Produces _) as x), ((Produces _) as y) when x = y ->
+                                            | (ReplacesWith _ as t), OutputDefault
+                                            | (Inserts _ as t), OutputDefault
+                                            | (Deletes _ as t), OutputDefault
+                                            | OutputDefault, (ReplacesWith _ as t)
+                                            | OutputDefault, (Inserts _ as t) 
+                                            | OutputDefault, (Deletes _ as t) ->
+                                                t
+                                            | ((ReplacesWith _) as x), ((ReplacesWith _) as y)
+                                            | ((Inserts _) as x), ((Inserts _) as y)
+                                            | ((Deletes _) as x), ((Deletes _) as y) when x = y ->
                                                 x
-                                            | NoOutput, NoOutput ->
-                                                NoOutput
-                                            | Produces _, Produces _ ->
+                                            | OutputDefault, OutputDefault ->
+                                                OutputDefault
+                                            | _ ->
                                                 failwith "Both transitions have transformation!"
                                         Some (MaybeDeterministic ((From current, input, To d2), result))
                                     | _ -> None)
@@ -210,12 +282,14 @@ module internal DeterministicFiniteAutomaton =
                         |> List.map getDest
                         |> State.merge
                     let production =
-                        (NoOutput, dests)
+                        (OutputDefault, dests)
                         ||> List.fold (fun out (_, result) ->
                             match out, result with
-                            | Produces a, Produces b when a <> b ->
+                            | ReplacesWith (_, a), ReplacesWith (_, b) when a <> b ->
                                 failwithf "Merged state %O has multiple productions! (%O, %O)" mergedDest out result
-                            | NoOutput, (Produces _ as result) ->
+                            | OutputDefault, (ReplacesWith _ as result)
+                            | OutputDefault, (Inserts _ as result)
+                            | OutputDefault, (Deletes _ as result) ->
                                 result
                             | _ ->
                                 out)
@@ -249,15 +323,6 @@ module internal DeterministicFiniteAutomaton =
                     |> Set.union dfaTransitions
                 fromNfa' nextStack nextTransitions
 
-        if showNfa then
-            printf "NFA:\n\n"
-            table
-            |> List.sortBy (fun ((From origin, input, dest), result) -> (State.ord origin, input, dest), result)
-            |> List.indexed
-            |> List.map (fun (i, ((From origin, input, To dest), result)) ->
-                let t = sprintf "(%O, %O)" origin input
-                sprintf "%d.\t%-25s-> %O, %O" i t dest result)
-            |> String.concat "\n"
-            |> System.Console.WriteLine
+        if showNfa then printNfa table
 
         fromNfa' [startState] Set.empty

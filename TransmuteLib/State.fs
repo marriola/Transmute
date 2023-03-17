@@ -1,16 +1,28 @@
 ﻿namespace TransmuteLib
 
 type StateType = Final | NonFinal
-type Segment = EnvironmentSegment | InputSegment
+
+type TransitionResult =
+    /// Output the same symbol that was consumed.
+    | OutputDefault
+
+    /// Drops the last N output symbols and adds a new symbol.
+    | ReplacesWith of count: int * output: string
+
+    /// Adds the consumed symbol, followed by a new symbol.
+    | Inserts of output: string
+
+    /// Drops the last N output symbols.
+    | Deletes of count: int * text: string
 
 type State =
-    | State of name: string * segment: Segment * stateType: StateType
-    | MergedState of State list * segment: Segment
+    | State of name: string * stateType: StateType
+    | MergedState of State list
     with
         /// Returns the state's name.
         static member name = function
-            | State (name, _, _) -> name
-            | MergedState (states, _) ->
+            | State (name, _) -> name
+            | MergedState states ->
                 states
                 |> Seq.map State.name
                 |> String.concat (string Special.JOINER)
@@ -18,42 +30,22 @@ type State =
         /// Returns the ordinal part of a state's name (e.g. "q5" -> 5), -1 if the state name contains no ordinal part,
         /// or throws an exception if given a merged state.
         static member ord = function
-            | State (name, _, _) ->
+            | State (name, _) ->
                 match name.[1..] with
                 | "" -> -1
                 | x -> int x
             | MergedState _ ->
                 failwith "Merged states have no ordinal"
 
-        /// Creates a non-final state marked as matching a symbol in the input segment.
-        static member make name = State (name, InputSegment, NonFinal)
+        /// Creates a non-final state marked as matching a symbol in the input section.
+        static member make name = State (name, NonFinal)
     
         /// Marks a state as being final.
         static member makeFinal = function
-            | State (name, isInput, _) ->
-                State (name, isInput, Final)
+            | State (name, _) ->
+                State (name, Final)
             | MergedState _ as state ->
                 failwithf "%s is a merged state; it cannot be made final" (string state)
-
-        /// Marks a state as corresponding to input matched in the environment segment.
-        static member makeEnvironment = function
-            | State (name, _, isFinal) ->
-                State (name, EnvironmentSegment, isFinal)
-            | MergedState (states, _) ->
-                let states =
-                    List.map
-                        (fun (State (name, _, isFinal)) -> State (name, EnvironmentSegment, isFinal))
-                        states
-                MergedState (states, EnvironmentSegment)
-
-        static member makeInput = function
-            | State (name, _, isFinal) ->
-                State (name, InputSegment, isFinal)
-            | MergedState (states, _) ->
-                let states =
-                    states
-                    |> List.map (fun (State (name, _, isFinal)) -> State (name, InputSegment, isFinal))
-                MergedState (states, InputSegment)
         
         /// Merges a list of states into one merged state.
         static member merge states =
@@ -61,38 +53,25 @@ type State =
                 states
                 |> Seq.collect (function
                     | State _ as state -> [ state ]
-                    | MergedState (states, _) -> states)
+                    | MergedState states -> states)
                 |> Seq.distinct
                 |> Seq.sortBy State.ord
                 |> List.ofSeq
-            let segment =
-                match statesToMerge with
-                | (State (_, InputSegment, _))::_ ->
-                    InputSegment
-                | _ ->
-                    EnvironmentSegment
             match statesToMerge with
             | [state] -> state
-            | _ -> MergedState (statesToMerge, segment)
+            | _ -> MergedState statesToMerge
+
+        static member isMerged = function
+            | MergedState _ -> true
+            | _ -> false
 
         /// Returns a boolean indicating whether the state is final.
         static member isFinal = function
-            | State (_, _, Final) -> true
-            | State (_, _, NonFinal) -> false
-            | MergedState (states, _) ->
+            | State (_, Final) -> true
+            | State (_, NonFinal) -> false
+            | MergedState states ->
                 List.exists State.isFinal states
-
-        /// Returns a boolean indicating whether the state corresponds to input matched in the environment segment.
-        static member isEnvironment = function
-            | State (_, EnvironmentSegment, _)
-            | MergedState (_, EnvironmentSegment) ->
-                true
-            | _ ->
-                false
 
         override this.ToString() =
             let leftParen, rightParen = if State.isFinal this then "(", ")" else "", ""
-            let segmentIndicator = if State.isEnvironment this then "ᴱ" else "ᴵ"
-            leftParen + State.name this + rightParen + segmentIndicator
-
-type Transformation = Transition<State> * string
+            leftParen + State.name this + rightParen
