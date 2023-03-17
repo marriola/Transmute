@@ -43,7 +43,7 @@ Because X-SAMPA clashes with Transmute identifiers, you need to use a `$` sigil 
 
     ; X-SAMPA rule
 
-    [STOP-Voiced] / [+Fricative] / (#|**$**V|**$**SONORANT)_
+    [STOP-Voiced] / [+Fricative] / (#|$V|$SONORANT)_
 
 ### Identifiers
 
@@ -62,7 +62,7 @@ You can put phonemes of any length in a set.
 
 Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
-    C {
+    C (
         p t k
         b d g
         m n ŋ
@@ -76,7 +76,7 @@ Commas are optional. Whitespace is enough to separate phonemes, and you may list
 
 Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
 
-    [Fricative] {
+    [Fricative] (
         k → x
         kʷ → xʷ
         p → ɸ
@@ -170,12 +170,12 @@ A compound set matches all phonemes that share all of the listed features. Wheth
 
 More concretely, given the following sets and features
 
-    Stop {
+    Stop (
         p t k kʷ
         b d g gʷ
     )
     
-    [Voiced] {
+    [Voiced] (
         p → b
         t → d
         k → g
@@ -185,7 +185,7 @@ More concretely, given the following sets and features
         ŋ
     )
 
-    [Fricative] {
+    [Fricative] (
         p → ɸ
         t → θ
         k → x
@@ -199,9 +199,15 @@ By starting with the set `Stop` and removing all phonemes that are `Voiced` (/b 
     
     [Stop-Voiced] → [+Fricative]
 
-#### Transforming a sound by changing a feature
+#### Transforming a sound by changing features
 
-The same notation used to match either the presence or absence of a feature can also be used in the output section of the rule. Currently only one feature may be changed. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
+The same notation used to match either the presence or absence of a feature can also be used in the output section of the rule. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
+
+More than one feature can be changed. In the following rule, /n/ is deleted after a vowel undergoes nasalization and compensatory lengthening before /x/:
+
+    [-Nasalized]n → [+Nasalized +Long] / _x
+
+    ; brɑnxtɑz -> brãːxtɑz
 
 #### Optional matches
 
