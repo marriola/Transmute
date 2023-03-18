@@ -86,6 +86,7 @@ module internal Lexer =
                     onMany
                         [ seq { 'a'..'z' }
                           seq { '\u0250'..'\u0341' }
+                          "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
                           "æœðøçɸβθχ" :> char seq
                         ]
                         Q_Utterance
@@ -94,6 +95,7 @@ module internal Lexer =
                         [ seq { 'a'..'z' }
                           seq { 'A'..'Z' }
                           seq { '0'..'9' }
+                          "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
                           @"?&@{}""%:_\<>`'~" :> char seq
                         ]
                         Q_Utterance
@@ -106,6 +108,7 @@ module internal Lexer =
                         [ seq { 'a'..'z' }
                           seq { 'A'..'Z' }
                           seq { '0'..'9' }
+                          "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
                           @".?&@{}""%" :> char seq
                         ]
                         Q_Utterance
