@@ -97,72 +97,15 @@ module internal DeterministicFiniteAutomaton =
         |> String.concat "\n"
         |> System.Console.WriteLine
 
-    let fromNfaOld startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
-        let table = augment table transformations
-        let rec fromNfa' stack dfaTransitions =
-            match stack with
-            | [] ->
-                Set.toList dfaTransitions
-            | top::rest when top = errorState ->
-                fromNfa' rest dfaTransitions
-            | top::rest ->
-                let deterministicTransitions, nondeterministicTransitions =
-                    table
-                    |> List.filter (getOrigin >> (<%) top)
-                    |> List.partition (getInput >> (<>) OnEpsilon)
-                let mergeTargets = nondeterministicTransitions |> List.map (fst >> StateMachine.getDest)
-                let isMerged, nextOrigin =
-                    if List.isEmpty mergeTargets then
-                        false, top
-                    elif List.isEmpty deterministicTransitions then
-                        true, State.merge mergeTargets
-                    else
-                        true, State.merge (top :: mergeTargets)
-                let followedEpsilonTransitions =
-                    table
-                    |> List.filter (fun ((From origin, _, _), _) -> List.contains origin mergeTargets)
-                let nextTransitions =
-                    (deterministicTransitions @ followedEpsilonTransitions)
-                    |> List.map (fun ((_, input, dest), result) -> (From nextOrigin, input, dest), result)
-                    |> Set.ofList
-                if Seq.exists (getInput >> (=) OnEpsilon) nextTransitions then
-                    fromNfa' (nextOrigin :: rest) dfaTransitions
-                else
-                    let retargetedDfaTransitions =
-                        if isMerged then
-                            let transformation = nondeterministicTransitions |> List.map snd |> List.head 
-                            dfaTransitions
-                            |> Seq.map (fun ((origin, input, To dest), result as t) ->
-                                if dest = top then
-                                    let production = transformation
-                                        //match transformation, result with
-                                        //| NoOutput, (Produces _ as p)
-                                        //| (Produces _ as p), NoOutput -> p
-                                        //| NoOutput, NoOutput -> NoOutput
-                                        //| Produces _, Produces _ -> failwith "Oops! All productions"
-                                    (origin, input, To nextOrigin), production
-                                else
-                                    t)
-                            |> Set.ofSeq
-                        else
-                            dfaTransitions
-                    let visitNext = nextTransitions |> Seq.map (fst >> StateMachine.getDest) |> List.ofSeq
-                    fromNfa' (rest @ visitNext) (Set.union retargetedDfaTransitions nextTransitions)
-
-        if showNfa then printNfa table
-
-        fromNfa' [startState] Set.empty
-
     /// Converts an NFA into an equivalent DFA.
     let fromNfa startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
         let table = augment table transformations
 
-        let hasNonEpsilonTransition state =
-            List.exists
-                (fun ((From origin, input, _), _) -> state = origin && input <> OnEpsilon)
-                table
+        let inline hasNonEpsilonTransition state =
+            table
+            |> List.exists (fun ((From origin, input, _), _) -> state = origin && input <> OnEpsilon)
 
-        let allTransitionsDeterministic origin =
+        let inline allTransitionsDeterministic origin =
             table
             |> List.exists (function
                 | (From o, OnEpsilon, _), _ when o = origin -> true
@@ -183,7 +126,7 @@ module internal DeterministicFiniteAutomaton =
                     // Search for states that might have deterministic transitions from their destinations.
                     let successors =
                         search
-                        |> List.collect (fun ((From o, input, To d), result as t) ->
+                        |> List.collect (fun ((From o, input, To d), tResult as t) ->
                             // For each transition T from O to D that is succeeded by a nondeterministic transition U,
                             // move the destination of T forwards to skip it. If any of these lead to deterministic transitions,
                             // they will be accumulated in the next iteration, along with final states.
@@ -191,33 +134,24 @@ module internal DeterministicFiniteAutomaton =
                                 table
                                 |> List.choose (function
                                     | (From successor, OnEpsilon, To d2), uResult as u
-                                        //when successor <% d && hasEpsilonTransition d2 ->
                                         when successor <% d ->
                                         let result =
-                                            match result, uResult with
-                                            | (ReplacesWith _ as t), OutputDefault
-                                            | (Inserts _ as t), OutputDefault
-                                            | (Deletes _ as t), OutputDefault
-                                            | OutputDefault, (ReplacesWith _ as t)
-                                            | OutputDefault, (Inserts _ as t) 
-                                            | OutputDefault, (Deletes _ as t) ->
-                                                t
-                                            | ((ReplacesWith _) as x), ((ReplacesWith _) as y)
-                                            | ((Inserts _) as x), ((Inserts _) as y)
-                                            | ((Deletes _) as x), ((Deletes _) as y) when x = y ->
-                                                x
-                                            | OutputDefault, OutputDefault ->
-                                                OutputDefault
-                                            | _ ->
-                                                failwith "Both transitions have transformation!"
+                                            if tResult <> OutputDefault then
+                                                if uResult = OutputDefault then
+                                                    tResult
+                                                else
+                                                    failwith "Both transitions have transformation!"
+                                            else
+                                                uResult
                                         Some (MaybeDeterministic ((From current, input, To d2), result))
-                                    | _ -> None)
+                                    | _ ->
+                                        None)
                             // Keep the original transition T if D is final or has deterministic transitions
                             let originalTransition =
-                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d)
-                                    && (State.isFinal d || input <> OnEpsilon)
-                                    then [Deterministic t]
-                                    else []
+                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d) then //&& (State.isFinal d || input <> OnEpsilon) then
+                                    [Deterministic ((From current, input, To d), tResult)]
+                                else
+                                    []
                             originalTransition @ followedTransitions)
                     // Follow transitions to states we haven't already been to that have non-deterministic transitions
                     let nextTransitions =
