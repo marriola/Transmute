@@ -2,12 +2,6 @@
 ;   Ingvaeonic and Anglo-Frisian   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-T (t)
-R (r)
-D (t r)
-
-a/o/_k(D)(D)#
-
 ; Nasal spirant law
 
 [-Long] → [+Long] / _nFRICATIVE

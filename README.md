@@ -2,6 +2,34 @@
 
 A sound change applier for constructed languages. Transmute uses a distinctive feature-based approach that allows you to write concise and expressive sound change rules.
 
+## Examples
+
+Under the `sample/ipa` and `sample/x-sampa` folders, there are IPA and X-SAMPA versions of:
+
+| File name         | Description                           |
+|-------------------|---------------------------------------|
+| pie.txt           | A sample Proto-Indo-European lexicon  |
+| protogermanic.txt | A sample Proto-Germanic lexicon       |
+| westgermanic.txt  | A sample West-Germanic lexicon        |
+| protogermanic.sc  | PIE to Proto-Germanic rules           |
+| westgermanic.sc   | Proto-Germanic to West Germanic rules |
+| oldenglish.sc     | West Germanic to Old English rules    |
+
+Try it out by transforming the PIE lexicon to Proto-Germanic:
+
+    ./transmute sample/ipa/pie.txt sample/ipa/protogermanic.sc -v 2
+
+Try it in X-SAMPA:
+
+    ./transmute -x sample/x-sampa/pie.txt sample/x-sampa/protogermanic.sc -v 2
+
+Try piping the output from PIE, to Proto-Germanic, to West Germanic, and finally to Old English:
+
+    cat sample/x-sampa/pie.txt |
+        ./transmute -x sample/x-sampa/protogermanic.sc - |
+        ./transmute -x sample/x-sampa/westgermanic.sc - |
+        ./transmute -x sample/x-sampa/oldenglish.sc -
+
 ## Performance
 
 Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
