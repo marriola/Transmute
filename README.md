@@ -1,6 +1,6 @@
 ﻿# Transmute
 
-A sound change applier for constructed languages. Transmute aims for expressiveness and flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on an Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
+A sound change applier for constructed languages. Transmute aims for expressiveness and flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
 
 
 

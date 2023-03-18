@@ -156,7 +156,7 @@ module RuleMachine =
                 let lastOutputPosition = value.lastOutputOn |> Option.map string |> Option.defaultValue ""
                 let nextOutputStr = nextOutput |> List.rev |> List.map string |> String.concat ""
                 printf $"   %2d{position} %c{input} %2s{lastOutputPosition}: "
-                printfn $"Error at %-25O{current} | %-15s{nextOutputStr}"
+                printfn $"Error at %-25O{current} | %-20s{nextOutputStr}"
             Restart {
                 value with
                     isPartialMatch = false
@@ -186,7 +186,7 @@ module RuleMachine =
                 let transition = $"{current} -> {nextState}"
                 let nextOutputStr = output |> List.rev |> List.map string |> String.concat ""
                 let nextProductionStr = nextProduction |> List.rev |> List.map string |> String.concat " "
-                printfn $"%-34s{transition} | %-15s{nextOutputStr} {nextProductionStr}"
+                printfn $"%-34s{transition} | %-20s{nextOutputStr} {nextProductionStr}"
             { value with
                 isPartialMatch = true
                 wasLastFinal = isNextFinal
