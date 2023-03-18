@@ -4,9 +4,7 @@
 
 ; Nasal spirant law
 
-[-Long] → [+Long] / _nFRICATIVE
-[-Nasalized] → [+Nasalized] / _nFRICATIVE
-n → ∅ / [+Nasalized]_
+[+V]n → [+Nasalized +Long] / _FRICATIVE
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
@@ -29,13 +27,13 @@ n → ∅ / [+Nasalized]_
 
 ; Front vowel breaking
 
-∅ → u / [V+Front-y]_((x|w)(V|#) | rC | lC)
+∅ → u / [V+Front-/y/]_((x|w)(V|#) | rC | lC)
 
 ; Diphthong height harmonization
 
-(ɑi|ɑj) → ɑː
-(æu|æw) → æɑ
-(eu|ew) → eo
+[+/ɑi ɑj/] → ɑː
+[+/æu æw/] → æɑ
+[+/eu ew/] → eo
 
 ; A-restoration
 

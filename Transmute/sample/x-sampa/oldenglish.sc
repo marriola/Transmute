@@ -4,9 +4,7 @@
 
 ; Nasal spirant law
 
-[-Long] -> [+Long] / _n$FRICATIVE
-[-Nasalized] -> [+Nasalized] / _n$FRICATIVE
-n // [+Nasalized]_
+[+V]n -> [+Long +Nasalized] / _$FRICATIVE
 
 (A~:|}~:) -> O~:
 
@@ -33,9 +31,9 @@ A -> } / _$C
 
 ; Diphthong height harmonization
 
-(Ai|Aj) -> A:
-(}u|}w) -> }A
-(eu|ew) -> eo
+[+/Ai Aj/] -> A:
+[+/}u }w/] -> }A
+[+/eu ew/] -> eo
 
 ; A-restoration
 
