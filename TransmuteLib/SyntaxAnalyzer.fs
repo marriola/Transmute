@@ -1,4 +1,9 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      SyntaxAnalyzer
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 module internal SyntaxAnalyzer =
     let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) result =

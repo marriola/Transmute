@@ -1,4 +1,10 @@
-﻿module Arguments
+﻿// Project:     Transmute
+// Module:      Arguments
+// Description: Console driver command line argument parser
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+module Arguments
 
 open TransmuteLib
 

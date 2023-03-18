@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      DeterministicFiniteAutomaton
+// Description: Converts a finite state transducer that is nondeterministic to an equivalent one that is deterministic.
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 type Transformation = Transition<State> * TransitionResult
 
@@ -52,7 +58,7 @@ module internal DeterministicFiniteAutomaton =
     /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
     /// </summary>
     /// <returns>A set of input symbol and state tuples.</returns>
-    let private computeFollowSet transitions state =
+    let private computePowerSet transitions state =
         let rec inner transitions states result =
             match states with
             | [] ->
@@ -148,8 +154,8 @@ module internal DeterministicFiniteAutomaton =
                                         None)
                             // Keep the original transition T if D is final or has deterministic transitions
                             let originalTransition =
-                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d) then //&& (State.isFinal d || input <> OnEpsilon) then
-                                    [Deterministic ((From current, input, To d), tResult)]
+                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d) then // && (State.isFinal d || input <> OnEpsilon) then
+                                    [ Deterministic ((From current, input, To d), tResult) ]
                                 else
                                     []
                             originalTransition @ followedTransitions)
@@ -179,7 +185,7 @@ module internal DeterministicFiniteAutomaton =
         /// <returns>A list of deterministric transitions.</returns>
         let followEpsilonTransitions origin transitions =
             transitions
-            |> List.collect (getDest >> computeFollowSet table)
+            |> List.collect (getDest >> computePowerSet table)
             |> List.distinct
             |> List.map (fun (input, dest, result) -> (From origin, input, To dest), result)
 

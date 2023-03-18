@@ -1,4 +1,9 @@
-﻿module TransmuteLib.Test.Tests
+﻿// Project:     TransmuteLib.Test
+// Module:      Tests
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+module TransmuteLib.Test.Tests
 
 open TransmuteLib
 open Xunit
@@ -8,7 +13,7 @@ let testRule format rules inputs expected =
         rules
         |> RuleParser.parseRules format
         |> Result.map (fun (features, sets, rules) -> RuleCompiler.compile false features sets rules[0])
-        |> Result.map (fun rule -> inputs |> List.map (RuleMachine.transform false rule))
+        |> Result.map (fun rule -> inputs |> List.map (Transducer.transform false rule))
     Assert.Equal<string>(expected, Result.defaultWith List.singleton actual) 
 
 let testRules format rules inputs (expected: string list) =
@@ -20,7 +25,7 @@ let testRules format rules inputs (expected: string list) =
         rules
         |> Result.map (fun rules ->
             (input, rules)
-            ||> List.fold (fun input rule -> RuleMachine.transform false rule input))
+            ||> List.fold (fun input rule -> Transducer.transform false rule input))
     let actual =
         inputs
         |> List.map transform

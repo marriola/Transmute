@@ -1,4 +1,11 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      RuleCompiler
+// Description: Rule to finite state transducer converter. The generated transducer has epsilon transitions and must be
+//              converted by the the DeterministicFiniteAutomaton module before it can be used.
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 open ICSharpCode.SharpZipLib.GZip
 open MBrace.FsPickler

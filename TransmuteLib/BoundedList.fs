@@ -1,4 +1,9 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      BoundedList
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 type BoundedList<'a> =
     | Begin

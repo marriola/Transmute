@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      State
+// Description: FSA state type
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 type StateType = Final | NonFinal
 

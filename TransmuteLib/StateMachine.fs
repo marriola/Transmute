@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      StateMachine
+// Description: Generic state machine. Supports epsilon transitions, but does not implement backtracking.
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 type Origin<'TState> = From of 'TState
 

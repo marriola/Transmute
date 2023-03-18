@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="LICENSE" />
     <Compile Include="Properties\AssemblyInfo.fs" />
     <Compile Include="Utils\Cata.fs" />
     <Compile Include="BoundedList.fs" />
@@ -23,7 +24,7 @@
     <Compile Include="State.fs" />
     <Compile Include="DeterministicFiniteAutomaton.fs" />
     <Compile Include="RuleCompiler.fs" />
-    <Compile Include="RuleMachine.fs" />
+    <Compile Include="Transducer.fs" />
   </ItemGroup>
 
   <ItemGroup>

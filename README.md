@@ -1,8 +1,18 @@
 ﻿# Transmute
 
-A sound change applier for constructed languages. Transmute aims for expressiveness and flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
+A sound change applier for constructed languages.
 
+## Performance
 
+Transmute aims for expressiveness and flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
+
+Because X-SAMPA rules have to chew through so many more states for every diacritic and extended character, they don't perform as well as IPA rules. Depending on the target platform, the X-SAMPA version of `protogermanic.sc` performs 40-50% slower than the IPA version.
+
+## To do
+
+* α variables
+* Syllable detection
+* Replace the explicit transformation-based approach with a feature matrix-based approach and a built in standard matrix
 
 ## Command line options
 

@@ -1,5 +1,4 @@
-﻿akt
-pXt"e:r
+﻿pXt"e:r
 meXt"e:r
 b_hr"eXte:r
 sw"este:r
@@ -48,6 +47,7 @@ b_h"end_honom
 XpX_w"el?nonom
 dng'_hw"eXn
 b_holg'_his
+g_h"lX_wtom
 g'_h"lX_wtom
 b_hr"onk'tos
 g_w_h"iXb_hX

@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      Node
+// Description: Syntax tree node type
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 open System.Collections.Generic
 open TransmuteLib.Position

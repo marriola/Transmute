@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      RuleParser
+// Description: Rule parser
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 open System.IO
 open TransmuteLib.Lexer

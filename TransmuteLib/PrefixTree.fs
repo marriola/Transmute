@@ -1,4 +1,10 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      PrefixTree
+// Description: Prefix tree type
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 type internal PrefixTree =
     | Root of children: PrefixTree list

@@ -1,4 +1,10 @@
-﻿open Arguments
+﻿// Project:     Transmute
+// Module:      Program
+// Description: Console driver for TransmuteLib
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+open Arguments
 open System
 open System.IO
 open TransmuteLib
@@ -62,7 +68,7 @@ let transform options rules word =
         | [] ->
             word, nextWord, log, totalTime
         | (i, _, rule, _)::xs ->
-            let result, elapsed = time (fun () -> RuleMachine.transform showNfa rule nextWord)
+            let result, elapsed = time (fun () -> Transducer.transform showNfa rule nextWord)
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then

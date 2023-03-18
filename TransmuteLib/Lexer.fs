@@ -1,4 +1,9 @@
-﻿namespace TransmuteLib
+﻿// Project:     TransmuteLib
+// Module:      Lexer
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace TransmuteLib
 
 open TransmuteLib.Position
 open TransmuteLib.StateMachine
