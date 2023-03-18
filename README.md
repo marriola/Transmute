@@ -1,12 +1,12 @@
 ﻿# Transmute
 
-A sound change applier for constructed languages.
+A sound change applier for constructed languages. Transmute uses a distinctive feature-based approach that allows you to write concise and expressive sound change rules.
 
 ## Performance
 
-Transmute aims for expressiveness and flexibility, rather than speed, although it is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
+Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
 
-Because X-SAMPA rules have to chew through so many more states for every diacritic and extended character, they don't perform as well as IPA rules. Depending on the target platform, the X-SAMPA version of `protogermanic.sc` performs 40-50% slower than the IPA version.
+Because X-SAMPA rules have to chew through so many more states for every diacritic and extended character, they don't perform as well as IPA rules. Depending on the target platform, the X-SAMPA version of `protogermanic.sc` compiles 40-50% slower than the IPA version. Once compiled, X-SAMPA rules perform nearly as well as IPA rules.
 
 ## To do
 
@@ -55,7 +55,11 @@ A rule file consists of a list of sets, features and rules.
 
 By default, Transmute accepts rules written in IPA. You can write rules in X-SAMPA by using the `--x-sampa` or `-x` switch.
 
-Because X-SAMPA clashes with Transmute identifiers, you need to use a `$` sigil to disambiguate identifiers when used outside of brackets:
+### Identifiers
+
+Sets and features are identified by a name consisting of alphanumeric characters beginning with a capital letter, e.g. `C` or `Voiced`.
+
+Because X-SAMPA clashes with identifiers, when using X-SAMPA you need to use a `$` sigil to disambiguate identifiers when used outside of brackets:
 
     ; IPA rule
 
@@ -64,10 +68,6 @@ Because X-SAMPA clashes with Transmute identifiers, you need to use a `$` sigil 
     ; X-SAMPA rule
 
     [STOP-Voiced] / [+Fricative] / (#|$V|$SONORANT)_
-
-### Identifiers
-
-Sets and features are identified by a name consisting of alphanumeric characters beginning with a capital letter, e.g. `C` or `Voiced`.
 
 ### Defining sets
 
@@ -212,6 +212,18 @@ More concretely, given the following sets and features
         kʷ → xʷ
         s
     )
+
+You can also construct a set, and then remove specific segments from it:
+
+    ; /u/ becomes /o/ before any consonant but /n/
+
+    u → o / _[C-/n/]
+
+You can also construct a set out of only segments:
+
+    ; Delete final /ɑ ɑ̃/
+
+    [+/ɑ ɑ̃/] → ∅ / _#
 
 By starting with the set `Stop` and removing all phonemes that are `Voiced` (/b d g gʷ/), we can write a rule that affects only the voiceless stops /p t k kʷ/ː
 

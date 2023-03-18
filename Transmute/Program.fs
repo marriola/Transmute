@@ -143,7 +143,7 @@ let main argv =
             else
                 time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
-    if options.verbosityLevel >= ShowTimings then
+    if options.verbosityLevel >= ShowTransformations then
         fprintfn stderr ""
 
         rules
@@ -152,7 +152,10 @@ let main argv =
             | Some testRules -> List.contains i testRules
             | None -> true)
         |> List.iter (fun (i, node, rule, milliseconds) ->
-            printfn $"[%8s{formatTime milliseconds}] %2d{i}. {node}"
+            if options.verbosityLevel >= ShowTimings then
+                printf $"[%8s{formatTime milliseconds}] "
+
+            printfn $"%2d{i}. {node}"
 
             if options.verbosityLevel >= ShowDFA then
                 let transitions, transformations = rule

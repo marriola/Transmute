@@ -1,7 +1,7 @@
 ﻿; Northwest Gmc.
 
 [-Front] → [+Front] / _C(C)(C)(i|j)
-u → o / _[C-n](C)(C)[V-HIGH]
+u → o / _[C-/n/](C)(C)[V-HIGH]
 [-Short] → [+Short] / _#
 [+Overlong] → [-Overlong]
 
@@ -15,8 +15,7 @@ u → o / _[C-n](C)(C)[V-HIGH]
 z → ∅ / _#
 z → r / SONORANT_
 s → ∅ / C_#
-;(ɑ|ɑ̃) → 0 / V C(C)(C)_#
-[ +ɑ +ɑ̃ ] → ∅ / V C(C)(C)_#
+[+/ɑ ɑ̃/] → ∅ / _#	; V C(C)(C)_#
 [-Geminate] → [+Geminate] / _j
 
 HIGH { i iː y yː u uː }

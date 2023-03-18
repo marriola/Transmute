@@ -32,8 +32,7 @@ type Options =
       rulesFile: string
       verbosityLevel: VerbosityLevel
       testRules: int list option
-      testWords: int list option
-    }
+      testWords: int list option }
 
 let defaultOptions =
     { format = IPA
@@ -42,8 +41,7 @@ let defaultOptions =
       rulesFile = null
       verbosityLevel = Normal
       testRules = None
-      testWords = None
-    }
+      testWords = None }
 
 let parse (argv: string[]) =
     let rec parse' args options =
@@ -114,10 +112,13 @@ let parse (argv: string[]) =
 
 let validate (options: Options) =
     let mutable isValid = true
+
     if options.lexiconFiles.Length = 0 then
         printfn "Lexicon not specified"
         isValid <- false
+    
     if options.rulesFile = null then
         printfn "Rules file not specified"
         isValid <- false
+
     isValid

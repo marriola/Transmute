@@ -25,8 +25,8 @@ type Node =
     /// Represents the presence or absence of a feature in a set identifier.
     | FeatureIdentifierNode of isPresent:bool * name:string
 
-    /// Represents the presence or absence of a phoneme in a set identifier.
-    | UtteranceIdentifierNode of isPresent:bool * utterance: string
+    /// Represents the presence or absence of a list of phonemes in a set identifier.
+    | SegmentIdentifierNode of isPresent:bool * segments: string list
 
     /// Represents an utterance.
     | UtteranceNode of string
@@ -71,10 +71,12 @@ type Node =
         | SetIdentifierNode value
         | TermIdentifierNode value ->
             value
-        | FeatureIdentifierNode (isPresent, name)
-        | UtteranceIdentifierNode (isPresent, name) ->
+        | FeatureIdentifierNode (isPresent, name) ->
             let sign = if isPresent then "+" else "-"
             sign + name
+        | SegmentIdentifierNode (isPresent, segments) ->
+            let sign = if isPresent then "+" else "-"
+            sign + "/" + (String.concat " " segments) + "/"
         | CompoundSetIdentifierNode terms ->
             terms
             |> List.map string
@@ -362,10 +364,10 @@ module Node =
             | x::xs ->
                 let nextSet =
                     match x with
-                    | Untag (UtteranceIdentifierNode (isPresent, utterance), _) ->
+                    | Untag (SegmentIdentifierNode (isPresent, segments), _) ->
                         if isPresent
-                            then Set.add utterance result
-                            else Set.remove utterance result
+                            then segments |> Set.ofList |> Set.union result
+                            else segments |> Set.ofList |> Set.difference result
                     | Untag (TermIdentifierNode name, _)
                     | Untag (SetIdentifierNode name, _) ->
                         tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
@@ -394,7 +396,7 @@ module Node =
 
         if segmentsOnly then
             setDescriptor
-            |> List.choose (function UtteranceIdentifierNode (isPresent, utterance) -> if isPresent then Some utterance else None)
+            |> List.collect (function SegmentIdentifierNode (isPresent, segments) -> if isPresent then segments else [])
             |> List.distinct
         else
             inner setDescriptor alphabet |> List.ofSeq

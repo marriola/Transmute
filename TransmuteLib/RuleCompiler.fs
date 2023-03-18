@@ -1,7 +1,6 @@
 ﻿// Project:     TransmuteLib
 // Module:      RuleCompiler
-// Description: Rule to finite state transducer converter. The generated transducer has epsilon transitions and must be
-//              converted by the the DeterministicFiniteAutomaton module before it can be used.
+// Description: Rule to finite state transducer converter.
 // Copyright:   (c) 2023 Matt Arriola
 // License:     MIT
 
@@ -38,10 +37,10 @@ module RuleCompiler =
         states: State seq
 
         /// The tokens from the section currently being processed.
-        input: Node list
+        currentNodes: Node list
 
         /// The tokens from the output section.
-        output: Node list
+        outputNodes: Node list
 
         /// Accumulates key-value pairs that will create the transition table.
         transitions: Transition<State> list
@@ -62,11 +61,9 @@ module RuleCompiler =
         isPlaceholderNextStack: bool list
     }
     with
-        member this.AreAllSubtreesFinal
-            with get() = not (List.contains SubtreeNonfinal this.subtreePositionStack)
+        member this.AreAllSubtreesFinal = not (List.contains SubtreeNonfinal this.subtreePositionStack)
         
-        member this.IsPlaceholderNext
-            with get() = this.isPlaceholderNextStack |> List.reduce (&&)
+        member this.IsPlaceholderNext = this.isPlaceholderNextStack |> List.reduce (&&)
 
     type private RuleGeneratorState =
         | HasNext of NFAState
@@ -83,10 +80,10 @@ module RuleCompiler =
 
         /// <param name="state">The internal NFA state.</param>
         let rec buildStateMachine' state : NFAState =
-            let state = {
-                state with
+            let state =
+                { state with
                     subtreePositionStack =
-                        match state.subtreePositionStack, state.input with
+                        match state.subtreePositionStack, state.currentNodes with
                         | _::rest, [_] ->
                             SubtreeFinal :: rest
                         | _::rest, _ ->
@@ -95,13 +92,13 @@ module RuleCompiler =
                             failwith "Subtree position stack empty"
 
                     isPlaceholderNextStack =
-                        match state.input with
+                        match state.currentNodes with
                         | [ PlaceholderNode _ ] ->
                             false :: state.isPlaceholderNextStack
                         | _ ->
                             let b =
-                                state.input
-                                |> Seq.skip (min 1 state.input.Length)
+                                state.currentNodes
+                                |> Seq.skip (min 1 state.currentNodes.Length)
                                 |> Seq.takeWhile (function PlaceholderNode _ -> false | _ -> true)
                                 |> Seq.filter (function OptionalNode _ -> false | _ -> true)
                                 |> Seq.isEmpty
@@ -113,12 +110,12 @@ module RuleCompiler =
             /// Otherwise consumes nothing and gives nothing.
             /// </summary>
             let giveOutput state =
-                match state.currentSection, state.output, input with
+                match state.currentSection, state.outputNodes, input with
                 | InputSection, node::xs, _ ->
-                    let nextState = { state with output = xs }
+                    let nextState = { state with outputNodes = xs }
                     nextState, Some node
                 | _, node::xs, [] when state.IsPlaceholderNext ->
-                    let nextState = { state with output = xs }
+                    let nextState = { state with outputNodes = xs }
                     nextState, Some node
                 | _ ->
                     state, None
@@ -129,16 +126,17 @@ module RuleCompiler =
                     if state.AreAllSubtreesFinal
                         then State.makeFinal nextState
                         else nextState
+
                 { state with states = states }, nextState
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
                 let state, next = getNextState state
                 let transitions = (From state.current, OnChar c, To next) :: state.transitions
+
                 { state with
                     transitions = transitions
-                    current = next
-                }
+                    current = next }
 
             /// <summary>
             /// Matches one of the boundary characters inserted on either end of the input string, <see cref="Special.START" /> and <see cref="Special.END" />.
@@ -213,7 +211,7 @@ module RuleCompiler =
                                 transitions = transitions
                                 current = next }
 
-                matchUtterance' (List.ofSeq utterance) state.output state
+                matchUtterance' (List.ofSeq utterance) state.outputNodes state
 
             /// Computes the intersection of a list of feature and set identifiers, and creates a
             /// tree of states and transitions that match each member of the resulting set.
@@ -289,11 +287,11 @@ module RuleCompiler =
                     |> matchSet' state
 
                 { nextState with
-                    output =
+                    outputNodes =
                         if state.currentSection = InputSection then
-                            nextState.output[1..]
+                            nextState.outputNodes[1..]
                         else
-                            nextState.output }
+                            nextState.outputNodes }
 
             /// Match the input section.
             let matchInput () =
@@ -301,7 +299,7 @@ module RuleCompiler =
                 let nextState =
                     buildStateMachine'
                         { state with
-                            input = input
+                            currentNodes = input
                             currentSection = InputSection
                             inputPosition = InputNoninitial
                             subtreePositionStack = subtreePosition :: state.subtreePositionStack }
@@ -312,12 +310,12 @@ module RuleCompiler =
             /// Optionally match a sequence of nodes. Continue even if no match possible.
             let matchOptional nodes =
                 let state, terminator = getNextState state
-                let nextState = buildStateMachine' {
-                    state with
-                        input = nodes
-                        inputPosition = InputNoninitial
-                        subtreePositionStack = SubtreeNonfinal :: state.subtreePositionStack
-                }
+                let nextState =
+                    buildStateMachine'
+                        { state with
+                            currentNodes = nodes
+                            inputPosition = InputNoninitial
+                            subtreePositionStack = SubtreeNonfinal :: state.subtreePositionStack }
                 let transitions =
                     [ From state.current, OnEpsilon, To terminator
                       From nextState.current, OnEpsilon, To terminator ]
@@ -327,24 +325,16 @@ module RuleCompiler =
                     current = terminator
                     subtreePositionStack = state.subtreePositionStack }
 
-            let matchDisjunctBranch nodes ((states, output, transitions, transformations, _)::_ as acc) = 
-                //let innerSubtreePosition =
-                //    match state.subtreePositionStack with
-                //    | SubtreeFinal::_ when state.AreAllSubtreesFinal ->
-                //        SubtreeFinal
-                //    | _ ->
-                //        SubtreeNonfinal
-                let { current = current; states = states; transitions = transitions; transformations = transformations } =
+            let matchDisjunctBranch nodes (branchState::_ as acc) = 
+                let nextState =
                     buildStateMachine'
                         { state with
                             current = state.current
-                            states = states
-                            input = nodes
-                            transitions = transitions
-                            transformations = transformations
-                            //subtreePositionStack = innerSubtreePosition :: state.subtreePositionStack
-                        }
-                (states, output, transitions, transformations, current) :: acc
+                            states = branchState.states
+                            currentNodes = nodes
+                            transitions = branchState.transitions
+                            transformations = branchState.transformations }
+                nextState :: acc
 
             /// Match exactly one of many sequences of nodes.
             let matchDisjunct branches =
@@ -356,10 +346,10 @@ module RuleCompiler =
                     List.foldBack
                         matchDisjunctBranch
                         branches
-                        [state.states, state.output, state.transitions, state.transformations, state.current]
+                        [ state ]
 
                 // Continue with the state of the last subtree built.
-                let (states, output, transitions, transformations, _)::_ = out
+                let state::_ = out
 
                 // Add epsilon transitions from the last state of each subtree to the terminator state.
                 // Reverse the list and take the tail first so we don't epsilon from current to terminator and match without consuming input.
@@ -367,7 +357,7 @@ module RuleCompiler =
                     out
                     |> Seq.rev
                     |> Seq.tail
-                    |> Seq.map (fun (_, _, _, _, subtreeFinal) -> From subtreeFinal, OnEpsilon, To terminator)
+                    |> Seq.map (fun state -> From state.current, OnEpsilon, To terminator)
                     |> List.ofSeq
 
                 let insertions =
@@ -380,13 +370,12 @@ module RuleCompiler =
 
                 { state with
                     current = terminator
-                    states = states
-                    output = output
-                    transitions = subtreeFinalToLastState @ transitions
-                    transformations = transformations @ insertions }
+                    outputNodes = output
+                    transitions = subtreeFinalToLastState @ state.transitions
+                    transformations = state.transformations @ insertions }
 
             let generatorState =
-                match state.input with
+                match state.currentNodes with
                 | [] ->
                     Done
                 | WordBoundaryNode::_ ->
@@ -404,28 +393,27 @@ module RuleCompiler =
                 | (DisjunctNode branches)::_ ->
                     HasNext (matchDisjunct branches)
                 | _ ->
-                    failwithf "Unexpected '%s'" (string state.input.Head)
+                    failwithf "Unexpected '%s'" (string state.currentNodes.Head)
 
             match generatorState with
             | Done ->
                 state
             | HasNext nextState ->
-                buildStateMachine' {
-                    nextState with
-                        input = List.tail state.input
-                        inputPosition = InputNoninitial
-                }
+                buildStateMachine'
+                    { nextState with
+                        currentNodes = List.tail state.currentNodes
+                        inputPosition = InputNoninitial }
 
         let initialState = {
             current = START
             states = Seq.initInfinite (sprintf "q%d" >> State.make)
-            input = environment
-            output = output
+            currentNodes = environment
+            outputNodes = output
             transitions = List.empty
             transformations = List.empty
             currentSection = EnvironmentSection
             inputPosition = InputInitial
-            subtreePositionStack = [if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal]
+            subtreePositionStack = [ if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal ]
             isPlaceholderNextStack = []
         }
 
@@ -435,15 +423,15 @@ module RuleCompiler =
 
         let dfaTransformations =
             dfa
-            |> List.choose (function
+            |> Seq.choose (function
                 | _, OutputDefault -> None
                 | t, output -> Some (t, output))
-            |> Map.ofList
+            |> Map.ofSeq
 
         let dfaTransitionTable =
             dfa
-            |> List.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
-            |> Map.ofList
+            |> Seq.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
+            |> Map.ofSeq
 
         dfaTransitionTable, dfaTransformations
 

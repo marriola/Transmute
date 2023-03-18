@@ -225,12 +225,10 @@ module internal DeterministicFiniteAutomaton =
                         (OutputDefault, dests)
                         ||> List.fold (fun out (_, result) ->
                             match out, result with
+                            | OutputDefault, (_ as result) ->
+                                result
                             | ReplacesWith (_, a), ReplacesWith (_, b) when a <> b ->
                                 failwithf "Merged state %O has multiple productions! (%O, %O)" mergedDest out result
-                            | OutputDefault, (ReplacesWith _ as result)
-                            | OutputDefault, (Inserts _ as result)
-                            | OutputDefault, (Deletes _ as result) ->
-                                result
                             | _ ->
                                 out)
                     (From current, on, To mergedDest), production)

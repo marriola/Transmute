@@ -54,6 +54,12 @@
     <Content Include="sample\ipa\test.sc">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
+    <Content Include="sample\x-sampa\protogermanic.txt">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Include="sample\x-sampa\westgermanic.sc">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
     <Content Include="sample\x-sampa\pie.txt">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>

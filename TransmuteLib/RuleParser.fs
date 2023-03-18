@@ -45,7 +45,7 @@ module RuleParser =
             | _ ->
                 tokens, None
 
-        /// Matches a token to one of a list of token types.
+        /// Matches a token to one of a list of token types, automatically skipping over any whitespace.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         /// <param name="tokenTypes">The list of valid token types.</param>
@@ -60,20 +60,43 @@ module RuleParser =
             | x::_ ->
                 unexpectedToken tokenTypes x
 
+        let matchUtteranceIdentifierNode (tokens: Token list) isPresent =
+            let rec inner last tokens out =
+                match tokens with
+                | [] ->
+                    failwith $"Expected segment or '/', got end of file at {last.position}"
+
+                | { tokenType = Whitespace } as token :: rest ->
+                    if token.value.Contains "\n" then
+                        failwith $"Expected segment or '/', got end of line at {token.position}"
+                    else
+                        inner token rest out
+
+                | { tokenType = Divider } :: rest ->
+                    rest, SegmentIdentifierNode (isPresent, List.rev out)
+
+                | { tokenType = Utterance } as token :: rest ->
+                    inner token rest (token.value :: out)
+
+                | token :: _ ->
+                    failwith $"Expected segment or '/', got {token} at {token.position}"
+
+            inner tokens[0] tokens[1..] []
+
         /// <summary>
         /// Matches a <see cref="FeatureIdentifierNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchFeatureIdentifierTerm tokens =
             let tokens, presence = matchOneOf tokens [ Plus; Minus ]
-            let tokens, term = matchOneOf tokens [ Id; Utterance ]
+            let rest, term = matchOneOf tokens [ Id; Divider ]
             let isPresent = presence.tokenType = Plus
-            let node =
+            let tokens, node =
                 match term with
                 | { tokenType = Id } ->
-                    FeatureIdentifierNode (isPresent, term.value)
-                | { tokenType = Utterance } ->
-                    UtteranceIdentifierNode (isPresent, term.value)
+                    rest, FeatureIdentifierNode (isPresent, term.value)
+                | { tokenType = Divider } ->
+                    matchUtteranceIdentifierNode tokens isPresent
             tokens, Node.tag node presence.position
 
         /// <summary>
