@@ -74,7 +74,9 @@ module Transducer =
                 | ReplacesWith (count, s) ->
                     let bufferLength = List.length value.production
                     let skip = min bufferLength count
-                    BufferString.coalesce (skip + 1) (Replaced (position, s, string symbol) :: value.production)
+                    let nextProduction = Replaced (position, s, string symbol) :: value.production
+                    BufferString.coalesce (skip + 1) nextProduction
+
                 | Inserts (s) ->
                     let production =
                         match value.production with
@@ -86,9 +88,18 @@ module Transducer =
                             underscore :: rest
                         | _ ->
                             value.production
+
                     Inserted (position + 1, s) :: Unchanged (position, string symbol) :: production
+
                 | Deletes (count, s) ->
-                    Deleted (position, count, string symbol) :: value.production
+                    let prefix, position, production =
+                        match value.production with
+                        | Deleted (firstPosition, _, s) :: rest ->
+                            s, firstPosition, rest
+                        | _ ->
+                            "", position, value.production
+
+                    Deleted (position, count, prefix + string symbol) :: production
 
             /// Returns a list of raw strings with replacements and insertions reversed.
             static member undo xs =
