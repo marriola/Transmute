@@ -33,6 +33,9 @@ type TokenType =
     /// A ')' token.
     | RParen
 
+    /// A '.' token.
+    | Separator
+
     /// A ',' token.
     | Comma
 

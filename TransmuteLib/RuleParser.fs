@@ -195,7 +195,8 @@ module RuleParser =
 
             let rec inner tokens out =
                 match tokens with
-                | OfType Empty _::xs ->
+                | OfType Empty _::xs
+                | OfType Separator _::xs ->
                     inner xs out
                 | NonNewlineWhitespace _::xs ->
                     inner xs out
@@ -322,7 +323,7 @@ module RuleParser =
                 let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
                 tokens, ruleNode
             | OfType Utterance _::xs ->
-                let tokens, ruleNode = matchRuleStartingWithIdentifier xs identifier
+                let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
                 tokens, ruleNode
             | [] ->
                 failwith "No more input"

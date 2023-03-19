@@ -29,6 +29,7 @@ module internal Lexer =
         | Q_RBrace
         | Q_LParen
         | Q_RParen
+        | Q_Separator
         | Q_Comma
         | Q_Divider
         | Q0
@@ -78,7 +79,7 @@ module internal Lexer =
 
             let identifierTransitions =
                 onMany
-                    [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' }; "." :> char seq ]
+                    [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' } ]
                     Q_Identifier
 
             let utteranceTransitions =
@@ -122,6 +123,7 @@ module internal Lexer =
 
                   makeTransitions (From START)
                     [ To Q_Comma, OnChar ','
+                      To Q_Separator, OnChar '.'
                       To Q_LBrack, OnChar '['
                       To Q_RBrack, OnChar ']'
                       To Q_LBrace, OnChar '{'
@@ -167,6 +169,7 @@ module internal Lexer =
         // Maps final states to a tuple of the token type to be produced and a function that modifies the token produced.
         let stateTokenTypes =
             [ Q_WhitespaceFinal, Whitespace.id
+              Q_Separator, Separator.id
               Q_Comma, Comma.id
               Q_LBrack, LBrack.id
               Q_RBrack, RBrack.id
