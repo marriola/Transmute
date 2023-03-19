@@ -401,6 +401,7 @@ module RuleCompiler =
             | HasNext nextState ->
                 buildStateMachine'
                     { nextState with
+                        isPlaceholderNextStack = List.tail nextState.isPlaceholderNextStack
                         currentNodes = List.tail state.currentNodes
                         inputPosition = InputNoninitial }
 
