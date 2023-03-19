@@ -73,8 +73,8 @@ $LARYNGEAL -> @
 
 ; Sievers' law
 
-/ i / [V-Long][C-/j/][C-/j/]([C-/j/])_j
-/ i / [V+Long][C-/j/]([C-/j/])([C-/j/])_j
+/ i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
+/ i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
 
 (j|w) // _(e|a|o)#
 (e|a|o) // $C_#
@@ -146,7 +146,6 @@ zm -> mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 
-e / i / $V([+Glide])($C)($C)_(#|$C)
 e / i / $V([+Glide])($C)($C)_(#|$C)
 (ei|ej) -> i:
 iji -> i:

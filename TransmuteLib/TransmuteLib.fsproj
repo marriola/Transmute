@@ -8,6 +8,7 @@
   <ItemGroup>
     <None Include="LICENSE" />
     <Compile Include="Properties\AssemblyInfo.fs" />
+    <Compile Include="Utils\Operators.fs" />
     <Compile Include="Utils\Cata.fs" />
     <Compile Include="BoundedList.fs" />
     <Compile Include="Position.fs" />

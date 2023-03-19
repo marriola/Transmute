@@ -12,7 +12,7 @@ type VerbosityLevel =
     | Silent
     | Normal
     | ShowTransformations
-    | ShowTimings
+    | ShowTimes
     | ShowDFA
     | ShowNFA
 
@@ -20,7 +20,7 @@ let verbosityLevels = dict [
     "0", Silent
     "1", Normal
     "2", ShowTransformations
-    "3", ShowTimings
+    "3", ShowTimes
     "4", ShowDFA
     "5", ShowNFA
 ]
@@ -28,8 +28,10 @@ let verbosityLevels = dict [
 type Options =
     { format: InputFormat
       lexiconFiles: string list
+      listRules: bool
       recompile: bool
       rulesFile: string
+      saveRules: bool
       verbosityLevel: VerbosityLevel
       testRules: int list option
       testWords: int list option }
@@ -37,8 +39,10 @@ type Options =
 let defaultOptions =
     { format = IPA
       lexiconFiles = []
+      listRules = false
       recompile = false
       rulesFile = null
+      saveRules = true
       verbosityLevel = Normal
       testRules = None
       testWords = None }
@@ -52,6 +56,14 @@ let parse (argv: string[]) =
         | "-l"::filename::xs
         | "--lexicon"::filename::xs ->
             parse' xs { options with lexiconFiles = filename :: options.lexiconFiles }
+
+        | "-lr"::xs
+        | "--list-rules"::xs ->
+            parse' xs { options with listRules = true }
+
+        | "-ns"::xs
+        | "--no-save"::xs ->
+            parse' xs { options with saveRules = false }
 
         | "-r"::filename::xs
         | "--rules"::filename::xs ->

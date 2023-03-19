@@ -57,6 +57,8 @@ A filename of `-` stands for standard input.
 | Switch                 | Short form | Description                                              |
 | -----------------------|------------|----------------------------------------------------------|
 | --lexicon FILE         | -l         | Load lexicon from FILE.                                  |
+| --list-rules           | -lr        | Print the numbered rule list and quit.                   |
+| --no-save              | -ns        | Don't save compiled rules.                               |
 | --rules FILE           | -r         | Load rules from FILE.                                    |
 | --recompile            | -rc        | Recompile rules file instead of loading compiled rules.  |
 | --show-transformations | -v 2       | Shows the result of each rule that applies to each word. |
@@ -204,7 +206,16 @@ In the simplest case, one phoneme out of a set can be matched using only its ide
 
     C → ∅ / _#
 
-If you need to use two identifiers in a row in a rule, you can separate them with spaces, as in `C C`.
+If you need to use two identifiers in a row in a rule, you can separate them with either ` ` or `.`. This isn't necessary in X-SAMPA mode since identifiers are already separated by `$`.
+
+    ; These are equivalent
+
+    t → ∅ / V.C(C)(C)V(C)(C)_#
+    t → ∅ / V C(C)(C)V(C)(C)_#
+
+    ; X-SAMPA version
+
+    t // $V$C($C)($C)$V($C)($C)_#
 
 #### Matching phonemes satisfying one or more characteristics
 

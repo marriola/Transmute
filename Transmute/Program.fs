@@ -28,12 +28,6 @@ let time fn =
     result, milliseconds
 
 let compileRules options features sets rules =
-    let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
-    let selectedRules =
-        options.testRules
-        |> Option.map (fun ruleNumbers -> indexedRules |> List.filter (fun (i, _) -> List.contains i ruleNumbers))
-        |> Option.defaultValue indexedRules
-
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
 
@@ -41,7 +35,7 @@ let compileRules options features sets rules =
 
     let rules, elapsed =
         time (fun () ->
-            selectedRules
+            rules
 #if DEBUG
             |> List.mapi
 #else
@@ -60,19 +54,28 @@ let compileRules options features sets rules =
 
     rules, elapsed
 
-let transform options rules word =
+let transformWord options rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
 
     let rec inner nextWord log totalTime rules =
         match rules with
         | [] ->
             word, nextWord, log, totalTime
+
         | (i, _, rule, _)::xs ->
-            let result, elapsed = time (fun () -> Transducer.transform showNfa rule nextWord)
+            let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa rule nextWord)
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
-                    log @ [ $"%7d{i}. %25s{nextWord} -> {result}" ]
+                    let mutable changeLine = Array.create nextWord.Length ' '
+
+                    for i in locations do
+                        changeLine[i] <- '^'
+
+                    log @ [
+                        $"%2d{i}. {result}"
+                        String.Join("", changeLine).PadLeft(4 + nextWord.Length)
+                    ]
                 else
                     log
 
@@ -81,8 +84,8 @@ let transform options rules word =
     inner word [] 0.0 rules
 
 let transformLexicon options rules lexicon =
-    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transform options rules word)
-    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transform options rules word)
+    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transformWord options rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transformWord options rules word)
 
 #if DEBUG
     let fTransform = transformSerial
@@ -115,11 +118,11 @@ let main argv =
                 else options.rulesFile + COMPILED_RULES_EXTENSION
 
         if options.recompile
+            || options.testRules <> None
             || options.rulesFile = "-"
             || not (File.Exists compiledFile)
-            || File.GetLastWriteTime options.rulesFile > File.GetLastWriteTime compiledFile
-            then
-                let result =
+            || File.GetLastWriteTime options.rulesFile > File.GetLastWriteTime compiledFile then
+                let parseResult =
                     if options.rulesFile = "-" then
                         let text = Console.In.ReadToEnd().Replace("\r", "\n")
                         RuleParser.parseRules options.format text
@@ -127,54 +130,66 @@ let main argv =
                         RuleParser.parseRulesFile options.format options.rulesFile
 
                 let features, sets, rules =
-                    match result with
+                    match parseResult with
                     | Ok (features, sets, rules) ->
                         features, sets, rules
                     | Result.Error msg ->
                         fprintfn stderr "%s" msg
                         exit 1
 
-                let rules, compileTime = compileRules options features sets rules
+                let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
 
-                if options.rulesFile <> "-" then
+                let selectedRules =
+                    options.testRules
+                    |> Option.map (List.map (fun i -> indexedRules[i - 1]))
+                    |> Option.defaultValue indexedRules
+
+                let rules, compileTime = compileRules options features sets selectedRules
+
+                if options.saveRules && options.testRules = None && options.rulesFile <> "-" then
                     RuleCompiler.saveCompiledRules compiledFile rules |> ignore
 
                 rules, compileTime
             else
                 time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
-    if options.verbosityLevel >= ShowTransformations then
+    // List selected rules
+
+    if options.listRules || options.verbosityLevel >= ShowTransformations then
         fprintfn stderr ""
 
-        rules
-        |> List.filter (fun (i, _, _, _) ->
-            match options.testRules with
-            | Some testRules -> List.contains i testRules
-            | None -> true)
-        |> List.iter (fun (i, node, rule, milliseconds) ->
-            if options.verbosityLevel >= ShowTimings then
+        for i, node, _, milliseconds in rules do
+            if options.verbosityLevel >= ShowTimes then
                 printf $"[%8s{formatTime milliseconds}] "
 
             printfn $"%2d{i}. {node}"
 
-            if options.verbosityLevel >= ShowDFA then
-                let transitions, transformations = rule
-                printfn $"\nRule {i}: {node}"
+        printfn ""
 
-                transitions
-                |> Map.toList
-                |> List.iteri (fun j ((fromState, m), toState) ->
-                    let t = $"({fromState}, {m})"
-                    printfn $"{j+1}.\t%-35s{t}-> {toState}")
+    if options.listRules then
+        exit 0
 
-                printfn "\ntransformations:"
+    // Dump rule DFAs
 
-                transformations
-                |> Map.toList
-                |> List.iteri (fun j ((From origin, input, To dest), result) ->
-                    printfn $"{j+1}. ({origin}, {input}) -> {dest} => {result}")
+    if options.verbosityLevel >= ShowDFA then
+        for i, node, rule, _ in rules do
+            let transitions, transformations = rule
+            printfn $"\nRule {i}: {node}"
 
-                printfn "\n********************************************************************************")
+            transitions
+            |> Map.toList
+            |> List.iteri (fun j ((fromState, m), toState) ->
+                let t = $"({fromState}, {m})"
+                printfn $"{j+1}.\t%-35s{t}-> {toState}")
+
+            printfn "\ntransformations:"
+
+            transformations
+            |> Map.toList
+            |> List.iteri (fun j ((From origin, input, To dest), result) ->
+                printfn $"{j+1}. ({origin}, {input}) -> {dest} => {result}")
+
+            printfn "\n********************************************************************************"
 
         printfn ""
 
@@ -208,17 +223,26 @@ let main argv =
         if options.verbosityLevel <= Normal then
             printfn "%s" result
         else
-            if options.verbosityLevel >= ShowTimings then
-                printf $"[%5.2f{milliseconds} ms] %23s{original} -> {result}\n"
-            else
-                printfn $"%34s{original} -> {result}"
+            if options.verbosityLevel = ShowTransformations then
+                printf "    "
+            elif options.verbosityLevel >= ShowTimes then
+                printf $"[%5.2f{milliseconds} ms] "
+            
+            printfn $"{original} -> {result}"
 
-            for line in log do
-                printfn "%s" line
+            if options.verbosityLevel >= ShowTransformations then
+                printfn ""
+
+                for line in log do
+                    if options.verbosityLevel >= ShowTimes then
+                        printf "       "
+                    printfn "%s" line
 
             printfn ""
 
-    if options.verbosityLevel >= ShowTimings then
+    // Time report
+
+    if options.verbosityLevel >= ShowTimes then
         let totalTransformMilliseconds =
             transformedLexicon
             |> Array.sumBy (fun (_, _, _, milliseconds) -> int milliseconds)
