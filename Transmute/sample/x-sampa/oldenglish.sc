@@ -4,7 +4,7 @@
 
 ; Nasal spirant law
 
-[+V]n -> [+Long +Nasalized] / _$FRICATIVE
+$V.n -> [+Long +Nasalized] / _$FRICATIVE
 
 (A~:|}~:) -> O~:
 

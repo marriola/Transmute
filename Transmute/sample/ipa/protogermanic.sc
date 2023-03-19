@@ -73,8 +73,8 @@ LARYNGEAL → ə
 
 ; Sievers' law
 
-;∅ → i / [V-Long][C-j][C-j]([C-j])_j    ; /i/ is getting inserted after /j/. is the transformation being applied to the right transition?
-;∅ → i / [V+Long]C(C)(C)_j
+∅ → i / [V-Long][C-/j/][C-/j/]([C-/j/])_j
+∅ → i / [V+Long][C-/j/]([C-/j/])([C-/j/])_j
 
 (j|w) → ∅ / _(e|a|o)#
 (e|a|o) → ∅ / C_#
@@ -116,7 +116,7 @@ g → ɣ / (#|LIQUID|[+Fricative])_
 
 ; Verner's law
 
-[+Fricative-Voiced] → [+Voiced] / [-Stressed-SONORANT](SONORANT)_(SONORANT)[+Stressed]
+[+Fricative-Voiced] → [+Voiced] / (C|#)[-Stressed-SONORANT](SONORANT)_(#|V|[+Overlong]|[+Stressed]|[+Voiced])
 
 ; Undo Verner's law after voiceless consonants and before voiceless stops
 
@@ -149,7 +149,8 @@ zm → mm
 e → i / V([+Glide])(C)(C)_(#|C)
 e → i / V([+Glide])(C)(C)_(#|C)
 (ei|ej) → iː
-ij(i) → iː
+iji → iː
+ij → iː / _(C|#)
 iːi → iː
 
 ; TODO: on error, allow the machine to jump to another branch (e.g. from C to _) if that one is capable of matching the input
@@ -314,6 +315,7 @@ C (DENTAL, LABIAL, VELAR, SONORANT, LIQUID, Glide, NASAL, LARYNGEAL, SIBILANT)
     s → z
     dʰ
     θ → ð
+    SONORANT
 )
 
 [Palatalized] (

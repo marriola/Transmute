@@ -73,8 +73,8 @@ $LARYNGEAL -> @
 
 ; Sievers' law
 
-;/ i / [V-Long]$C $C($C)_j
-;/ i / [V+Long]$C($C)($C)_j
+/ i / [V-Long][C-/j/][C-/j/]([C-/j/])_j
+/ i / [V+Long][C-/j/]([C-/j/])([C-/j/])_j
 
 (j|w) // _(e|a|o)#
 (e|a|o) // $C_#
@@ -116,7 +116,7 @@ g -> G / (#|$LIQUID|[+Fricative])_
 
 ; Verner's law
 
-[+Fricative-Voiced] -> [+Voiced] / [-Stressed-SONORANT]($SONORANT)_($SONORANT)[+Stressed]
+[+Fricative-Voiced] -> [+Voiced] / ($C|#)[-Stressed-SONORANT]($SONORANT)_(#|$V|[+Overlong]|[+Stressed]|[+Voiced])
 
 ; Undo Verner's law after voiceless consonant
 
@@ -149,7 +149,8 @@ zm -> mm
 e / i / $V([+Glide])($C)($C)_(#|$C)
 e / i / $V([+Glide])($C)($C)_(#|$C)
 (ei|ej) -> i:
-ij(i) -> i:
+iji -> i:
+ij -> i: / _(C|#)
 i:i -> i:
 
 ; TODO: on error, allow the machine to jump to another branch (e.g. from C to _) if that one is capable of matching the input
@@ -314,6 +315,7 @@ $C ($DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, [+Glide] $NASAL, $LARYNGEAL, $
     s -> z
     d_h
     T -> D
+    $SONORANT
 )
 
 [Palatalized] (

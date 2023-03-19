@@ -42,7 +42,6 @@ w"rmis
 d_hr"og_honom
 spr"egonom
 lipj"onom
-kowsj"onom
 Xk'Xowsj"onom
 b_h"end_honom
 XpX_w"el?nonom
@@ -68,3 +67,5 @@ s"e?mo:
 d_hews"om
 Xok'j"eX
 kn"udes
+s"eXgjonom
+s"eXgtom

@@ -4,7 +4,7 @@ brO:Te:r
 sweste:r
 su:nuz
 duxte:r
-leGiTi
+leGiDi
 AjnAz
 AjnO:
 AjnA~
@@ -42,7 +42,7 @@ wurmiz
 drAGAnA~
 sprekAnA~
 liBjAnA~
-xAwzjAnA~
+xAwzijAnA~
 bindAnA~
 p\AllAnA~
 tungwO~:
@@ -67,3 +67,5 @@ se:mO::
 dewzA~
 AGjO:
 xnutiz
+sO:kijAnA~
+sO:xtA~

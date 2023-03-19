@@ -4,7 +4,7 @@
 
 ; Nasal spirant law
 
-[+V]n → [+Nasalized +Long] / _FRICATIVE
+V n → [+Nasalized +Long] / _FRICATIVE
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
