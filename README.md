@@ -252,6 +252,12 @@ More concretely, given the following sets and features
         s
     )
 
+By starting with the set `Stop` and removing all phonemes that are `Voiced` (/b d g gʷ/), we can write a rule that affects only the voiceless stops /p t k kʷ/ː
+
+    ; Grimm's law for voiceless consonants
+    
+    [Stop-Voiced] → [+Fricative]
+
 You can also construct a set, and then remove specific segments from it:
 
     ; /u/ becomes /o/ before any consonant but /n/
@@ -263,12 +269,6 @@ You can also construct a set out of only segments:
     ; Delete final /ɑ ɑ̃/
 
     [+/ɑ ɑ̃/] → ∅ / _#
-
-By starting with the set `Stop` and removing all phonemes that are `Voiced` (/b d g gʷ/), we can write a rule that affects only the voiceless stops /p t k kʷ/ː
-
-    ; Grimm's law for voiceless consonants
-    
-    [Stop-Voiced] → [+Fricative]
 
 #### Transforming a sound by changing features
 
