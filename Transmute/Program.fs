@@ -55,27 +55,36 @@ let compileRules options features sets rules =
     rules, elapsed
 
 let getIpaChangeLine ruleNum (changes: int list) (result: string) =
-    // Add zero-width space for deletions at the end
-    let result = result + "\u200b" |> List.ofSeq
+    let result = result |> List.ofSeq
     
-    // Insert a combining long underline at each change
-    let outChars =
+    // Insert a combining long underline after each change, but if there's a deletion at the end, put a regular underscore there
+    let deletionAtEnd, changes =
         changes
         |> List.rev
-        |> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result) result
+        |> List.partition ((<=) result.Length)
+    let outChars =
+        let chars =
+            (result, changes)
+            ||> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result)
+        if List.isEmpty deletionAtEnd then
+            chars
+        else
+            chars @ ['_']
 
     let out = String.Join("", outChars)
+
     [ $"%2d{ruleNum}. {out}" ]
 
 let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
-    let mutable changeLine = Array.create (result.Length * 2) ' '
+    let maxIndex = List.max changes + 1
 
-    for i in changes do
-        changeLine[i] <- '^'
+    let changeLine =
+        Array.create maxIndex ' '
+        |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
 
     [
         $"%2d{ruleNum}. {result}"
-        "    " + String.Join("", changeLine)//.PadLeft(4 + nextWord.Length)
+        "    " + String.Join("", changeLine)
     ]
 
 let transformWord options rules word =
