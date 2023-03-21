@@ -46,6 +46,12 @@ module Transducer =
                 | Replaced (_, _, original) ->
                     original
 
+            static member getLengthDifference = function
+                | Unchanged _ -> 0
+                | Inserted (_, s) -> s.Length
+                | Deleted (_, _, s) -> -(s.Length)
+                | Replaced (_, replacement, original) -> replacement.Length - original.Length
+
             /// Replaces the original symbol.
             static member withText (text: string) = function
                 | Unchanged (p, _) -> Unchanged (p, text)
@@ -72,14 +78,14 @@ module Transducer =
             static member addProduction position value symbol production =
                 match production with
                 | ReplacesWith (count, s) ->
-                    let bufferLength = List.length value.production
+                    let bufferLength = List.length value.buffer
                     let skip = min bufferLength count
-                    let nextProduction = Replaced (position, s, string symbol) :: value.production
+                    let nextProduction = Replaced (position, s, string symbol) :: value.buffer
                     BufferString.coalesce (skip + 1) nextProduction
 
                 | Inserts (s) ->
-                    let production =
-                        match value.production with
+                    let buffer =
+                        match value.buffer with
                         | Inserted _ :: rest ->
                             // Drop insertion from an incomplete application
                             rest
@@ -87,19 +93,19 @@ module Transducer =
                             // Same as above, but preserve intervening X-SAMPA underscore
                             underscore :: rest
                         | _ ->
-                            value.production
+                            value.buffer
 
-                    Inserted (position + 1, s) :: Unchanged (position, string symbol) :: production
+                    Inserted (position + 1, s) :: Unchanged (position, string symbol) :: buffer
 
                 | Deletes (count, s) ->
-                    let prefix, position, production =
-                        match value.production with
+                    let prefix, position, buffer =
+                        match value.buffer with
                         | Deleted (firstPosition, _, s) :: rest ->
                             s, firstPosition, rest
                         | _ ->
-                            "", position, value.production
+                            "", position, value.buffer
 
-                    Deleted (position, count, prefix + string symbol) :: production
+                    Deleted (position, count, prefix + string symbol) :: buffer
 
             /// Returns a list of raw strings with replacements and insertions reversed.
             static member undo xs =
@@ -141,17 +147,30 @@ module Transducer =
                         |> List.rev
                         |> String.concat ""
                     // Add the updated head and skip the strings we just processed
+                    let offset =
+                        let headText = BufferString.getText xs[0]
+                        if ysText.StartsWith headText then headText.Length else 0
                     let head =
-                        xs
-                        |> List.head
+                        xs[0]
                         |> BufferString.withText ysText
-                        |> BufferString.withPosition lastPosition
+                        |> BufferString.withPosition (lastPosition + offset)
                     head :: List.skip n xs
 
-            static member getChangeLocations xs =
-                xs
-                |> List.filter BufferString.isMutation
-                |> List.map BufferString.getPosition
+            static member getChangeLocations offset xs =
+                // Get a list of change locations and the difference in the length of the string caused by each change,
+                // then compute a running total of the differences and add them to the position of each change as we go
+                // through the list.
+                let totalDifference, changes =
+                    xs
+                    |> List.filter BufferString.isMutation
+                    |> List.map (fun bs -> BufferString.getPosition bs, BufferString.getLengthDifference bs)
+                    |> List.rev
+                    |> List.fold (fun (totalDifference, acc) (position, difference) ->
+                        let acc = (position + offset + totalDifference) :: acc
+                        let totalDifference = totalDifference + difference
+                        totalDifference, acc) (0, [])
+
+                offset + totalDifference, changes
 
     and internal RuleMachineState = {
         /// Indicates whether the rule has begun to match to the input.
@@ -163,8 +182,12 @@ module Transducer =
         /// Locations where the rule applied to the word.
         locations: int list
 
+        /// The total difference in the length of the string accumulated from the committed changes so far.
+        /// This is used to keep change locations accurate as characters get inserted and removed.
+        locationOffset: int
+
         /// The current production.
-        production: BufferString list
+        buffer: BufferString list
 
         /// The output buffer.
         output: string list
@@ -194,9 +217,10 @@ module Transducer =
         |> withInitialValue
             { isPartialMatch = false
               wasLastFinal = false
+              locationOffset = 0
               locations = []
               output = []
-              production = [] }
+              buffer = [] }
         |> onError (fun position input current value _ ->
             let position = position - 1
 
@@ -204,21 +228,23 @@ module Transducer =
                 if value.isPartialMatch then
                     if value.wasLastFinal then
                         // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
-                        BufferString.apply value.production @ value.output
+                        BufferString.apply value.buffer @ value.output
                     else
                         // The rule failed to match
-                        BufferString.undo value.production @ value.output
-                // The rule has not yet begun to match.
-                elif input <> Special.START && input <> Special.END then
-                    string input :: value.output
+                        BufferString.undo value.buffer @ value.output
                 else
-                    value.output
+                    // The rule has not yet begun to match.
+                    if input <> Special.START && input <> Special.END then
+                        string input :: value.output
+                    else
+                        value.output
 
-            let nextLocations =
+            let nextOffset, nextLocations =
                 if reportChangeLocations && value.isPartialMatch && value.wasLastFinal then
-                    value.locations @ BufferString.getChangeLocations value.production
+                    let nextOffset, changes = BufferString.getChangeLocations value.locationOffset value.buffer
+                    nextOffset, value.locations @ changes
                 else
-                    value.locations
+                    value.locationOffset, value.locations
 
             if verbose then
                 let nextOutputStr = nextOutput |> List.rev |> List.map string |> String.concat ""
@@ -229,11 +255,12 @@ module Transducer =
                 value with
                     isPartialMatch = false
                     locations = nextLocations
-                    production = []
+                    locationOffset = nextOffset
+                    buffer = []
                     output = nextOutput
             })
         |> onTransition (fun position transition _ symbol current nextState value ->
-            let { production = production; output = output } = value
+            let { buffer = production; output = output } = value
             let position = position - 1
             if verbose then
                 printf $" • %2d{position} %c{symbol}: "
@@ -252,16 +279,18 @@ module Transducer =
                 let nextOutputStr = output |> List.rev |> List.map string |> String.concat ""
                 let nextProductionStr = nextProduction |> List.rev |> List.map string |> String.concat " "
                 printfn $"%-34s{transition} | %-20s{nextOutputStr} {nextProductionStr}"
+
             { value with
                 isPartialMatch = true
                 wasLastFinal = isNextFinal
-                production = nextProduction })
+                buffer = nextProduction })
         |> onFinish (fun value ->
             // Flush last production
             let outputBuffer, locations =
                 if value.wasLastFinal then
-                    let out = BufferString.apply value.production @ value.output
-                    let locations = value.locations @ BufferString.getChangeLocations value.production
+                    let out = BufferString.apply value.buffer @ value.output
+                    let _, changes = BufferString.getChangeLocations value.locationOffset value.buffer
+                    let locations = value.locations @ changes
                     out, locations
                 else
                     value.output, value.locations

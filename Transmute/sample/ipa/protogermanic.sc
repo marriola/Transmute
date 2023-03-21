@@ -147,6 +147,7 @@ zm → mm
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 
 e → i / V([+Glide])(C)(C)_(#|C)
+e → i / V([+Glide])(C)(C)_(#|C)
 (ei|ej) → iː
 iji → iː
 ij → iː / _(C|#)
