@@ -218,27 +218,35 @@ let main argv =
     // Transform lexicon and report
 
     let transformedLexicon, totalMilliseconds = transformLexicon options rules (Array.ofList lexicon)
+    let outputStream =
+        match options.outputFile with
+        | None -> Console.Out
+        | Some path -> new StreamWriter(path)
 
     for original, result, log, milliseconds in transformedLexicon do
         if options.verbosityLevel <= Normal then
-            printfn "%s" result
+            fprintfn outputStream "%s" result
         else
             if options.verbosityLevel = ShowTransformations then
-                printf "    "
+                fprintf outputStream "    "
             elif options.verbosityLevel >= ShowTimes then
-                printf $"[%5.2f{milliseconds} ms] "
+                fprintf outputStream $"[%5.2f{milliseconds} ms] "
             
-            printfn $"{original} -> {result}"
+            fprintfn outputStream $"{original} -> {result}"
 
             if options.verbosityLevel >= ShowTransformations then
-                printfn ""
+                fprintfn outputStream ""
 
                 for line in log do
                     if options.verbosityLevel >= ShowTimes then
-                        printf "       "
-                    printfn "%s" line
+                        fprintf outputStream "       "
+                    fprintfn outputStream "%s" line
 
-            printfn ""
+            fprintfn outputStream ""
+
+    if options.outputFile <> None then
+        outputStream.Flush()
+        outputStream.Close()
 
     // Time report
 

@@ -29,6 +29,7 @@ type Options =
     { format: InputFormat
       lexiconFiles: string list
       listRules: bool
+      outputFile: string option
       recompile: bool
       rulesFile: string
       saveRules: bool
@@ -40,6 +41,7 @@ let defaultOptions =
     { format = IPA
       lexiconFiles = []
       listRules = false
+      outputFile = None
       recompile = false
       rulesFile = null
       saveRules = true
@@ -64,6 +66,10 @@ let parse (argv: string[]) =
         | "-ns"::xs
         | "--no-save"::xs ->
             parse' xs { options with saveRules = false }
+
+        | "-o"::path::xs
+        | "--out"::path::xs ->
+            parse' xs { options with outputFile = Some path }
 
         | "-r"::filename::xs
         | "--rules"::filename::xs ->
