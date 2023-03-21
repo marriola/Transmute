@@ -54,6 +54,30 @@ let compileRules options features sets rules =
 
     rules, elapsed
 
+let getIpaChangeLine ruleNum (changes: int list) (result: string) =
+    // Add zero-width space for deletions at the end
+    let result = result + "\u200b" |> List.ofSeq
+    
+    // Insert a combining long underline at each change
+    let outChars =
+        changes
+        |> List.rev
+        |> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result) result
+
+    let out = String.Join("", outChars)
+    [ $"%2d{ruleNum}. {out}" ]
+
+let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
+    let mutable changeLine = Array.create (result.Length * 2) ' '
+
+    for i in changes do
+        changeLine[i] <- '^'
+
+    [
+        $"%2d{ruleNum}. {result}"
+        "    " + String.Join("", changeLine)//.PadLeft(4 + nextWord.Length)
+    ]
+
 let transformWord options rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
 
@@ -67,15 +91,10 @@ let transformWord options rules word =
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
-                    let mutable changeLine = Array.create nextWord.Length ' '
-
-                    for i in locations do
-                        changeLine[i] <- '^'
-
-                    log @ [
-                        $"%2d{i}. {result}"
-                        String.Join("", changeLine).PadLeft(4 + nextWord.Length)
-                    ]
+                    if options.format = IPA then
+                        log @ getIpaChangeLine i locations result
+                    else
+                        log @ getXsampaChangeLine i locations result
                 else
                     log
 
