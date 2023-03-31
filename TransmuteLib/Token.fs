@@ -69,6 +69,9 @@ type TokenType =
     /// A '!' token.
     | Not
 
+    /// A '=' token.
+    | Equals
+
     /// An identifier token.
     | Id
 

@@ -15,7 +15,9 @@ module RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
 
-    type CompiledRule = TransitionTable<State> * Map<Transition<State>, TransitionResult>
+    type CompiledRule = TransitionTable * Map<Transition, TransitionResult>
+
+    type SyllableRule = TransitionTable * Map<Transition, char>
 
     type private InputPosition =
         | InputInitial
@@ -43,10 +45,10 @@ module RuleCompiler =
         outputNodes: Node list
 
         /// Accumulates key-value pairs that will create the transition table.
-        transitions: Transition<State> list
+        transitions: Transition list
 
         /// Accumulates transformations produced by matching transitions.
-        transformations: (Transition<State> * TransitionResult) list
+        transformations: (Transition * TransitionResult) list
 
         /// Specifies the rule section being compiled (environment or placeholder).
         currentSection: RuleSection
@@ -69,7 +71,7 @@ module RuleCompiler =
         | HasNext of NFAState
         | Done
 
-    let private buildStateMachine (features: Map<string, Node>) sets input output environment showNfa =
+    let private buildNfa showNfa statePrefix (features: Map<string, Node>) sets start input output environment =
         let takeState (states: State seq) =
             Seq.tail states, Seq.head states
 
@@ -392,8 +394,8 @@ module RuleCompiler =
                     HasNext (matchOptional children)
                 | (DisjunctNode branches)::_ ->
                     HasNext (matchDisjunct branches)
-                | _ ->
-                    failwithf "Unexpected '%s'" (string state.currentNodes.Head)
+                | x::_ ->
+                    failwithf $"Unexpected {x}"
 
             match generatorState with
             | Done ->
@@ -406,12 +408,12 @@ module RuleCompiler =
                         inputPosition = InputNoninitial }
 
         let initialState = {
-            current = START
-            states = Seq.initInfinite (sprintf "q%d" >> State.make)
+            current = start
+            states = Seq.initInfinite (string >> (+) statePrefix >> State.make)
             currentNodes = environment
             outputNodes = output
-            transitions = List.empty
-            transformations = List.empty
+            transitions = []
+            transformations = []
             currentSection = EnvironmentSection
             inputPosition = InputInitial
             subtreePositionStack = [ if List.isEmpty environment then SubtreeNonfinal else SubtreeFinal ]
@@ -420,7 +422,55 @@ module RuleCompiler =
 
         let { transitions = transitions; transformations = transformations } = buildStateMachine' initialState
 
-        let dfa = DeterministicFiniteAutomaton.fromNfa START ERROR (List.rev transitions) transformations showNfa
+        transitions, transformations
+
+    let joinNfas sOnset sNucleus sCoda (nfas: Map<State * InputSymbol, State> list) =
+        let transitions = nfas |> List.collect (Map.toList)
+
+        let finalStates =
+            nfas
+            |> List.map (fun table ->
+                table
+                |> Map.toList
+                |> List.choose (fun (_, dest) -> if State.isFinal dest then Some dest else None)
+                |> List.distinct)
+            |> List.ofSeq
+        
+        let onsetToNucleus = finalStates[0] |> List.map (fun s -> (s, OnEpsilon), sNucleus)
+        let nucleusToCoda = finalStates[1] |> List.map (fun s -> (s, OnEpsilon), sCoda)
+        let codaToOnset = finalStates[2] |> List.map (fun s -> (s, OnEpsilon), sOnset)
+        
+        let transitions = transitions @ onsetToNucleus @ nucleusToCoda |> Map.ofList
+
+        let onsetTransformations = nfas[0] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'O')
+        let nucleusTransformations = nfas[1] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'N')
+        let codaTransformations = nfas[2] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'C')
+        let transformations = Map.ofList (onsetTransformations @ nucleusTransformations @ codaTransformations)
+
+        transitions, transformations
+
+    let keepAsNfa showNfa (transitions, transformations) =
+        let dfaTransitionTable =
+            transitions
+            |> Seq.map (fun (From origin, input, To dest) -> (origin, input), dest)
+            |> Map.ofSeq
+
+        let dfaTransformations =
+            transformations
+            |> Seq.choose (function
+                | _, OutputDefault -> None
+                | t, output -> Some (t, output))
+            |> Map.ofSeq
+
+        dfaTransitionTable, dfaTransformations
+
+    let toDfa showNfa start (transitions, transformations) =
+        let dfa = DeterministicFiniteAutomaton.fromNfa start ERROR (List.rev transitions) transformations showNfa
+
+        let dfaTransitionTable =
+            dfa
+            |> Seq.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
+            |> Map.ofSeq
 
         let dfaTransformations =
             dfa
@@ -429,38 +479,56 @@ module RuleCompiler =
                 | t, output -> Some (t, output))
             |> Map.ofSeq
 
-        let dfaTransitionTable =
-            dfa
-            |> Seq.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
-            |> Map.ofSeq
-
         dfaTransitionTable, dfaTransformations
 
     /// <summary>
-    /// Compiles a Mealy machine from a phonological rule.
+    /// Compiles a finite state transducer from a phonological rule.
     /// The resulting state machine can be passed into <see cref="RuleMachine.transform" /> to apply the rule to a word.
     /// </summary>
-    let compile showNfa features sets rule : CompiledRule =
+    let compileRule showNfa features sets rule : CompiledRule =
         match Node.untag rule with
         | RuleNode (input, output, environment) ->
             let input = Node.untagAll input
             let output = Node.untagAll output
             let environment = Node.untagAll environment
-            buildStateMachine features sets input output environment showNfa
+            buildNfa showNfa "q" features sets START input output environment
+            |> toDfa showNfa START
         | _ ->
             invalidArg "rule" "Must be a RuleNode"
 
+    let toList (transitions, transformations) =
+        let transitions =
+            transitions
+            |> Seq.map (fun (From origin, input, To dest) -> (origin, input), dest)
+            |> Map.ofSeq
+        transitions, transformations
+
+    /// Compiles a finite state transducer from a set of syllable definition rules.
+    let compileSyllableRule showNfa features sets rule : SyllableRule =
+        match rule with
+        | SyllableDefinitionNode (onset, nucleus, coda) ->
+            let S_ONSET = State.make "S_onset"
+            let S_NUCLEUS = State.make "S_nucleus"
+            let S_CODA = State.make "S_coda"
+            let onset, _ = Node.untagAll onset |> buildNfa showNfa "o" features sets S_ONSET [] [] |> toList
+            let nucleus, _ = Node.untagAll nucleus |> buildNfa showNfa "n" features sets S_NUCLEUS [] [] |> toList
+            let coda, _ = Node.untagAll coda |> buildNfa showNfa "c" features sets S_CODA [] [] |> toList
+            [ onset; nucleus; coda ]
+            |> joinNfas S_ONSET S_NUCLEUS S_CODA
+        | _ ->
+            invalidArg "rule" "Must be a SyllableDefinitionNode"
+
     let compileRules showNfa features sets rules =
         rules
-        |> List.map (fun rule -> compile showNfa features sets rule)
+        |> List.map (fun rule -> compileRule showNfa features sets rule)
 
     let compileRulesParallel showNfa features sets rules =
         rules
         |> Array.ofList
 #if DEBUG
-        |> Array.mapi (fun i rule -> compile showNfa features sets rule)
+        |> Array.mapi (fun i rule -> compileRule showNfa features sets rule)
 #else
-        |> Array.Parallel.mapi (fun i rule -> compile showNfa features sets rule)
+        |> Array.Parallel.mapi (fun i rule -> compileRule showNfa features sets rule)
 #endif
         |> Array.toList
 

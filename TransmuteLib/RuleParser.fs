@@ -195,23 +195,23 @@ module RuleParser =
 
             let rec inner tokens out =
                 match tokens with
-                | OfType Empty _::xs
-                | OfType Separator _::xs ->
+                | OfType Empty _ :: xs
+                | OfType Separator _ :: xs ->
                     inner xs out
-                | NonNewlineWhitespace _::xs ->
+                | NonNewlineWhitespace _ :: xs ->
                     inner xs out
-                | OfType Id x::xs ->
+                | OfType Id x :: xs ->
                     inner xs (Node.tag (SetIdentifierNode x.value) x.position :: out)
-                | OfType Utterance x::xs ->
+                | OfType Utterance x :: xs ->
                     inner xs (Node.tag (UtteranceNode x.value) x.position :: out)
-                | OfType Placeholder x::xs ->
+                | OfType Placeholder x :: xs ->
                     inner xs (Node.tag PlaceholderNode x.position :: out)
-                | OfType WordBoundary x::xs ->
+                | OfType WordBoundary x :: xs ->
                     inner xs (Node.tag WordBoundaryNode x.position :: out)
-                | OfType LBrack x::xs ->
+                | OfType LBrack x :: xs ->
                     let tokens, setIdentifier = matchSetIdentifier xs x.position
                     inner tokens (setIdentifier :: out)
-                | OfType LParen _::_ ->
+                | OfType LParen _ :: _ ->
                     let tokens, optional = matchOptional_Disjunct tokens
                     inner tokens (optional :: out)
                 | _ ->
@@ -304,6 +304,51 @@ module RuleParser =
             | _ ->
                 invalidSyntax "Expected a rule" _position
 
+        let matchAssignment tokens =
+            let tokens, identifier = matchToken tokens Id
+            let tokens, _ = matchToken tokens Equals
+            let tokens, nodes = matchRuleSection tokens
+            tokens, identifier.value, nodes
+
+        let matchSyllableDefinition tokens =
+            let rec inner tokens out =
+                match tokens with
+                | []
+                | OfType RParen _ :: _->
+                    tokens, List.rev out
+                | OfType Comment _ :: xs
+                | OfType Whitespace _ :: xs ->
+                    inner xs out
+                | OfType Id _ :: _ ->
+                    let xs, name, nodes = matchAssignment tokens
+                    inner xs ((name, nodes) :: out)
+                | token::_ ->
+                    invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda'; got {token}" _position
+
+            let tokens, _ = matchToken tokens LParen
+            let tokens, parts = inner tokens []
+            let tokens, _ = matchToken tokens RParen
+
+            let parts =
+                parts
+                |> List.groupBy fst
+                |> List.map (fun (key, parts) ->
+                    match parts with
+                    | [] -> key, []
+                    | [_, nodes] -> key, nodes
+                    | _ -> 
+                        let disjunctNode =
+                            parts
+                            |> List.map (fun (_, nodes) -> nodes)
+                            |> DisjunctNode
+                        key, [ disjunctNode ])
+
+            let onset = List.find (fst >> (=) "Onset") parts |> snd
+            let nucleus = List.find (fst >> (=) "Nucleus") parts |> snd
+            let coda = List.find (fst >> (=) "Coda") parts |> snd
+
+            tokens, SyllableDefinitionNode (onset, nucleus, coda)
+
         /// <summary>
         /// Matches either a set or a rule.
         /// </summary>
@@ -312,6 +357,8 @@ module RuleParser =
             match tokens with
             | OfType Whitespace _::xs ->
                 matchSet_Rule xs identifier
+            | xs when identifier.value = "Syllable" ->
+                matchSyllableDefinition xs
             | OfType LParen openToken::xs
             | OfType LBrace openToken::xs ->
                 // TODO: include members of other sets
@@ -431,6 +478,10 @@ module RuleParser =
             | x::_ ->
                 unexpectedToken [ Plus; Minus; Id ] x
 
+        let matchSyllableRule tokens =
+            let tokens, _ = matchToken tokens Equals
+            matchRuleSection tokens
+
         /// <summary>
         /// Determines which rule to match to the available tokens.
         /// </summary>
@@ -500,6 +551,7 @@ module RuleParser =
             |> Result.bind SyntaxAnalyzer.validate
             |> Result.bind (Node.untagAll >> Ok)
 
+        let syllableDefinition = Result.map (List.tryFind (function SyllableDefinitionNode _ -> true | _ -> false)) nodes
         let features = Result.map Node.getFeatures nodes
         let sets = Result.map Node.getSets nodes
 
@@ -509,12 +561,13 @@ module RuleParser =
                 | RuleNode _ as x -> Some x
                 | _ -> None))
 
-        match features, sets, rules with
-        | _, _, (Result.Error msg)
-        | _, (Result.Error msg), _
-        | (Result.Error msg), _, _ ->
+        match syllableDefinition, features, sets, rules with
+        | _, _, _, (Result.Error msg)
+        | _, _, (Result.Error msg), _
+        | _, (Result.Error msg), _, _
+        | (Result.Error msg), _, _, _ ->
             Result.Error msg
-        | (Ok features), (Ok sets), (Ok rules) ->
+        | Ok (syllableDefinition), (Ok features), (Ok sets), (Ok rules) ->
             // Resolve references to other sets and features
             let resolvedFeatures =
                 features
@@ -528,7 +581,7 @@ module RuleParser =
                 |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
                 |> Map.ofList
 
-            Ok (resolvedFeatures, resolvedSets, rules)
+            Ok (syllableDefinition, resolvedFeatures, resolvedSets, rules)
 
 #if !FABLE_COMPILER
     let parseRulesStreamReader inputFormat (reader: StreamReader) =

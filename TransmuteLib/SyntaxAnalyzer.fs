@@ -63,14 +63,22 @@ module internal SyntaxAnalyzer =
         validateInternal nodes None
 
     let private environmentNodeMustHavePlaceholderIfNotEmpty nodes result =
-        if List.isEmpty nodes then
-            Ok result
-        elif nodes |> List.exists isPlaceholder then
-            Ok result
-        else
-            match nodes with
-            | TaggedNode (position, _)::_ ->
-                Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
+        let rec inner nodes =
+            if List.isEmpty nodes then
+                Ok result
+            elif nodes |> List.exists isPlaceholder then
+                Ok result
+            else
+                match nodes with
+                | TaggedNode (_, OptionalNode children)::[] ->
+                    inner children
+                | TaggedNode (position, DisjunctNode branches)::[] ->
+                    match List.tryFind (inner >> Result.isOk) branches with
+                    | Some _ -> Ok result
+                    | None -> Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
+                | TaggedNode (position, _)::_ ->
+                    Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
+        inner nodes
 
     let private optionalNodeMayNotBeEmpty nodes result =
         let rec validateInternal (nodes: Node list) =

@@ -37,9 +37,7 @@ type State =
         /// or throws an exception if given a merged state.
         static member ord = function
             | State (name, _) ->
-                match name.[1..] with
-                | "" -> -1
-                | x -> int x
+                if name.StartsWith "S" then -1 else int name[1..]
             | MergedState _ ->
                 failwith "Merged states have no ordinal"
 

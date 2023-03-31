@@ -12,16 +12,22 @@ A(i|j) -> A:
 
 ; Anglo-Frisian brightening
 
-A -> } / _$C
+A -> } / _[C-/m n/]($C)($C)([V+Front])
 }~ -> A~
-} -> A / _$C($C)($C)[V-Front]
-} -> A / _$C($C)($C)[V-Front]
+
+; Undo before syllable with back vowel
+;} -> A / _$C($C)($C)[V-Front]
+
+; Re-undo before velar consonant
+A -> } / _(x|w|r$C|l$C)
 
 [+/} A A~/] // _#
 
 ;;;;;;;;;;;;;;;;;;;
 ;   Old English   ;
 ;;;;;;;;;;;;;;;;;;;
+
+x -> h / (#_ | _$V)
 
 [+Nasalized] -> [-Nasalized]
 
@@ -37,11 +43,11 @@ A -> } / _$C
 
 ; A-restoration
 
-} -> A / _[+Geminate]
+} -> A / _[+Geminate]( [C-/j/][V-Front] | # )
 
 ; Palatalization of velars
 
-[Palatalized] (k -> tS, g -> dZ)
+[Palatalized] (k -> tS, g -> dZ, gg -> dZ)
 [-Palatalized] -> [+Palatalized] / _(i(:)|j)
 [-Palatalized] -> [+Palatalized] / i: _ ($C|#)
 G -> j\ / [V+Front]_
@@ -50,9 +56,12 @@ sk -> S
 
 ; ...
 
-[-Front] -> [+Front] / _$C($C)($C)(i|j)
+[-Front] -> [+Front] / _[C-/j/]([C-/j/])([C-/j/])(i|j)
 
 (i|u) // (:|$C)$C_#
+
+(i)j // [V+Long+/}A eo iy }A: eo: iy:/]$C($C)($C)_
+(i)j // [V-Long+/}A eo iy/]$C$C($C)($C)_
 
 j\ -> j
 j // $C_#
@@ -66,6 +75,8 @@ u ͏-> o / _$C($C)($C)#
 2 -> e
 iu -> eo
 G -> g / #_
+
+[FRICATIVE+Voiced] -> [-Voiced] / _#
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,11 +93,18 @@ $AFFRICATE (tS dZ)
 $SONORANT (LIQUID NASAL V)
 $C ($STOP $GLIDE $LIQUID $NASAL $FRICATIVE $AFFRICATE)
 
+[Voiced] (
+	x -> G
+	f -> v
+	T -> D
+	s -> z
+)
+
 [Front] (
 	A -> }
 	A: -> }:
-	}A -> y:
-	}A: -> y:
+	}A -> iy
+	}A: -> iy:
 	eo -> y
 	eo: -> y:
 	e

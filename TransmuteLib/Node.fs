@@ -55,6 +55,9 @@ type Node =
     /// Defines a set of lists of nodes, of which only one may be matched.
     | DisjunctNode of Node list list
 
+    /// Defines the rule used by the syllable boundary detector.
+    | SyllableDefinitionNode of onset: Node list * nucleus: Node list * coda: Node list
+
     /// Represents a node tagged with metadata.
     | TaggedNode of pos: (Offset * Line * Column) * Node
 

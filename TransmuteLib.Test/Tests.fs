@@ -12,20 +12,26 @@ let testRule format rules inputs expected =
     let actual =
         rules
         |> RuleParser.parseRules format
-        |> Result.map (fun (features, sets, rules) -> RuleCompiler.compile false features sets rules[0])
-        |> Result.map (fun rule -> inputs |> List.map (Transducer.transform false rule))
+        |> Result.map (fun (syllableDefinition, features, sets, rules) ->
+            let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileRule false features sets)
+            let rule = RuleCompiler.compileRule false features sets rules[0]
+            syllableRule, rule)
+        |> Result.map (fun (syllableMatcher, rule) -> inputs |> List.map (Transducer.transform false syllableMatcher rule))
     Assert.Equal<string>(expected, Result.defaultWith List.singleton actual) 
 
 let testRules format rules inputs (expected: string list) =
     let rules =
         rules
         |> RuleParser.parseRules format
-        |> Result.map (fun (features, sets, rules) -> RuleCompiler.compileRulesParallel false features sets rules)
+        |> Result.map (fun (syllableDefinition, features, sets, rules) ->
+            let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileRule false features sets)
+            let rules = RuleCompiler.compileRulesParallel false features sets rules
+            syllableRule, rules)
     let transform input =
         rules
-        |> Result.map (fun rules ->
+        |> Result.map (fun (syllableMatcher, rules) ->
             (input, rules)
-            ||> List.fold (fun input rule -> Transducer.transform false rule input))
+            ||> List.fold (fun input rule -> Transducer.transform false syllableMatcher rule input))
     let actual =
         inputs
         |> List.map transform

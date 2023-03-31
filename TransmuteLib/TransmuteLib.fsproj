@@ -16,15 +16,16 @@
     <Compile Include="Token.fs" />
     <Compile Include="Exceptions.fs" />
     <Compile Include="Node.fs" />
+    <Compile Include="State.fs" />
     <Compile Include="StateMachine.fs" />
     <Compile Include="Lexer.fs" />
     <Compile Include="SyntaxAnalyzer.fs" />
     <Compile Include="RuleParser.fs" />
     <Compile Include="PrefixTree.fs" />
     <Compile Include="Special.fs" />
-    <Compile Include="State.fs" />
     <Compile Include="DeterministicFiniteAutomaton.fs" />
     <Compile Include="RuleCompiler.fs" />
+    <Compile Include="SyllableBoundaryDetector.fs" />
     <Compile Include="Transducer.fs" />
   </ItemGroup>
 

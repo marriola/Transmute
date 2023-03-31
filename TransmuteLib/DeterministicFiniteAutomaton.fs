@@ -6,14 +6,14 @@
 
 namespace TransmuteLib
 
-type Transformation = Transition<State> * TransitionResult
+type Transformation = Transition * TransitionResult
 
 module internal DeterministicFiniteAutomaton =
-    type private TransitionType<'TState> =
+    type private TransitionType =
         /// A transition with a destination state that needs to be checked for deterministic transitions.
-        | MaybeDeterministic of (Transition<'TState> * TransitionResult)
+        | MaybeDeterministic of (Transition * TransitionResult)
         /// A transition with a destination state that either has deterministic transitions or just doesn't have any nondeterministic ones.
-        | Deterministic of (Transition<'TState> * TransitionResult)
+        | Deterministic of (Transition * TransitionResult)
 
     /// Returns true if the states X and Y are equivalent, or if state Y is a merged state containing state X
     let inline private ( <% ) x y =
@@ -27,10 +27,10 @@ module internal DeterministicFiniteAutomaton =
             false
 
     /// Transition augmented with an optional transformation
-    type private Transition' = Transition<State> * TransitionResult
+    type private Transition' = Transition * TransitionResult
 
     // Combines a transition list and a transformation list into a transition + optional transformation list
-    let private augment (transitions: Transition<State> list) (transformations: Transformation list) =
+    let private augment (transitions: Transition list) (transformations: Transformation list) =
         let transformationsByTransition =
             transformations
             |> List.groupBy (fun (transition, _) -> transition)
@@ -104,7 +104,7 @@ module internal DeterministicFiniteAutomaton =
         |> System.Console.WriteLine
 
     /// Converts an NFA into an equivalent DFA.
-    let fromNfa startState errorState (table: Transition<State> list) (transformations: Transformation list) showNfa =
+    let fromNfa startState errorState (table: Transition list) (transformations: Transformation list) showNfa =
         let table = augment table transformations
 
         let inline hasNonEpsilonTransition state =
@@ -207,7 +207,7 @@ module internal DeterministicFiniteAutomaton =
 
         /// Groups all transitions by input symbol, and merges states that can be reached
         /// by the same input symbol.
-        let groupTransitions current (transitions: (Transition<State> * TransitionResult) list) =
+        let groupTransitions current (transitions: (Transition * TransitionResult) list) =
             let single, multiple =
                 transitions
                 |> List.distinct

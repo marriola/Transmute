@@ -8,32 +8,22 @@ open Arguments
 open System
 open System.IO
 open TransmuteLib
+open Utils
 
 let RULES_EXTENSION = ".sc"
 let COMPILED_RULES_EXTENSION = ".scc"
 
-let formatTime ms =
-    if ms > 1000.0 then
-        $"%.2f{ms / 1000.0} s"
-    else
-        $"%.1f{ms} ms"
-
-let trimWhitespace (s: string) = s.Trim()
-
-let time fn =
-    let start = DateTime.Now
-    let result = fn()
-    let stop = DateTime.Now
-    let milliseconds = (stop - start).TotalMilliseconds
-    result, milliseconds
-
-let compileRules options features sets rules =
+let compileRules options features sets syllableDefinition rules =
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
 
     let showNfa = options.verbosityLevel = ShowNFA
 
-    let rules, elapsed =
+    // TODO re-enable showing the NFA here
+    //let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileSyllableRule showNfa features sets)
+    let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileSyllableRule false features sets)
+
+    let rules, rulesTime =
         time (fun () ->
             rules
 #if DEBUG
@@ -43,7 +33,9 @@ let compileRules options features sets rules =
             |> Array.Parallel.mapi
 #endif
                 (fun _ (i, node) ->
-                    let rule, elapsed = time (fun () -> RuleCompiler.compile showNfa features sets node)
+                    // TODO re-enable showing the NFA here
+                    //let rule, elapsed = time (fun () -> RuleCompiler.compileRule showNfa features sets node)
+                    let rule, elapsed = time (fun () -> RuleCompiler.compileRule false features sets node)
                     if options.verbosityLevel > Silent then
                         fprintf stderr "."
                     i, node, rule, elapsed)
@@ -52,12 +44,12 @@ let compileRules options features sets rules =
     if options.verbosityLevel > Silent then
         fprintfn stderr ""
 
-    rules, elapsed
+    syllableRule, rules, rulesTime
 
+/// Returns the word with each change underlined.
 let getIpaChangeLine ruleNum (changes: int list) (result: string) =
     let result = result |> List.ofSeq
     
-    // Insert a combining long underline after each change, but if there's a deletion at the end, put a regular underscore there
     let deletionAtEnd, changes =
         changes
         |> List.rev
@@ -75,45 +67,81 @@ let getIpaChangeLine ruleNum (changes: int list) (result: string) =
 
     [ $"%2d{ruleNum}. {out}" ]
 
+/// Returns a string filled with spaces, with a '^' inserted at the location of each change.
 let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
-    let maxIndex = List.max changes + 1
+    if List.isEmpty changes then
+        []
+    else
+        let maxIndex = List.max changes + 1
 
-    let changeLine =
-        Array.create maxIndex ' '
-        |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
+        let changeLine =
+            Array.create maxIndex ' '
+            |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
 
-    [
-        $"%2d{ruleNum}. {result}"
-        "    " + String.Join("", changeLine)
-    ]
+        [
+            $"%2d{ruleNum}. {result}"
+            "    " + String.Join("", changeLine)
+        ]
 
-let transformWord options rules word =
+let transformWord options syllableRule rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
+    let syllableBoundaryLocations, segmentLocations =
+        syllableRule
+        |> Option.map (fun rule -> SyllableBoundaryDetector.get showNfa rule word)
+        |> Option.defaultValue ([], Map.empty)
 
-    let rec inner nextWord log totalTime rules =
+    let rec inner (syllableBoundaryLocations: int list, segmentLocations: Map<int, SyllableSegment>) nextWord log totalTime rules =
         match rules with
         | [] ->
             word, nextWord, log, totalTime
 
         | (i, _, rule, _)::xs ->
-            let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa rule nextWord)
+            let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa syllableBoundaryLocations rule nextWord)
+
+            let (syllableBoundaryLocations, segmentLocations), syllableBoundaryTime =
+                if syllableRule <> None && result <> nextWord then
+                    time (fun () ->
+                        syllableRule
+                        |> Option.map (fun rule -> SyllableBoundaryDetector.get showNfa rule result)
+                        |> Option.defaultValue ([], Map.empty))
+                else
+                    (syllableBoundaryLocations, segmentLocations), 0.0
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
+                    let segmentLine =
+                        seq { 0..result.Length }
+                        |> Seq.map (fun i ->
+                            segmentLocations
+                            |> Map.tryFind i
+                            |> function
+                                | Some Onset -> 'O'
+                                | Some Nucleus -> 'N'
+                                | Some Coda -> 'C'
+                                | None -> ' ')
+                    let syllableLine =
+                        if syllableBoundaryLocations = [] then
+                            []
+                        else
+                            let line = 
+                                seq { 0..result.Length }
+                                |> Seq.map (fun i -> if List.contains i syllableBoundaryLocations then 'S' else ' ')
+                            [ "    " + String.Join("", segmentLine) ] @ [ "    " + String.Join("", line) ]
+
                     if options.format = IPA then
-                        log @ getIpaChangeLine i locations result
+                        log @ syllableLine @ getIpaChangeLine i locations result
                     else
-                        log @ getXsampaChangeLine i locations result
+                        log @ syllableLine @ getXsampaChangeLine i locations result
                 else
                     log
 
-            inner result log (totalTime + elapsed) xs
+            inner (syllableBoundaryLocations, segmentLocations) result log (totalTime + elapsed + syllableBoundaryTime) xs
 
-    inner word [] 0.0 rules
+    inner (syllableBoundaryLocations, segmentLocations) word [] 0.0 rules
 
-let transformLexicon options rules lexicon =
-    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transformWord options rules word)
-    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transformWord options rules word)
+let transformLexicon options syllableRule rules lexicon =
+    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transformWord options syllableRule rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transformWord options syllableRule rules word)
 
 #if DEBUG
     let fTransform = transformSerial
@@ -139,7 +167,7 @@ let main argv =
 
     // Compile rules if the compiled rules file is stale or not present, otherwise load the compiled rules file
 
-    let rules, compileTime =
+    let precompiled, ((syllableRule, rules), compileTime) =
         let compiledFile =
             if Path.GetExtension options.rulesFile = RULES_EXTENSION
                 then Path.Combine(Path.GetDirectoryName options.rulesFile, Path.GetFileNameWithoutExtension options.rulesFile) + COMPILED_RULES_EXTENSION
@@ -157,13 +185,11 @@ let main argv =
                     else
                         RuleParser.parseRulesFile options.format options.rulesFile
 
-                let features, sets, rules =
-                    match parseResult with
-                    | Ok (features, sets, rules) ->
-                        features, sets, rules
-                    | Result.Error msg ->
-                        fprintfn stderr "%s" msg
-                        exit 1
+                let syllableDefinition, features, sets, rules =
+                    parseResult
+                    |> Result.mapError (fprintfn stderr "%s")
+                    |> Result.toOption
+                    |> Option.get
 
                 let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
 
@@ -172,14 +198,14 @@ let main argv =
                     |> Option.map (List.map (fun i -> indexedRules[i - 1]))
                     |> Option.defaultValue indexedRules
 
-                let rules, compileTime = compileRules options features sets selectedRules
+                let syllableRule, rules, compileTime = compileRules options features sets syllableDefinition selectedRules
 
                 if options.saveRules && options.testRules = None && options.rulesFile <> "-" then
-                    RuleCompiler.saveCompiledRules compiledFile rules |> ignore
+                    RuleCompiler.saveCompiledRules compiledFile (syllableRule, rules) |> ignore
 
-                rules, compileTime
+                false, ((syllableRule, rules), compileTime)
             else
-                time (fun () -> RuleCompiler.readCompiledRules compiledFile)
+                true, time (fun () -> RuleCompiler.readCompiledRules compiledFile)
 
     // List selected rules
 
@@ -199,7 +225,7 @@ let main argv =
 
     // Dump rule DFAs
 
-    if options.verbosityLevel >= ShowDFA then
+    if false && options.verbosityLevel >= ShowDFA then
         for i, node, rule, _ in rules do
             let transitions, transformations = rule
             printfn $"\nRule {i}: {node}"
@@ -245,7 +271,7 @@ let main argv =
 
     // Transform lexicon and report
 
-    let transformedLexicon, totalMilliseconds = transformLexicon options rules (Array.ofList lexicon)
+    let transformedLexicon, totalMilliseconds = transformLexicon options syllableRule rules (Array.ofList lexicon)
     let outputStream =
         match options.outputFile with
         | None -> Console.Out
@@ -291,7 +317,10 @@ let main argv =
         let numRules = float rules.Length
         let numWords = float lexicon.Length
 
-        printfn $"\nCompiled {rules.Length} rules in {formatTime compileTime} (average {formatTime (compileTime / numRules)})"
+        if precompiled then
+            printfn $"Loaded {rules.Length} rules in {formatTime compileTime}"
+        else
+            printfn $"Compiled {rules.Length} rules in {formatTime compileTime} (average {formatTime (compileTime / numRules)})"
         printfn $"Total compile time {formatTime totalCompileMilliseconds} (average {formatTime (totalCompileMilliseconds / numRules)})"
         printfn $"Transformed {lexicon.Length} words in {formatTime totalMilliseconds} (average {formatTime (totalMilliseconds / numWords)})"
         printfn $"Total transform time {formatTime totalTransformMilliseconds} (average {formatTime (totalTransformMilliseconds / numWords)})"

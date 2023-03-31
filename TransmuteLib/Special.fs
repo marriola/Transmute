@@ -10,4 +10,4 @@ namespace TransmuteLib
 type internal Special =
     static member START = '␂'
     static member END = '␃'
-    static member JOINER = '\ufeff' //'\u200d'
+    static member SYLLABLE_SEPARATOR = '␟'

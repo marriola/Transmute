@@ -2,7 +2,7 @@
 
 A sound change applier for constructed languages. Transmute uses a distinctive feature-based approach that allows you to write concise and expressive sound change rules.
 
-## Examples
+## Example files
 
 Under the `sample/ipa` and `sample/x-sampa` folders, there are IPA and X-SAMPA versions of:
 
@@ -30,11 +30,44 @@ Try piping the output from PIE, to Proto-Germanic, to West Germanic, and finally
         ./transmute -x sample/x-sampa/westgermanic.sc - |
         ./transmute -x sample/x-sampa/oldenglish.sc -
 
+### A transformation example: "edge"
+
+#### Proto-Indo-European to Proto-Germanic
+
+| Result    | Rule                                                                                                                 | Rule description                                                      |
+|-----------|----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
+| χokʲjˈeχ  |                                                                                                                      | Original word                                                         |
+| χokj̲ˈeχ​   | [+Palatalized] → [-Palatalized]                                                                                      | Merging of palatovelars into velars                                   |
+| o̲kjˈeχ​    | LARYNGEAL → Ø / #_                                                                                                   | Deletion of word-initial laryngeal                                    |
+| okjˈɑ̲ː​    | eχ → ɑː                                                                                                              | e-coloring, deletion of laryngeal, compensatory lengthening           |
+| ox̲jˈɑː​    | [STOP-Voiced] → [+Fricative] / (#\|V\|SONORANT)_                                                                     | Grimm's law - voiceless stops shift become fricatives                 |
+| oɣ̲jˈɑː​    | [+Fricative-Voiced] → [+Voiced] / (C\|#)\[-Stressed-SONORANT\](SONORANT)_(#\|V\|[+Overlong]\|[+Stressed]\|[+Voiced]) | Verner's law - voicing of voiceless fricatives after unstressed vowel |
+| oɣjɑ̲ː​     | [+Stressed] → [-Stressed]                                                                                            | Stopped marking stress because it moved to the initial syllable       |
+| ɑ̲ɣjɑː​     | (o\|a) → ɑ                                                                                                           | Vowel shift (o → ɑ)                                                   |
+| ɑɣjɔ̲ː     | ɑː → ɔː                                                                                                              | Vowel shift (ɔː → ɑː)                                                 |
+
+#### Proto-Germanic to West Germanic
+
+| Result    | Rule                                 | Rule description                                            |
+|-----------|--------------------------------------|-------------------------------------------------------------|
+| æ̲ɣjɔː​     | [-Front] → [+Front] / _C(C)(C)(i\|j) | Umlaut                                                      |
+| æɣju̲​      | [-Short] → [+Short] / _#             | Vowel shift (ɔː -> u)                                       |
+| æg̲gju     | [-Geminate] → [+Geminate] / _j       | Gemination before /j/                                       |
+
+#### West Germanic to Old English
+
+| Result    | Rule                                          | Rule description                                            |
+|-----------|-----------------------------------------------|-------------------------------------------------------------|
+| æd̲ʒju​​     | [-Palatalized] → [+Palatalized] / _(i(ː)\|j)  | Palatalization before /j/                                   |
+| ædʒj​_     | (i\|u) → Ø / (ː\|C)C_#                        | Deleted final vowel                                         |
+| ædʒ​_      | j → Ø / C_#                                   | Deleted final glide                                         |
+| e̲dʒ       | (æ\|i) → e / _(C)(C)(C)#                      | Vowel shift (æ → e)                                         |
+
 ## Performance
 
-Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
+Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average. Using the sample `pie.txt` lexicon, each word takes ~1 millisecond on average to process all the rules without syllable detection, and ~3 milliseconds with syllable detection.
 
-Because X-SAMPA rules have to chew through so many more states for every diacritic and extended character, they don't perform as well as IPA rules. Depending on the target platform, the X-SAMPA version of `protogermanic.sc` compiles 40-50% slower than the IPA version. Once compiled, X-SAMPA rules perform nearly as well as IPA rules.
+Because X-SAMPA rules have to create and process about 50% more states for every diacritic and extended character, they don't perform as well as IPA rules. Depending on the target platform, the X-SAMPA version of `protogermanic.sc` compiles 40-50% slower than the IPA version. Once compiled, X-SAMPA rules perform nearly as well as IPA rules.
 
 ## To do
 
@@ -59,6 +92,7 @@ A filename of `-` stands for standard input.
 | --lexicon FILE         | -l         | Load lexicon from FILE.                                  |
 | --list-rules           | -lr        | Print the numbered rule list and quit.                   |
 | --no-save              | -ns        | Don't save compiled rules.                               |
+| --out                  | -o         | Output file path. If not given, prints to the console.   |
 | --rules FILE           | -r         | Load rules from FILE.                                    |
 | --recompile            | -rc        | Recompile rules file instead of loading compiled rules.  |
 | --show-transformations | -v 2       | Shows the result of each rule that applies to each word. |

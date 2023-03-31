@@ -46,6 +46,7 @@ module Transducer =
                 | Replaced (_, _, original) ->
                     original
 
+            /// Gets the difference in length between the result of the change and the original symbol
             static member getLengthDifference = function
                 | Unchanged _ -> 0
                 | Inserted (_, s) -> s.Length
@@ -78,12 +79,13 @@ module Transducer =
             static member addProduction position value symbol production =
                 match production with
                 | ReplacesWith (count, s) ->
+                    // If this is a non-initial part of a multi-character match, drop the last replacement
                     let bufferLength = List.length value.buffer
                     let skip = min bufferLength count
                     let nextProduction = Replaced (position, s, string symbol) :: value.buffer
                     BufferString.coalesce (skip + 1) nextProduction
 
-                | Inserts (s) ->
+                | Inserts s ->
                     let buffer =
                         match value.buffer with
                         | Inserted _ :: rest ->
@@ -97,7 +99,7 @@ module Transducer =
 
                     Inserted (position + 1, s) :: Unchanged (position, string symbol) :: buffer
 
-                | Deletes (count, s) ->
+                | Deletes (count, _) ->
                     let prefix, position, buffer =
                         match value.buffer with
                         | Deleted (firstPosition, _, s) :: rest ->
@@ -172,7 +174,7 @@ module Transducer =
 
                 offset + totalDifference, changes
 
-    and internal RuleMachineState = {
+    and internal TransducerState = {
         /// Indicates whether the rule has begun to match to the input.
         isPartialMatch: bool
 
@@ -199,7 +201,7 @@ module Transducer =
     /// <param name="verbose">If true, displays the state of the state machine at each step.</param>
     /// <param name="rule">The rule to apply.</param>
     /// <param name="word">The word to transform.</param>
-    let private transformInternal reportChangeLocations verbose rule word =
+    let private transformInternal reportChangeLocations verbose syllableBoundaryLocations rule word =
         // Debug output columns
         //  is valid transition
         //  position in word
@@ -209,6 +211,12 @@ module Transducer =
         //  production buffer
 
         let transitions, transformations = rule
+        //let word =
+        //    syllableBoundaryLocations
+        //    |> List.fold (fun (s: string) i -> s[..i - 1] + (string Special.SYLLABLE_SEPARATOR) + s[i..]) word
+
+        if verbose then
+            printfn "%s" (new System.String('-', 80))
 
         stateMachineConfig()
         |> withTransitions transitions
@@ -221,7 +229,8 @@ module Transducer =
               locations = []
               output = []
               buffer = [] }
-        |> onError (fun position input current value _ ->
+        |> onError (fun input machineState ->
+            let { position = position; currentValue = value; currentState = current } = machineState
             let position = position - 1
 
             let nextOutput =
@@ -234,7 +243,7 @@ module Transducer =
                         BufferString.undo value.buffer @ value.output
                 else
                     // The rule has not yet begun to match.
-                    if input <> Special.START && input <> Special.END then
+                    if input <> Special.START && input <> Special.END && input <> Special.SYLLABLE_SEPARATOR then
                         string input :: value.output
                     else
                         value.output
@@ -259,13 +268,16 @@ module Transducer =
                     buffer = []
                     output = nextOutput
             })
-        |> onTransition (fun position transition _ symbol current nextState value ->
+        |> onTransition (fun symbol t machineState ->
+            let (_, _, To nextState) = t
+            let { position = position; currentState = current; currentValue = value } = machineState
             let { buffer = production; output = output } = value
             let position = position - 1
+            let isNextFinal = State.isFinal nextState
+            let tf = Map.tryFind t transformations
+
             if verbose then
                 printf $" • %2d{position} %c{symbol}: "
-            let isNextFinal = State.isFinal nextState
-            let tf = Map.tryFind transition transformations
 
             let nextProduction =
                 match tf with
@@ -296,11 +308,13 @@ module Transducer =
                     value.output, value.locations
             let output = outputBuffer |> List.rev |> String.concat ""
             output, locations)
-        |> runStateMachine (string Special.START + word + string Special.END)
+        |> runDFA (string Special.START + word + string Special.END)
 
-    let transformWithChangeLocations verbose rule word =
-        transformInternal true verbose rule word
-
-    let transform verbose rule word =
-        let result, _ = transformInternal false verbose rule word
+    /// Applies a rule to a word.
+    let transform verbose syllableBoundaryLocations rule word =
+        let result, _ = transformInternal false verbose syllableBoundaryLocations rule word
         result
+
+    /// Applies a rule to a word, returning locations where the rule applied along with the new word.
+    let transformWithChangeLocations verbose syllableBoundaryLocations rule word =
+        transformInternal true verbose syllableBoundaryLocations rule word

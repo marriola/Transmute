@@ -1,4 +1,14 @@
-﻿; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
+﻿; bad words #12 (Tri:iz) and #66 (s"e?mo::)
+
+; Why does adding overlong vowels to the nucleus make it infinite loop?
+
+$Syllable (
+    $Onset = ((s | $Laryngeal)) ($C) ($C)
+    $Nucleus = (") ($V | $Sonorant | $Laryngeal)
+    $Coda = ($C) ([C-Approximant])
+)
+
+; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
 ; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ?, X and X_w, respectively, on the basis that I think they're neat.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -6,8 +16,8 @@
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; TODO implement NOT nodes
-;   SONORANT/uSONORANT/V_!V
-;   SONORANT/uSONORANT/!V_V
+;   $Sonorant/u$Sonorant/$V_!$V
+;   $Sonorant/u$Sonorant/!$V_$V
 
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
@@ -19,22 +29,21 @@
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
 
-/ u / (#|[C-LARYNGEAL])(")_(m|n|l|r)(#|$C)
+/ u / (#|[C-Laryngeal])(")_(m|n|l|r)(#|$C)
 
 [-Overlong] -> [+Overlong] / _#
 
-$LARYNGEAL // #_$C
+$Laryngeal // #_$C
 
 ; e-coloring and dropping of laryngeals in onset
 
 e -> o / X_w(")_
 e -> a / X(")_
-$LARYNGEAL // #_
-$LARYNGEAL // _(")$V
+$Laryngeal // _(")$V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
 
-; LARYNGEAL → ∅ / _$
+; Laryngeal → ∅ / _$
 
 ; Homorganic vowels in hiatus -> long vowel
 
@@ -53,16 +62,16 @@ eX -> A:
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
-[-Long]$LARYNGEAL → [+Long] / _
-$LARYNGEAL → ∅ / ($V|$SONORANT)_
+[-Long]$Laryngeal → [+Long] / _
+$Laryngeal → ∅ / ($V|$Sonorant)_
 
 ; Cowgill's law
 
-X_w -> g / ($SONORANT)_w
+X_w -> g / ($Sonorant)_w
 
 ; Vocalization of remaining laryngeals
 
-$LARYNGEAL -> @
+$Laryngeal -> @
 
 
 ;;;;;;;;;;;;;;
@@ -81,8 +90,8 @@ $LARYNGEAL -> @
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 
-[STOP-Voiced] -> [+Fricative] / (#|$V|$SONORANT)_
-;[STOP-Voiced] -> [+Fricative] / !($OBSTRUENT)_
+[Stop-Voiced] -> [+Fricative] / (#|$V|$Sonorant)_
+;[Stop-Voiced] -> [+Fricative] / !($OBSTRUENT)_
 
 ; Undo Grimm's law after s-
 
@@ -90,33 +99,33 @@ $LARYNGEAL -> @
 
 ; Germanic spirant law
 
-[STOP+LABIAL] -> p\ / _(t|s) ;($C|$V)
-[STOP+DENTAL] -> ts / _(t|s) ;($C|$V)
+[Stop+Labial] -> p\ / _(t|s) ;($C|$V)
+[Stop+Dental] -> ts / _(t|s) ;($C|$V)
 tst -> ss
 ;tss -> ss
 ss -> s / _#
-[STOP+VELAR] -> x / _(t|s)($C|$V)
+[Stop+Velar] -> x / _(t|s)($C|$V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
 ; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
 ; Fix: identify features that have the sound as a prefix and transition on error
-; e.g. don't match b for [STOP+Voiced-Aspirated] when it is followed by _h
+; e.g. don't match b for [Stop+Voiced-Aspirated] when it is followed by _h
 
-[STOP +Voiced -Aspirated] -> [-Voiced] / _(#|(")$V|$C)
+[Stop +Voiced -Aspirated] -> [-Voiced] / _(#|(")$V|$C)
 
 ; Grimm's law: aspirated stops become unaspirated
 
-[STOP+Aspirated] -> [-Aspirated]
+[Stop+Aspirated] -> [-Aspirated]
 
 ; Lenition of /g/ and intervocalic voiced stops
 
-g -> G / (#|$LIQUID|[+Fricative])_
+g -> G / (#|$Liquid|[+Fricative])_
 
-[STOP+Voiced] -> [+Fricative] / ($V|[+Glide])_(#|$V|[+Glide])
+[Stop+Voiced] -> [+Fricative] / ($V|[+Glide])_(#|$V|[+Glide])
 
 ; Verner's law
 
-[+Fricative-Voiced] -> [+Voiced] / ($C|#)[-Stressed-SONORANT]($SONORANT)_(#|$V|[+Overlong]|[+Stressed]|[+Voiced])
+[+Fricative-Voiced] -> [+Voiced] / ($C|#)[-Stressed-Sonorant]($Sonorant)_(#|$V|[+Overlong]|[+Stressed]|[+Voiced])
 
 ; Undo Verner's law after voiceless consonant
 
@@ -124,11 +133,11 @@ g -> G / (#|$LIQUID|[+Fricative])_
 
 ; Undo Verner's law before voiceless stops
 
-[+Fricative+Voiced] -> [-Voiced] / _[STOP-Voiced]
+[+Fricative+Voiced] -> [-Voiced] / _[Stop-Voiced]
 
 ; Voiced fricatives resulting from Verner's law to stops after nasal
 
-[+Fricative+Voiced] -> [-Fricative] / $NASAL_
+[+Fricative+Voiced] -> [-Fricative] / $Nasal_
 
 ; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
 
@@ -136,7 +145,7 @@ g -> G / (#|$LIQUID|[+Fricative])_
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
 
-s -> z / $V(($NASAL|$LIQUID))_#
+s -> z / $V(($Nasal|$Liquid))_#
 
 g_w -> b / #_
 
@@ -163,7 +172,7 @@ ji -> i / $V($C)($C)_(#|$C)
 ; Late PGmc ;
 ;;;;;;;;;;;;;
 
-m -> n / _(#|$DENTAL)
+m -> n / _(#|$Dental)
 [-Nasalized]n -> [+Nasalized] / _#
 
 e~: -> A~:
@@ -233,7 +242,9 @@ $V (
 
 [Overlong] (
     a: -> a::
-    o: -> o::    
+    A: -> A::
+    o: -> o::
+    O: -> O::
 )
 
 [Nasalized] (
@@ -279,25 +290,26 @@ $V (
 ; V -> &:
 ;   produces a: e: i: o: u:
 
-$STOP (
+$Stop (
     k  k'  k_w  p  t
     g  g'  g_w  b  d
     g_h g'_h g_w_h b_h d_h
 )
 
-$DENTAL (t, d, d_h, T, D, s, z)
-$LABIAL (m, p, b, b_h, p\, B)
-$LABIOVELAR (k_w, g_w, g_w_h, x_w, G_w)
-$VELAR (k, g, g_h, g'_h, x, G, $LABIOVELAR)
-$SONORANT (m, n, l, r, w, j)
-$LIQUID (l, r)
+$Dental (t, d, d_h, T, D, s, z)
+$Labial (m, p, b, b_h, p\, B)
+$Labiovelar (k_w, g_w, g_w_h, x_w, G_w)
+$Velar (k, g, g_h, g'_h, x, G, $Labiovelar)
+$Nasal (m, n)
+$Liquid (l, r)
+$Approximant (w, j)
 [Glide] (u -> w, i -> j)
-$NASAL (m, n)
-$LARYNGEAL (?, X, X_w, X_)
-$SIBILANT (s z)
+$Sonorant ($Nasal, $Liquid, $Approximant)
+$Laryngeal (?, X, X_w, X_)
+$Sibilant (s z)
 
 $OBSTRUENT ($STOP, Fricative)
-$C ($DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, [+Glide] $NASAL, $LARYNGEAL, $SIBILANT)
+$C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant, $Fricative, [-Fricative] $Palatalized)
 
 [Voiced] (
     k -> g
@@ -315,7 +327,7 @@ $C ($DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, [+Glide] $NASAL, $LARYNGEAL, $
     s -> z
     d_h
     T -> D
-    $SONORANT
+    $Sonorant
 )
 
 [Palatalized] (
@@ -350,4 +362,3 @@ $C ($DENTAL, $LABIAL, $VELAR, $SONORANT, $LIQUID, [+Glide] $NASAL, $LARYNGEAL, $
     s
     z
 )
-

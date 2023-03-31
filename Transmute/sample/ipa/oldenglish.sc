@@ -4,7 +4,7 @@
 
 ; Nasal spirant law
 
-V n → [+Nasalized +Long] / _FRICATIVE
+V n → [+Long +Nasalized] / _FRICATIVE
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
@@ -12,16 +12,22 @@ V n → [+Nasalized +Long] / _FRICATIVE
 
 ; Anglo-Frisian brightening
 
-ɑ → æ / _C
+ɑ → æ / _[C-/m n/](C)(C)([V+Front])
 æ̃ → ɑ̃
-æ → ɑ / _C(C)(C)[V-Front]
-æ → ɑ / _C(C)(C)[V-Front]
 
-(æ|ɑ|ɑ̃) → ∅ / _#
+; Undo before syllable with back vowel
+;æ → ɑ / _C(C)(C)[V-Front]
+
+; Redo before velar consonant
+ɑ → æ / _(x|w|rC|lC)
+
+[+/æ ɑ ɑ̃/] → ∅ / _#
 
 ;;;;;;;;;;;;;;;;;;;
 ;   Old English   ;
 ;;;;;;;;;;;;;;;;;;;
+
+x → h / (#_ | _V)
 
 [+Nasalized] → [-Nasalized]
 
@@ -37,11 +43,11 @@ V n → [+Nasalized +Long] / _FRICATIVE
 
 ; A-restoration
 
-æ → ɑ / _[+Geminate]
+æ → ɑ / _[+Geminate] ( [C-/j/][V-Front] | # )
 
 ; Palatalization of velars
 
-[Palatalized] (k → tʃ, g → dʒ)
+[Palatalized] (k → tʃ, g → dʒ, gg → dʒ)
 [-Palatalized] → [+Palatalized] / _(i(ː)|j)
 [-Palatalized] → [+Palatalized] / iː_(C|#)
 ɣ → ʝ / [V+Front]_
@@ -50,9 +56,12 @@ sk → ʃ
 
 ; ...
 
-[-Front] → [+Front] / _C(C)(C)(i|j)
+[-Front] → [+Front] / _[C-/j/] ([C-/j/])([C-/j/])(i|j)
 
 (i|u) → ∅ / (ː|C)C_#
+
+(i)j → ∅ / [V+Long+/æɑ eo iy æɑː eoː iyː/]C(C)(C)_
+(i)j → ∅ / [V-Long+/æɑ eo iy/]C.C(C)(C)_
 
 ʝ → j
 j → ∅ / C_#
@@ -66,6 +75,8 @@ u ͏→ o / _C(C)(C)#
 ø → e
 iu → eo
 ɣ → g / #_
+
+[FRICATIVE+Voiced] -> [-Voiced] / _#
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -82,11 +93,18 @@ AFFRICATE (tʃ dʒ)
 SONORANT (LIQUID NASAL V)
 C (STOP GLIDE LIQUID NASAL FRICATIVE AFFRICATE)
 
+[Voiced] (
+	x → ɣ
+	f → v
+	θ → ð
+	s → z
+)
+
 [Front] (
 	ɑ → æ
 	ɑː → æː
-	æɑ → yː
-	æɑː → yː
+	æɑ → iy
+	æɑː → iyː
 	eo → y
 	eoː → yː
 	e

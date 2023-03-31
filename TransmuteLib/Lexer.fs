@@ -18,37 +18,38 @@ module internal Lexer =
         | SyntaxError of string * Offset * Line * Column
         | FileError of string
 
-    type private State =
-        | START
-        | ERROR
-        | Q_Whitespace
-        | Q_WhitespaceFinal
-        | Q_LBrack
-        | Q_RBrack
-        | Q_LBrace
-        | Q_RBrace
-        | Q_LParen
-        | Q_RParen
-        | Q_Separator
-        | Q_Comma
-        | Q_Divider
-        | Q0
-        | Q_Arrow
-        | Q_Empty
-        | Q_Placeholder
-        | Q_WordBoundary
-        | Q_SyllableBoundary
-        | Q_SyllableBoundaryFinal
-        | Q_Plus
-        | Q_Minus
-        | Q_Pipe
-        | Q_Not
-        | Q_Identifier
-        | Q_IdentifierFinal
-        | Q_Utterance
-        | Q_UtteranceFinal
-        | Q_Comment
-        | Q_CommentFinal
+    let private START = State.make "START"
+    let private ERROR = State.make "ERROR"
+    let private Q_Whitespace = State.make "Q_Whitespace"
+    let private Q_WhitespaceFinal = State.make "Q_WhitespaceFinal" |> State.makeFinal
+    let private Q_LBrack = State.make "Q_LBrack" |> State.makeFinal
+    let private Q_RBrack = State.make "Q_RBrack" |> State.makeFinal
+    let private Q_LBrace = State.make "Q_LBrace" |> State.makeFinal
+    let private Q_RBrace = State.make "Q_RBrace" |> State.makeFinal
+    let private Q_LParen = State.make "Q_LParen" |> State.makeFinal
+    let private Q_RParen = State.make "Q_RParen" |> State.makeFinal
+    let private Q_Separator = State.make "Q_Separator" |> State.makeFinal
+    let private Q_Comma = State.make "Q_Comma" |> State.makeFinal
+    let private Q_Divider = State.make "Q_Divider" |> State.makeFinal
+    let private Q0 = State.make "Q0"
+    let private Q_Arrow = State.make "Q_Arrow" |> State.makeFinal
+    let private Q_Empty = State.make "Q_Empty" |> State.makeFinal
+    let private Q_Placeholder = State.make "Q_Placeholder" |> State.makeFinal
+    let private Q_WordBoundary = State.make "Q_WordBoundary" |> State.makeFinal
+    let private Q_SyllableBoundary = State.make "Q_SyllableBoundary"
+    let private Q_SyllableBoundaryFinal = State.make "Q_SyllableBoundaryFinal" |> State.makeFinal
+    let private Q_Plus = State.make "Q_Plus" |> State.makeFinal
+    let private Q_Minus = State.make "Q_Minus" |> State.makeFinal
+    let private Q_Pipe = State.make "Q_Pipe" |> State.makeFinal
+    let private Q_Not = State.make "Q_Not" |> State.makeFinal
+    let private Q_Equals = State.make "Q_Equals"
+    let private Q_EqualsFinal = State.make "Q_EqualsFinal" |> State.makeFinal
+    let private Q_Identifier = State.make "Q_Identifier"
+    let private Q_IdentifierFinal = State.make "Q_IdentifierFinal" |> State.makeFinal
+    let private Q_Utterance = State.make "Q_Utterance"
+    let private Q_UtteranceFinal = State.make "Q_UtteranceFinal" |> State.makeFinal
+    let private Q_Comment = State.make "Q_Comment"
+    let private Q_CommentFinal = State.make "Q_CommentFinal" |> State.makeFinal
 
     /// <summary>
     /// Removes the initial semicolon from the comment and trims whitespace.
@@ -145,6 +146,9 @@ module internal Lexer =
                   makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
                   makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
 
+                  makeTransitions (From START) [ To Q_Equals, OnChar '=' ]
+                  makeTransitions (From Q_Equals) [ To Q_EqualsFinal, OnEpsilon ]
+
                   makeTransitions (From START) [ To Q_SyllableBoundary, OnChar '$' ]
                   makeTransitions (From Q_SyllableBoundary) identifierTransitions
                   makeTransitions (From Q_SyllableBoundary) [ To Q_SyllableBoundaryFinal, OnEpsilon ]
@@ -187,15 +191,18 @@ module internal Lexer =
               Q_Minus, Minus.id
               Q_Pipe, Pipe.id
               Q_Not, Not.id
+              Q_EqualsFinal, Equals.id
               Q_IdentifierFinal, Id.apply (trimSigil '$')
               Q_UtteranceFinal, Utterance.apply (trimSigil '.')
               Q_CommentFinal, Comment.apply trimComment
             ]
             |> Map.ofSeq
 
-        let isFinal state = stateTokenTypes.ContainsKey state
         let accumulate (builder: char list) =
             System.String.Concat(builder |> List.rev |> Array.ofList)
+
+        let inline incrRow (Offset offset, Line row, _) = (Offset (offset + 1), Line (row + 1), Column 1)
+        let inline incrCol (Offset offset, Line row, Column col) = (Offset (offset + 1), Line row, Column (col + 1))
 
         stateMachineConfig()
         |> withTransitions table
@@ -207,7 +214,9 @@ module internal Lexer =
               mismatchAction = Restart
               builder = []
               acc = [] }
-        |> onError (fun _ inputSymbol _ ({ pos = offset, row, col } as value) _ ->
+        |> onError (fun inputSymbol machineState ->
+            let { currentValue = value } = machineState
+            let { pos = offset, row, col } = value
             match value.mismatchAction with
             | MismatchAction.Restart ->
                 ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
@@ -215,10 +224,12 @@ module internal Lexer =
                 (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, offset, row, col)
                 |> SyntaxError
                 |> ErrorAction.Stop)
-        |> onTransition (fun _ _ isEpsilonTransition inputSymbol currentState nextState value ->
-            let inline incrRow (Offset offset, Line row, _) = (Offset (offset + 1), Line (row + 1), Column 1)
-            let inline incrCol (Offset offset, Line row, Column col) = (Offset (offset + 1), Line row, Column (col + 1))
-            let isNextFinal = isFinal nextState
+        |> onTransition (fun inputSymbol t machineState ->
+            let (_, input, To nextState) = t
+            let { currentValue = value; currentState = currentState } = machineState
+            let isEpsilonTransition = input = OnEpsilon
+            let isNextFinal = State.isFinal nextState
+
             let nextPos =
                 if isEpsilonTransition then
                     value.pos
@@ -253,4 +264,4 @@ module internal Lexer =
                     acc = nextAcc })
         |> onFinish (fun ({ acc = acc }) ->
             acc |> List.rev |> OK)
-        |> runStateMachine (content + "\n")
+        |> runDFA (content + "\n")
