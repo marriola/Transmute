@@ -30,6 +30,8 @@ Try piping the output from PIE, to Proto-Germanic, to West Germanic, and finally
         ./transmute -x sample/x-sampa/westgermanic.sc - |
         ./transmute -x sample/x-sampa/oldenglish.sc -
 
+Try out the last step in the [browser demo](https://marriola.github.io/transmute-demo). Click Examples and select West Germanic to Old English.
+
 ## Performance
 
 Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 64 rules in `protogermanic.sc` and the `pie.txt` lexicon in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~20 ms on average, and words take a millisecond or less on average to process all the rules.
