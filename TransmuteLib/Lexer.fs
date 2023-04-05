@@ -11,6 +11,11 @@ open TransmuteLib.StateMachine
 type InputFormat =
     | IPA
     | X_SAMPA
+with
+    override this.ToString() =
+        match this with
+        | IPA -> "IPA"
+        | X_SAMPA -> "X-SAMPA"
 
 module internal Lexer =
     type Result =
@@ -88,7 +93,7 @@ module internal Lexer =
                         [ seq { 'a'..'z' }
                           seq { '\u0250'..'\u0341' }
                           "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
-                          "æœðøçɸβθχ" :> char seq
+                          "æœðøçɸβθχŋ" :> char seq
                         ]
                         Q_Utterance
                 else
