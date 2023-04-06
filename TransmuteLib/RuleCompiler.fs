@@ -120,10 +120,10 @@ module RuleCompiler =
                 | _ ->
                     state, None
 
-            let getNextState state =
+            let getNextState makeFinal state =
                 let states, nextState = takeState state.states
                 let nextState =
-                    if state.AreAllSubtreesFinal
+                    if makeFinal && state.AreAllSubtreesFinal
                         then State.makeFinal nextState
                         else nextState
 
@@ -131,7 +131,7 @@ module RuleCompiler =
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
-                let state, next = getNextState state
+                let state, next = getNextState true state
                 let transitions = (From state.current, OnChar c, To next) :: state.transitions
 
                 { state with
@@ -203,7 +203,7 @@ module RuleCompiler =
                         { innerState with transformations = transformations }
 
                     | c::xs ->
-                        let nextNfaState, next = getNextState innerState
+                        let nextNfaState, next = getNextState (xs = []) innerState
                         let transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
 
                         matchUtterance' xs output
@@ -218,7 +218,7 @@ module RuleCompiler =
             /// If any categories specify transformations that match the output of the rule,
             /// these will be added to the transformation list.
             let matchSet setDesc =
-                let state, terminator = getNextState state
+                let state, terminator = getNextState true state
 
                 let rec matchSet' state tree =
                     match tree with
@@ -288,8 +288,8 @@ module RuleCompiler =
 
                 { nextState with
                     outputNodes =
-                        if state.currentSection = InputSection then
-                            nextState.outputNodes[1..]
+                        if state.currentSection = InputSection && nextState.outputNodes.Length > 0 then
+                            List.tail nextState.outputNodes
                         else
                             nextState.outputNodes }
 
@@ -309,7 +309,7 @@ module RuleCompiler =
 
             /// Optionally match a sequence of nodes. Continue even if no match possible.
             let matchOptional nodes =
-                let state, terminator = getNextState state
+                let state, terminator = getNextState true state
                 let nextState =
                     buildStateMachine'
                         { state with
@@ -339,7 +339,7 @@ module RuleCompiler =
             /// Match exactly one of many sequences of nodes.
             let matchDisjunct branches =
                 // Create a common exit point for all subtrees
-                let state, terminator = getNextState state
+                let state, terminator = getNextState true state
 
                 // Build a subtree for each branch
                 let out =
