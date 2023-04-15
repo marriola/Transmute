@@ -1,13 +1,13 @@
 ﻿; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
-; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, χ and χʷ, respectively, on the basis that I think they're neat.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, ʕ and ʕʷ, respectively, on the basis that I think they're neat.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                        Rules                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; TODO implement NOT nodes
-;   SONORANT/uSONORANT/V_!V
-;   SONORANT/uSONORANT/!V_V
+;   Sonorant/u Sonorant/V_!V
+;   Sonorant/u Sonorant/!V_V
 
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
@@ -19,22 +19,21 @@
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
 
-∅ → u / (#|[C-LARYNGEAL])(ˈ)_(m|n|l|r)(#|C)
+∅ → u / (#|[C-Laryngeal])(ˈ)_(m|n|l|r)(#|C)
 
 [-Overlong] → [+Overlong] / _#
 
-LARYNGEAL → ∅ / #_C
+Laryngeal → ∅ / #_C
 
 ; e-coloring and dropping of laryngeals in onset
 
-e → o / χʷ(ˈ)_
-e → a / χ(ˈ)_
-LARYNGEAL → ∅ / #_
-LARYNGEAL → ∅ / _(ˈ)V
+e → o / ʕʷ(ˈ)_
+e → a / ʕ(ˈ)_
+Laryngeal → ∅ / _(ˈ)V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
 
-; LARYNGEAL → ∅ / _$
+; Laryngeal → ∅ / _$
 
 ; Homorganic vowels in hiatus → long vowel
 
@@ -46,23 +45,23 @@ uu → uːː
 
 ; e-coloring
 
-e → o / _(w|j)χʷ
-e → a / _(w|j)χ
-eχʷ → oː
-eχ → ɑː
+e → o / _(w|j)ʕʷ
+e → a / _(w|j)ʕ
+eʕʷ → oː
+eʕ → ɑː
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
-[-Long]LARYNGEAL → [+Long] / _
-LARYNGEAL → ∅ / (V|SONORANT)_
+[-Long]Laryngeal → [+Long] / _
+Laryngeal → ∅ / (V|Sonorant)_
 
 ; Cowgill's law
 
-χʷ → g / (SONORANT)_w
+ʕʷ → g / (Sonorant)_w
 
 ; Vocalization of remaining laryngeals
 
-LARYNGEAL → ə
+Laryngeal → ə
 
 
 ;;;;;;;;;;;;;;
@@ -81,8 +80,8 @@ LARYNGEAL → ə
 
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 
-[STOP-Voiced] → [+Fricative] / (#|V|SONORANT)_
-;[STOP-Voiced] → [+Fricative] / !(OBSTRUENT)_
+[Stop-Voiced] → [+Fricative] / (#|V|Sonorant)_
+;[Stop-Voiced] → [+Fricative] / !(Obstruent)_
 
 ; Undo Grimm's law after s-
 
@@ -90,33 +89,33 @@ LARYNGEAL → ə
 
 ; Germanic spirant law
 
-[STOP+LABIAL] → ɸ / _(t|s) ;(C|V)
-[STOP+DENTAL] → ts / _(t|s) ;(C|V)
+[Stop+Labial] → ɸ / _(t|s) ;(C|V)
+[Stop+Dental] → ts / _(t|s) ;(C|V)
 tst → ss
 ;tss → ss
 ss → s / _#
-[STOP+VELAR] → x / _(t|s)(C|V)
+[Stop+Velar] → x / _(t|s)(C|V)
 
 ; Grimm's law: voiced unaspirated stops become voiceless stops
 ; TODO: Do not match a sound if it is actually a prefix for a longer sound that should not be matched
 ; Fix: identify features that have the sound as a prefix and transition on error
-; e.g. don't match b for [STOP+Voiced-Aspirated] when it is followed by ʰ
+; e.g. don't match b for [Stop+Voiced-Aspirated] when it is followed by ʰ
 
-[STOP +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
+[Stop +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
 
 ; Grimm's law: aspirated stops become unaspirated
 
-[STOP+Aspirated] → [-Aspirated]
+[Stop+Aspirated] → [-Aspirated]
 
 ; Lenition of /g/ and intervocalic voiced stops
 
-g → ɣ / (#|LIQUID|[+Fricative])_
+g → ɣ / (#|Liquid|[+Fricative])_
 
-[STOP+Voiced] → [+Fricative] / (V|[+Glide])_(#|V|[+Glide])
+[Stop+Voiced] → [+Fricative] / (V|[+Glide])_(#|V|[+Glide])
 
 ; Verner's law
 
-[+Fricative-Voiced] → [+Voiced] / (C|#)[-Stressed-SONORANT](SONORANT)_(#|V|[+Overlong]|[+Stressed]|[+Voiced])
+[+Fricative-Voiced] → [+Voiced] / (C|#)[-Stressed-Sonorant](Sonorant)_(#|V|[+Overlong]|[+Stressed]|[+Voiced])
 
 ; Undo Verner's law after voiceless consonants and before voiceless stops
 
@@ -124,11 +123,11 @@ g → ɣ / (#|LIQUID|[+Fricative])_
 
 ; Undo Verner's law before voiceless stops
 
-[+Fricative+Voiced] → [-Voiced] / _[STOP-Voiced]
+[+Fricative+Voiced] → [-Voiced] / _[Stop-Voiced]
 
 ; Voiced fricatives resulting from Verner's law become stops after a nasal
 
-[+Fricative+Voiced] → [-Fricative] / NASAL_
+[+Fricative+Voiced] → [-Fricative] / Nasal_
 
 ; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
 
@@ -136,7 +135,7 @@ g → ɣ / (#|LIQUID|[+Fricative])_
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
 
-s → z / V((NASAL|LIQUID))_#
+s → z / V((Nasal|Liquid))_#
 
 gʷ → b / #_
 
@@ -163,7 +162,7 @@ ji → i / V(C)(C)_(#|C)
 ; Late PGmc ;
 ;;;;;;;;;;;;;
 
-m → n / _(#|DENTAL)
+m → n / _(#|Dental)
 [-Nasalized]n → [+Nasalized] / _#
 
 ẽː → ɑ̃ː
@@ -233,7 +232,9 @@ V (
 
 [Overlong] (
     aː → aːː
-    oː → oːː    
+    ɑː → ɑːː
+    oː → oːː
+    ɔː → ɔːː
 )
 
 [Nasalized] (
@@ -279,25 +280,26 @@ V (
 ; V → &ː
 ;   produces aː eː iː oː uː
 
-STOP (
+Stop (
     k  kʲ  kʷ  p  t
     g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
 )
 
-DENTAL (t, d, dʰ, θ, ð, s, z)
-LABIAL (m, p, b, bʰ, ɸ, β)
-LABIOVELAR (kʷ, gʷ, gʷʰ, xʷ, ɣʷ)
-VELAR (k, g, gʰ, gʲʰ, x, ɣ, LABIOVELAR)
-SONORANT (m, n, l, r, w, j)
-LIQUID (l, r)
+Dental (t, d, dʰ, θ, ð, s, z)
+Labial (m, p, b, bʰ, ɸ, β)
+Labiovelar (kʷ, gʷ, gʷʰ, xʷ, ɣʷ)
+Velar (k, g, gʰ, gʲʰ, x, ɣ, Labiovelar)
+Liquid (l, r)
+Nasal (m, n)
 [Glide] (u → w, i → j)
-NASAL (m, n)
-LARYNGEAL (ʔ, χ, χʷ)
-SIBILANT (s z)
+Approximant (w, j)
+Sonorant (Nasal, Liquid, Approximant)
+Laryngeal (ʔ, ʕ, ʕʷ)
+Sibilant (s z)
 
-OBSTRUENT (STOP, Fricative)
-C (DENTAL, LABIAL, VELAR, SONORANT, LIQUID, Glide, NASAL, LARYNGEAL, SIBILANT)
+Obstruent (Stop, Fricative)
+C (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative] Palatalized)
 
 [Voiced] (
     k → g
@@ -315,7 +317,7 @@ C (DENTAL, LABIAL, VELAR, SONORANT, LIQUID, Glide, NASAL, LARYNGEAL, SIBILANT)
     s → z
     dʰ
     θ → ð
-    SONORANT
+    Sonorant
 )
 
 [Palatalized] (

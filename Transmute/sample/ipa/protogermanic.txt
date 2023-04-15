@@ -1,71 +1,71 @@
-﻿ɸɑðeːr
-mɔːðeːr
-brɔːθeːr
-swesteːr
-suːnuz
-duxteːr
-leɣiði
-ɑjnɑz
-ɑjnɔː
-ɑjnɑ̃
-twɑj
-θriːz
-ɸeðwɔːr
-ɸemɸ
-sexs
-seβun
-ɑxtɔːw
-newun
-texun
-xundɑ̃
-tɑnθs
-tɑnθiz
-tɑnθũ
-tɑnθunz
-tundiz
-tundɔ̃ːː
-tundiː
-tundmɑz
-tundeː
-witɑnɑ̃
-wɑjt
-wɑjs
-wɑjt
-wissɑz
-ɸullɑz
-ɸullɑ̃
-ɸullɔː
-xʷexʷlɑ̃
-xʷewlɔː
-suːrɑz
-wurmiz
-drɑɣɑnɑ̃
-sprekɑnɑ̃
-liβjɑnɑ̃
-xɑwzijɑnɑ̃
-bindɑnɑ̃
-ɸɑllɑnɑ̃
-tungwɔ̃ː
-bɑlɣiz
-ɣulθɑ̃
-brɑ̃ːxtɑz
-wiːβɑ
-sɑngʷɑz
-deðɔ̃ː
-ɸɔːts
-ɸɔːtiz
-ɸexu
-ɑndi
-ɑnθs
-xurnɑ̃
-nurθrɑz
-sunθrɑz
-ɑwstrɑz
-berxtɑz
-ɣɑstiːz
-seːmɔːː
-dewzɑ̃
-ɑɣjɔː
-xnutiz
-sɔːkijɑnɑ̃
-sɔːxtɑ̃
+﻿ɸɑðeːr          ; father
+mɔːðeːr         ; mother
+brɔːθeːr        ; brother
+swesteːr        ; sister
+suːnuz          ; son
+duxteːr         ; daughter
+leɣiði          ; lay (past tense of lie)
+ɑjnɑz           ; one, masc.
+ɑjnɔː           ; one, fem.
+ɑjnɑ̃            ; one, neut.
+twɑj            ; two
+θriːz           ; three
+ɸeðwɔːr         ; four
+ɸemɸ            ; five
+sexs            ; six
+seβun           ; seven
+ɑxtɔːw          ; eight
+newun           ; nine
+texun           ; ten
+xundɑ̃           ; hundred
+tɑnθs           ; tooth, nom.sg.
+tɑnθiz          ; tooth, nom.pl.
+tɑnθũ           ; tooth, acc.sg.
+tɑnθunz         ; tooth, acc.pl.
+tundiz          ; tooth, gen.sg.
+tundɔ̃ːː         ; tooth, gen.pl.
+tundiː          ; tooth, dat.sg.
+tundmɑz         ; tooth, dat.pl.
+tundeː          ; tooth, inst.sg.
+witɑnɑ̃          ; know, inf.
+wɑjt            ; know, 1sg.
+wɑjs            ; know, 2sg.
+wɑjt            ; know, 3sg.
+wissɑz          ; know, pp.
+ɸullɑz          ; full, masc.
+ɸullɑ̃           ; full, neut.
+ɸullɔː          ; full, fem.
+xʷexʷlɑ̃         ; wheel, nom.sg.
+xʷewlɔː         ; wheel, collective
+suːrɑz          ; sour
+wurmiz          ; worm
+drɑɣɑnɑ̃         ; drag, inf.
+sprekɑnɑ̃        ; speak, inf.
+liβjɑnɑ̃         ; live, inf.
+xɑwzijɑnɑ̃       ; hear, inf.
+bindɑnɑ̃         ; bind, inf.
+ɸɑllɑnɑ̃         ; fall, inf.
+tungwɔ̃ː         ; tongue
+bɑlɣiz          ; belly
+ɣulθɑ̃           ; gold
+brɑ̃ːxtɑz        ; brought
+wiːβɑ           ; wife
+sɑngʷɑz         ; song
+deðɔ̃ː           ; did
+ɸɔːts           ; foot, nom.sg.
+ɸɔːtiz          ; foot, nom.pl
+ɸexu            ; fee (cattle)
+ɑndi            ; and
+ɑnθs            ; German ent- (a verb prefix)
+xurnɑ̃           ; horn
+nurθrɑz         ; north
+sunθrɑz         ; south
+ɑwstrɑz         ; east
+berxtɑz         ; bright
+ɣɑstiːz         ; guest
+seːmɔːː         ; German Samen "seed"
+dewzɑ̃           ; deer
+xnutiz          ; nuts
+sɔːkijɑnɑ̃       ; seek, inf.
+sɔːxtɑ̃          ; sought
+ɑɣjɔː           ; edge

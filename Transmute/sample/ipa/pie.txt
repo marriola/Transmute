@@ -1,71 +1,69 @@
-pχtˈeːr
-meχtˈeːr
-bʰrˈeχteːr
-swˈesteːr
-suʔnˈus
-dʰuktˈeːr
-lˈegʰjeti
-ˈojnos		; masc.
-ˈojneχ		; fem.
-ˈojnom		; neut.
-dwˈoj
-trˈejes
-petwˈoːr
-pˈempe
-sˈekʲs
-sepˈmd
-okʲtˈoːw
-ʔnˈewnd
-dˈekʲmd
-kʲmtˈom
-χʷdˈonts	; nom.sg.
-χʷdˈontes	; nom.pl.
-χʷdˈontm	; acc.sg.
-χʷdˈontms	; acc.pl.
-χʷdntˈes	; gen.sg.
-χʷdntˈoʔom	; gen.pl.
-χʷdntˈej	; dat.sg.
-χʷdntmˈos	; dat.pl.
-χʷdntˈeʔ	; inst.sg.
-widonom		; inf.
-wˈojdχe		; 1sg.
-wˈojdtχe	; 2sg.
-wˈojde		; 3sg.
-widtˈos
-plʔnˈos
-plʔnˈom
-plʔnˈeχ
-kʷˈekʷlom	; nom.sg.
-kʷekʷlˈeχ	; collective
-suʔrˈos
-wˈrmis
-dʰrˈogʰonom
-sprˈegonom
-lipjˈonom
-χkʲχowsjˈonom
-bʰˈendʰonom
-χpχʷˈelʔnonom
-dngʲʰwˈeχn
-bʰolgʲʰis
-gʲʰˈlχʷtom
-bʰrˈonkʲtos
-gʷʰˈiχbʰχ
-songʷʰos
-dʰˈedʰeʔm
-pˈoːds
-pˈoːdes
-pˈekʲu
-χentˈi
-χˈenχts
-kʲrχnˈom
-ʔnˈrtros
-sχˈuntros
-χˈewsros
-bʰˈergʲtos
-gʰˈostejes
-sˈeʔmoː
-dʰewsˈom
-χokʲjˈeχ
-knˈudes
-sˈeχgjonom
-sˈeχgtom
+pʕtˈeːr         ; father
+meʕtˈeːr        ; mother
+bʰrˈeʕteːr      ; brother
+swˈesteːr       ; sister
+suʔnˈus         ; son
+dʰuktˈeːr       ; daughter
+lˈegʰjeti       ; lay (past tense of lie)
+ˈojnos          ; one, masc.
+ˈojneʕ          ; one, fem.
+ˈojnom          ; one, neut.
+dwˈoj           ; two
+trˈejes         ; three
+petwˈoːr        ; four
+pˈempe          ; five
+sˈekʲs          ; six
+sepˈmd          ; seven
+okʲtˈoːw        ; eight
+ʔnˈewnd         ; nine
+dˈekʲmd         ; ten
+kʲmtˈom         ; hundred
+ʕʷdˈonts        ; tooth, nom.sg.
+ʕʷdˈontes       ; tooth, nom.pl.
+ʕʷdˈontm        ; tooth, acc.sg.
+ʕʷdˈontms       ; tooth, acc.pl.
+ʕʷdntˈes        ; tooth, gen.sg.
+ʕʷdntˈoʔom      ; tooth, gen.pl.
+ʕʷdntˈej        ; tooth, dat.sg.
+ʕʷdntmˈos       ; tooth, dat.pl.
+ʕʷdntˈeʔ        ; tooth, inst.sg.
+widonom         ; know, inf.
+wˈojdʕe         ; know, 1sg.
+wˈojdtʕe        ; know, 2sg.
+wˈojde          ; know, 3sg.
+widtˈos         ; know, pp.
+plʔnˈos         ; full, masc.
+plʔnˈom         ; full, neut.
+plʔnˈeʕ         ; full, fem.
+kʷˈekʷlom       ; wheel, nom.sg.
+kʷekʷlˈeʕ       ; wheel, collective
+suʔrˈos         ; sour
+wˈrmis          ; worm
+dʰrˈogʰonom     ; drag, inf.
+sprˈegonom      ; speak, inf.
+lipjˈonom       ; live, inf.
+ʕkʲʕowsjˈonom   ; hear, inf.
+bʰˈendʰonom     ; bind, inf.
+ʕpʕʷˈelʔnonom   ; fall, inf.
+dngʲʰwˈeʕn      ; tongue
+bʰolgʲʰis       ; belly
+gʲʰˈlʕʷtom      ; gold
+bʰrˈonkʲtos     ; brought
+gʷʰˈiʕbʰʕ       ; wife
+songʷʰos        ; song
+dʰˈedʰeʔm       ; did
+pˈoːds          ; foot, nom.sg.
+pˈoːdes         ; foot, nom.pl
+pˈekʲu          ; fee (cattle)
+ʕentˈi          ; and
+kʲrʕnˈom        ; horn
+ʔnˈrtros        ; north
+sʕˈuntros       ; south
+ʕˈewsros        ; east
+bʰˈergʲtos      ; bright
+gʰˈostejes      ; guest
+dʰewsˈom        ; deer
+knˈudes         ; nuts
+sˈeʕgjonom      ; seek, inf.
+sˈeʕgtom        ; sought
+ʕokʲjˈeʕ        ; edge

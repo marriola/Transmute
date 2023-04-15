@@ -2,32 +2,34 @@
 ;   Ingvaeonic and Anglo-Frisian   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Nasal spirant law
+; Ingvaeonic nasal spirant law
 
-V n → [+Nasalized +Long] / _FRICATIVE
+V n → [+Long +Nasalized] / _Fricative
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
-ɑ(i|j) → ɑː
+(ɑi|ɑj) → ɑː
 
 ; Anglo-Frisian brightening
 
-ɑ → æ / _C
+ɑ → æ / _[C-/m n/](C)(C)([V+Front])
 æ̃ → ɑ̃
-æ → ɑ / _C(C)(C)[V-Front]
+
+; Undo before syllable with back vowel
 æ → ɑ / _C(C)(C)[V-Front]
 
-(æ|ɑ|ɑ̃) → ∅ / _#
+; Redo before velar consonant
+ɑ → æ / _(x|w|rC|lC)
+
+[+/æ ɑ ɑ̃/] → ∅ / _#
 
 ;;;;;;;;;;;;;;;;;;;
 ;   Old English   ;
 ;;;;;;;;;;;;;;;;;;;
 
-[+Nasalized] → [-Nasalized]
-
 ; Front vowel breaking
 
-∅ → u / [V+Front-/y/]_((x|w)(V|#) | rC | lC)
+∅ → u / [V+Front-/y/]_((x|h|w)(V|#) | rC | lC)
 
 ; Diphthong height harmonization
 
@@ -37,64 +39,108 @@ V n → [+Nasalized +Long] / _FRICATIVE
 
 ; A-restoration
 
-æ → ɑ / _[+Geminate]
+æ → ɑ / _[+Geminate] ( [C-/j/][V-Front] | # )
 
 ; Palatalization of velars
 
-[Palatalized] (k → tʃ, g → dʒ)
+[Palatalized] (k → tʃ, g → dʒ, gg → dʒ)
+
 [-Palatalized] → [+Palatalized] / _(i(ː)|j)
 [-Palatalized] → [+Palatalized] / iː_(C|#)
 ɣ → ʝ / [V+Front]_
 ɣ → ʝ / _[V+Front]
 sk → ʃ
 
-; ...
+; ... WIP ...
 
-[-Front] → [+Front] / _C(C)(C)(i|j)
+x → h / #_
+x → h / _V
+hʷ → hw
 
-(i|u) → ∅ / (ː|C)C_#
+; Umlaut
+
+[-Front] → [+Front] / _[C-/j ʝ/] ([C-/j ʝ/])([C-/j ʝ/])(i|j|ʝ)
+
+; Loss of short, low vowels in medial syllables
+
+(ɑ|æ|e) → ∅ / V.C(C)(C)_C.V
+
+; High vowel loss
+
+(i|u) → ∅ / ([V+Long] | Diphthong | C)C_#
+
+(i)j → ∅ / ([V+Long] | Diphthong)C(C)(C)_
+(i)j → ∅ / ([V-Long] | [Diphthong-Long])C.C(C)(C)_
 
 ʝ → j
 j → ∅ / C_#
 
-; Final syllable vowel reductions
+[Fricative-Voiced] -> [+Voiced] / V_V
 
+; H-loss
+
+(h|x) → ∅ / (V|l|r)_V
+
+; Palatal umlaut
+
+(e|eo) → i / _(xs|xt)
+
+; Unstressed vowel reductions
+
+ɔː → u / _#
 oː → ɑ / _(C)(C)(C)#
-u ͏→ o / _C(C)(C)#
+[+Nasalized] → [-Nasalized]
+[V+Long] → [-Long] / V.C(C)(C)_(C)(C)(C)(V|#)
+u → o / V.C(C)(C)_C(C)(C)(V|#)
 (æ|i) → e / _(C)(C)(C)#
+ɔ → o
 
 ø → e
 iu → eo
 ɣ → g / #_
 
+[Fricative+Voiced] -> [-Voiced] / _#
+
+xs → ks
+h → x / _#
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   Sets and features   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
 V (Long [-Long] Front [-Front] Overlong Nasalized)
-STOP (k kʷ p t g b d)
-GLIDE (w j)
-LIQUID (r l)
-NASAL (m n)
-FRICATIVE (x xʷ f θ ɣ v ð s z)
-AFFRICATE (tʃ dʒ)
-SONORANT (LIQUID NASAL V)
-C (STOP GLIDE LIQUID NASAL FRICATIVE AFFRICATE)
+Stop (k kʷ p t g b d)
+Glide (w j)
+Liquid (r l)
+Nasal (m n)
+Fricative (h x xʷ f θ ɣ v ð s z)
+Affricate (tʃ dʒ)
+Sonorant (Liquid Nasal V)
+C (Stop Glide Liquid Nasal Fricative Affricate)
+
+Diphthong (æɑ, æɑː, eo, eoː, iy, iyː)
+
+[Voiced] (
+	x → ɣ
+	f → v
+	θ → ð
+	s → z
+)
 
 [Front] (
 	ɑ → æ
 	ɑː → æː
-	æɑ → yː
-	æɑː → yː
+	æɑ → iy
+	æɑː → iyː
 	eo → y
 	eoː → yː
 	e
 	eː
 	i
 	iː
-	ɔ → ø
+	o → ø
 	ɔː → øː
+	ɔ̃ː → ø̃ː
 	u → y
 	uː → yː
 )
@@ -104,10 +150,14 @@ C (STOP GLIDE LIQUID NASAL FRICATIVE AFFRICATE)
 	ɑ → ɑː
 	e → eː
 	i → iː
-	ɔ → ɔː
+	o → ɔː
 	ø → øː
+	ø̃ → ø̃ː
 	u → uː
 	y → yː
+    æɑ → æɑː
+    eo → eoː
+    iy → iyː
 )
 
 [Overlong] (
