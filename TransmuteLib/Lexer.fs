@@ -62,7 +62,13 @@ module internal Lexer =
     let trimComment token = { token with value = token.value.[1..].Trim() }
 
     /// Removes the initial sigil from a token if it has one.
-    let trimSigil sigil token = { token with value = if token.value.Length > 0 && token.value[0] = sigil then token.value[1..] else token.value }
+    let trimSigil sigil token =
+        { token with
+            value =
+                if token.value.Length > 0 && token.value.[0] = sigil then
+                    token.value.[1..token.value.Length - 1]
+                else
+                    token.value }
 
     type MismatchAction = Restart | Stop
 

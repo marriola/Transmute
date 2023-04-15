@@ -150,31 +150,24 @@ module RuleCompiler =
 
             /// Takes a segment, applies a series of transformations to it, and finally adds a transformation to the given transition.
             let addFeatureTransformations transition transformations features depth originalSegment =
-                let rec addFeatureTransformations' transformations features segment =
-                    match features with
-                    | [] ->
-                        if segment <> originalSegment then
-                            (transition, ReplacesWith (depth, segment)) :: transformations
-                        else
-                            transformations
-
-                    | FeatureIdentifierNode (isPresent, name)::rest ->
+                let nextSegment =
+                    (originalSegment, features)
+                    ||> List.fold (fun segment (FeatureIdentifierNode (isPresent, name)) ->
                         let additions, removals = featureTransformations.[name]
                         let searchMap = if isPresent then additions else removals
-                        let nextValue =
-                            searchMap
-                            |> Map.tryFind segment
-                            |> Option.defaultValue segment
+                        searchMap
+                        |> Map.tryFind segment
+                        |> Option.defaultValue segment)
 
-                        addFeatureTransformations' transformations rest nextValue
-
-                addFeatureTransformations' transformations features originalSegment
+                if nextSegment <> originalSegment then
+                    (transition, ReplacesWith (depth, nextSegment)) :: transformations
+                else
+                    transformations
 
             /// Creates a series of states and transitions that match each character of an utterance.
             let matchUtterance (utterance: string) =
                 // If possible, adds a transformation for an utterance.
-
-                let rec matchUtterance' inputChars output innerState =
+                let rec matchUtterance' inputChars innerState =
                     match inputChars with
                     | [] ->
                         let innerState, outputNode = giveOutput innerState
@@ -206,12 +199,12 @@ module RuleCompiler =
                         let nextNfaState, next = getNextState (xs = []) innerState
                         let transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
 
-                        matchUtterance' xs output
+                        matchUtterance' xs
                             { nextNfaState with
                                 transitions = transitions
                                 current = next }
 
-                matchUtterance' (List.ofSeq utterance) state.outputNodes state
+                matchUtterance' (List.ofSeq utterance) state
 
             /// Computes the intersection of a list of feature and set identifiers, and creates a
             /// tree of states and transitions that match each member of the resulting set.

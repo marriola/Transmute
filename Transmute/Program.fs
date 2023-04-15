@@ -27,7 +27,7 @@ let time fn =
     let milliseconds = (stop - start).TotalMilliseconds
     result, milliseconds
 
-let compileRules options features sets rules =
+let compileRules options features sets (rules: (int * Node) list) =
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
 
@@ -35,57 +35,27 @@ let compileRules options features sets rules =
 
     let rules, elapsed =
         time (fun () ->
+            let r = new Random()
             rules
+            |> List.sortBy (fun _ -> r.Next()) // Shuffle the workload to keep heavy rules (maybe) evenly distributed
 #if DEBUG
-            |> List.mapi
+            |> List.map
 #else
             |> Array.ofList
-            |> Array.Parallel.mapi
+            |> Array.Parallel.map
 #endif
-                (fun _ (i, node) ->
+                (fun (i, node) ->
                     let rule, elapsed = time (fun () -> RuleCompiler.compile showNfa features sets node)
                     if options.verbosityLevel > Silent then
                         fprintf stderr "."
-                    i, node, rule, elapsed)
-            |> List.ofSeq)
+                    i, (node, rule, elapsed))
+            |> List.ofSeq
+            |> List.sortBy fst)
 
     if options.verbosityLevel > Silent then
         fprintfn stderr ""
 
     rules, elapsed
-
-let getIpaChangeLine ruleNum (changes: int list) (result: string) =
-    let result = result |> List.ofSeq
-    
-    // Insert a combining long underline after each change, but if there's a deletion at the end, put a regular underscore there
-    let deletionAtEnd, changes =
-        changes
-        |> List.rev
-        |> List.partition ((<=) result.Length)
-    let outChars =
-        let chars =
-            (result, changes)
-            ||> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result)
-        if List.isEmpty deletionAtEnd then
-            chars
-        else
-            chars @ ['_']
-
-    let out = String.Join("", outChars)
-
-    [ $"%2d{ruleNum}. {out}" ]
-
-let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
-    let maxIndex = List.max changes + 1
-
-    let changeLine =
-        Array.create maxIndex ' '
-        |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
-
-    [
-        $"%2d{ruleNum}. {result}"
-        "    " + String.Join("", changeLine)
-    ]
 
 let transformWord options rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
@@ -95,15 +65,15 @@ let transformWord options rules word =
         | [] ->
             word, nextWord, log, totalTime
 
-        | (i, _, rule, _)::xs ->
+        | (i, (_, rule, _))::xs ->
             let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa rule nextWord)
 
             let log =
                 if options.verbosityLevel >= ShowTransformations && nextWord <> result then
                     if options.format = IPA then
-                        log @ getIpaChangeLine i locations result
+                        log @ Transducer.getIpaChangeLine i locations result
                     else
-                        log @ getXsampaChangeLine i locations result
+                        log @ Transducer.getXsampaChangeLine i locations result
                 else
                     log
 
@@ -112,8 +82,8 @@ let transformWord options rules word =
     inner word [] 0.0 rules
 
 let transformLexicon options rules lexicon =
-    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transformWord options rules word)
-    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transformWord options rules word)
+    let inline transformSerial () = lexicon |> Array.map (fun word -> transformWord options rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.map (fun word -> transformWord options rules word)
 
 #if DEBUG
     let fTransform = transformSerial
@@ -186,7 +156,7 @@ let main argv =
     if options.listRules || options.verbosityLevel >= ShowTransformations then
         fprintfn stderr ""
 
-        for i, node, _, milliseconds in rules do
+        for i, (node, _, milliseconds) in rules do
             if options.verbosityLevel >= ShowTimes then
                 printf $"[%8s{formatTime milliseconds}] "
 
@@ -200,7 +170,7 @@ let main argv =
     // Dump rule DFAs
 
     if options.verbosityLevel >= ShowDFA then
-        for i, node, rule, _ in rules do
+        for i, (node, rule, _) in rules do
             let transitions, transformations = rule
             printfn $"\nRule {i}: {node}"
 
@@ -286,15 +256,15 @@ let main argv =
 
         let totalCompileMilliseconds =
             rules
-            |> List.sumBy (fun (_, _, _, milliseconds) -> milliseconds)
+            |> List.sumBy (fun (_, (_, _, milliseconds)) -> milliseconds)
 
         let numRules = float rules.Length
         let numWords = float lexicon.Length
 
-        printfn $"\nCompiled {rules.Length} rules in {formatTime compileTime} (average {formatTime (compileTime / numRules)})"
-        printfn $"Total compile time {formatTime totalCompileMilliseconds} (average {formatTime (totalCompileMilliseconds / numRules)})"
-        printfn $"Transformed {lexicon.Length} words in {formatTime totalMilliseconds} (average {formatTime (totalMilliseconds / numWords)})"
-        printfn $"Total transform time {formatTime totalTransformMilliseconds} (average {formatTime (totalTransformMilliseconds / numWords)})"
+        printfn $"\nCompiled {rules.Length} rules in {formatTime compileTime} (average {formatTime (compileTime / numRules)}/rule)"
+        printfn $"Total compile time {formatTime totalCompileMilliseconds} (average {formatTime (totalCompileMilliseconds / numRules)}/rule)"
+        printfn $"Transformed {lexicon.Length} words in {formatTime totalMilliseconds} (average {formatTime (totalMilliseconds / numWords)}/word)"
+        printfn $"Total transform time {formatTime totalTransformMilliseconds} (average {formatTime (totalTransformMilliseconds / numWords)}/word)"
         printfn ""
 
     0 // return an integer exit code

@@ -5,6 +5,12 @@
     <Platforms>AnyCPU;x86</Platforms>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>transmute</AssemblyName>
+    <Copyright>© 2023 Matt Arriola</Copyright>
+    <RepositoryUrl>https://github.com/marriola/Transmute</RepositoryUrl>
+    <AssemblyVersion>0.1</AssemblyVersion>
+    <FileVersion>$(AssemblyVersion)</FileVersion>
+    <Version>$(AssemblyVersion)</Version>
+    <SignAssembly>False</SignAssembly>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
