@@ -75,7 +75,7 @@ module internal SyntaxAnalyzer =
                 | TaggedNode (_, OptionalNode children)::[] ->
                     inner children
                 | TaggedNode (position, DisjunctNode branches)::[] ->
-                    match List.tryFind (inner >> Result.isOk) branches with
+                    match List.tryFind (inner >> function Ok _ -> true | _ -> false) branches with
                     | Some _ -> Ok result
                     | None -> Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
                 | TaggedNode (position, _)::_ ->

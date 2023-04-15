@@ -215,7 +215,7 @@ module internal StateMachine =
 
                 if List.isEmpty transitions then
                     let nextPosition = position + 1
-                    let nextInput = input[1..]
+                    let nextInput = input.[1..input.Length - 1]
                     let matchSymbol = OnChar nextSymbol
 
                     match fError nextSymbol machineState with
@@ -228,7 +228,7 @@ module internal StateMachine =
                                 // Backtrack to the next branch if there is one and we haven't already been there
                                 //printfn "*** BACKTRACK to %O,%O - %d left ***" matchSymbol s (List.length stackRest - 1)
                                 if Set.contains (matchSymbol, s) visited then
-                                    inner visited stackRest[1..]
+                                    inner visited stackRest.[1..stackRest.Length - 1]
                                 else
                                     inner (Set.add (matchSymbol, s) visited) stackRest
                             | _ ->

@@ -12,6 +12,7 @@ open System
 open System.IO
 
 module RuleCompiler =
+    let fuck = ()
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
 
@@ -388,7 +389,7 @@ module RuleCompiler =
                 | (DisjunctNode branches)::_ ->
                     HasNext (matchDisjunct branches)
                 | x::_ ->
-                    failwithf $"Unexpected {x}"
+                    failwithf "Unexpected %O" x
 
             match generatorState with
             | Done ->
@@ -429,15 +430,15 @@ module RuleCompiler =
                 |> List.distinct)
             |> List.ofSeq
         
-        let onsetToNucleus = finalStates[0] |> List.map (fun s -> (s, OnEpsilon), sNucleus)
-        let nucleusToCoda = finalStates[1] |> List.map (fun s -> (s, OnEpsilon), sCoda)
-        let codaToOnset = finalStates[2] |> List.map (fun s -> (s, OnEpsilon), sOnset)
+        let onsetToNucleus = finalStates.[0] |> List.map (fun s -> (s, OnEpsilon), sNucleus)
+        let nucleusToCoda = finalStates.[1] |> List.map (fun s -> (s, OnEpsilon), sCoda)
+        let codaToOnset = finalStates.[2] |> List.map (fun s -> (s, OnEpsilon), sOnset)
         
         let transitions = transitions @ onsetToNucleus @ nucleusToCoda |> Map.ofList
 
-        let onsetTransformations = nfas[0] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'O')
-        let nucleusTransformations = nfas[1] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'N')
-        let codaTransformations = nfas[2] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'C')
+        let onsetTransformations = nfas.[0] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'O')
+        let nucleusTransformations = nfas.[1] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'N')
+        let codaTransformations = nfas.[2] |> Map.toList |> List.map (fun ((origin, input), dest) -> (From origin, input, To dest), 'C')
         let transformations = Map.ofList (onsetTransformations @ nucleusTransformations @ codaTransformations)
 
         transitions, transformations
