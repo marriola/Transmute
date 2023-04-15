@@ -25,12 +25,14 @@ let compileRules options features sets syllableDefinition rules =
 
     let rules, rulesTime =
         time (fun () ->
+            let r = new Random()
             rules
+            |> List.sortBy (fun _ -> r.Next()) // Shuffle the workload to keep heavy rules (maybe) evenly distributed
 #if DEBUG
-            |> List.mapi
+            |> List.map
 #else
             |> Array.ofList
-            |> Array.Parallel.mapi
+            |> Array.Parallel.map
 #endif
                 (fun _ (i, node) ->
                     // TODO re-enable showing the NFA here
@@ -38,50 +40,14 @@ let compileRules options features sets syllableDefinition rules =
                     let rule, elapsed = time (fun () -> RuleCompiler.compileRule false features sets node)
                     if options.verbosityLevel > Silent then
                         fprintf stderr "."
-                    i, node, rule, elapsed)
-            |> List.ofSeq)
+                    i, (node, rule, elapsed))
+            |> List.ofSeq
+            |> List.sortBy fst)
 
     if options.verbosityLevel > Silent then
         fprintfn stderr ""
 
     syllableRule, rules, rulesTime
-
-/// Returns the word with each change underlined.
-let getIpaChangeLine ruleNum (changes: int list) (result: string) =
-    let result = result |> List.ofSeq
-    
-    let deletionAtEnd, changes =
-        changes
-        |> List.rev
-        |> List.partition ((<=) result.Length)
-    let outChars =
-        let chars =
-            (result, changes)
-            ||> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result)
-        if List.isEmpty deletionAtEnd then
-            chars
-        else
-            chars @ ['_']
-
-    let out = String.Join("", outChars)
-
-    [ $"%2d{ruleNum}. {out}" ]
-
-/// Returns a string filled with spaces, with a '^' inserted at the location of each change.
-let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
-    if List.isEmpty changes then
-        []
-    else
-        let maxIndex = List.max changes + 1
-
-        let changeLine =
-            Array.create maxIndex ' '
-            |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
-
-        [
-            $"%2d{ruleNum}. {result}"
-            "    " + String.Join("", changeLine)
-        ]
 
 let transformWord options syllableRule rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
@@ -95,7 +61,7 @@ let transformWord options syllableRule rules word =
         | [] ->
             word, nextWord, log, totalTime
 
-        | (i, _, rule, _)::xs ->
+        | (i, (_, rule, _))::xs ->
             let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa syllableBoundaryLocations rule nextWord)
 
             let (syllableBoundaryLocations, segmentLocations), syllableBoundaryTime =
@@ -129,9 +95,9 @@ let transformWord options syllableRule rules word =
                             [ "    " + String.Join("", segmentLine) ] @ [ "    " + String.Join("", line) ]
 
                     if options.format = IPA then
-                        log @ syllableLine @ getIpaChangeLine i locations result
+                        log @ syllableLine @ Transducer.getIpaChangeLine i locations result
                     else
-                        log @ syllableLine @ getXsampaChangeLine i locations result
+                        log @ syllableLine @ Transducer.getXsampaChangeLine i locations result
                 else
                     log
 
@@ -140,8 +106,8 @@ let transformWord options syllableRule rules word =
     inner (syllableBoundaryLocations, segmentLocations) word [] 0.0 rules
 
 let transformLexicon options syllableRule rules lexicon =
-    let inline transformSerial () = lexicon |> Array.mapi (fun i word -> transformWord options syllableRule rules word)
-    let inline transformParallel () = lexicon |> Array.Parallel.mapi (fun i word -> transformWord options syllableRule rules word)
+    let inline transformSerial () = lexicon |> Array.map (fun word -> transformWord options syllableRule rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.map (fun word -> transformWord options syllableRule rules word)
 
 #if DEBUG
     let fTransform = transformSerial
@@ -212,7 +178,7 @@ let main argv =
     if options.listRules || options.verbosityLevel >= ShowTransformations then
         fprintfn stderr ""
 
-        for i, node, _, milliseconds in rules do
+        for i, (node, _, milliseconds) in rules do
             if options.verbosityLevel >= ShowTimes then
                 printf $"[%8s{formatTime milliseconds}] "
 
@@ -226,7 +192,7 @@ let main argv =
     // Dump rule DFAs
 
     if false && options.verbosityLevel >= ShowDFA then
-        for i, node, rule, _ in rules do
+        for i, (node, rule, _) in rules do
             let transitions, transformations = rule
             printfn $"\nRule {i}: {node}"
 
@@ -312,7 +278,7 @@ let main argv =
 
         let totalCompileMilliseconds =
             rules
-            |> List.sumBy (fun (_, _, _, milliseconds) -> milliseconds)
+            |> List.sumBy (fun (_, (_, _, milliseconds)) -> milliseconds)
 
         let numRules = float rules.Length
         let numWords = float lexicon.Length

@@ -11,6 +11,11 @@ open TransmuteLib.StateMachine
 type InputFormat =
     | IPA
     | X_SAMPA
+with
+    override this.ToString() =
+        match this with
+        | IPA -> "IPA"
+        | X_SAMPA -> "X-SAMPA"
 
 module internal Lexer =
     type Result =
@@ -58,7 +63,13 @@ module internal Lexer =
     let trimComment token = { token with value = token.value.[1..].Trim() }
 
     /// Removes the initial sigil from a token if it has one.
-    let trimSigil sigil token = { token with value = if token.value.Length > 0 && token.value[0] = sigil then token.value[1..] else token.value }
+    let trimSigil sigil token =
+        { token with
+            value =
+                if token.value.Length > 0 && token.value.[0] = sigil then
+                    token.value.[1..token.value.Length - 1]
+                else
+                    token.value }
 
     type MismatchAction = Restart | Stop
 
@@ -89,7 +100,7 @@ module internal Lexer =
                         [ seq { 'a'..'z' }
                           seq { '\u0250'..'\u0341' }
                           "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
-                          "æœðøçɸβθχ" :> char seq
+                          "æœðøçɸβθχŋ" :> char seq
                         ]
                         Q_Utterance
                 else

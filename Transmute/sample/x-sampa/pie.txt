@@ -1,12 +1,12 @@
-﻿pXt"e:r
-meXt"e:r
-b_hr"eXte:r
+﻿p?\t"e:r
+me?\t"e:r
+b_hr"e?\te:r
 sw"este:r
 su?n"us
 d_hukt"e:r
 l"eg_hjeti
 "ojnos		; masc.
-"ojneX		; fem.
+"ojne?\		; fem.
 "ojnom		; neut.
 dw"oj
 tr"ejes
@@ -18,54 +18,52 @@ ok't"o:w
 ?n"ewnd
 d"ek'md
 k'mt"om
-X_wd"onts	; nom.sg.
-X_wd"ontes	; nom.pl.
-X_wd"ontm	; acc.sg.
-X_wd"ontms	; acc.pl.
-X_wdnt"es	; gen.sg.
-X_wdnt"o?om	; gen.pl.
-X_wdnt"ej	; dat.sg.
-X_wdntm"os	; dat.pl.
-X_wdnt"e?	; inst.sg.
+?\_wd"onts	; nom.sg.
+?\_wd"ontes	; nom.pl.
+?\_wd"ontm	; acc.sg.
+?\_wd"ontms	; acc.pl.
+?\_wdnt"es	; gen.sg.
+?\_wdnt"o?om	; gen.pl.
+?\_wdnt"ej	; dat.sg.
+?\_wdntm"os	; dat.pl.
+?\_wdnt"e?	; inst.sg.
 widonom		; inf.
-w"ojdXe		; 1sg.
-w"ojdtXe	; 2sg.
+w"ojd?\e		; 1sg.
+w"ojdt?\e	; 2sg.
 w"ojde		; 3sg.
 widt"os
 pl?n"os
 pl?n"om
-pl?n"eX
+pl?n"e?\
 k_w"ek_wlom	; nom.sg.
-k_wek_wl"eX	; collective
+k_wek_wl"e?\	; collective
 su?r"os
 w"rmis
 d_hr"og_honom
 spr"egonom
 lipj"onom
-Xk'Xowsj"onom
+?\k'?\owsj"onom
 b_h"end_honom
-XpX_w"el?nonom
-dng'_hw"eXn
+?\p?\_w"el?nonom
+dng'_hw"e?\n
 b_holg'_his
-g'_h"lX_wtom
+g'_h"l?\_wtom
 b_hr"onk'tos
-g_w_h"iXb_hX
+g_w_h"i?\b_h?\
 song_w_hos
 d_h"ed_he?m
 p"o:ds
 p"o:des
 p"ek'u
-Xent"ijos
-X"enXts
-k'rXn"om
+?\ent"o
+k'r?\n"om
 ?n"rtros
-sX"untros
-X"ewsros
+s?\"untros
+?\"ewsros
 b_h"erg'tos
 g_h"ostejes
-s"e?mo:
 d_hews"om
 kn"udes
-s"eXgjonom
-s"eXgtom
-Xok'j"eX
+s"e?\gjonom
+s"e?\gtom
+?\ok'j"e?\

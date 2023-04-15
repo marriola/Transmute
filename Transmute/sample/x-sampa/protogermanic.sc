@@ -9,15 +9,15 @@ $Syllable (
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
-; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ?, X and X_w, respectively, on the basis that I think they're neat.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ?, ?\ and ?\_w, respectively, on the basis that I think they're neat.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                        Rules                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 ; TODO implement NOT nodes
-;   $Sonorant/u$Sonorant/$V_!$V
-;   $Sonorant/u$Sonorant/!$V_$V
+;   Sonorant/uSONORANT/V_!V
+;   Sonorant/uSONORANT/!V_V
 
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
@@ -37,8 +37,8 @@ $Laryngeal // #_$C
 
 ; e-coloring and dropping of laryngeals in onset
 
-e -> o / X_w(")_
-e -> a / X(")_
+e -> o / ?\_w(")_
+e -> a / ?\(")_
 $Laryngeal // _(")$V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
@@ -55,10 +55,10 @@ uu -> u::
 
 ; e-coloring
 
-e -> o / _(w|j)X_w
-e -> a / _(w|j)X
-eX_w -> o:
-eX -> A:
+e -> o / _(w|j)?\_w
+e -> a / _(w|j)?\
+e?\_w -> o:
+e?\ -> A:
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
@@ -67,7 +67,7 @@ $Laryngeal → ∅ / ($V|$Sonorant)_
 
 ; Cowgill's law
 
-X_w -> g / ($Sonorant)_w
+?\_w -> g / ($Sonorant)_w
 
 ; Vocalization of remaining laryngeals
 
@@ -91,7 +91,7 @@ $Laryngeal -> @
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 
 [Stop-Voiced] -> [+Fricative] / (#|$V|$Sonorant)_
-;[Stop-Voiced] -> [+Fricative] / !($OBSTRUENT)_
+;[Stop-Voiced] -> [+Fricative] / !($Obstruent)_
 
 ; Undo Grimm's law after s-
 
@@ -300,16 +300,15 @@ $Dental (t, d, d_h, T, D, s, z)
 $Labial (m, p, b, b_h, p\, B)
 $Labiovelar (k_w, g_w, g_w_h, x_w, G_w)
 $Velar (k, g, g_h, g'_h, x, G, $Labiovelar)
-$Nasal (m, n)
+$Sonorant (m, n, l, r, w, j)
 $Liquid (l, r)
-$Approximant (w, j)
 [Glide] (u -> w, i -> j)
-$Sonorant ($Nasal, $Liquid, $Approximant)
-$Laryngeal (?, X, X_w, X_)
+$Nasal (m, n)
+$Laryngeal (?, ?\, ?\_w, ?\_)
 $Sibilant (s z)
 
-$OBSTRUENT ($STOP, Fricative)
-$C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant, $Fricative, [-Fricative] $Palatalized)
+$Obstruent ($Stop, Fricative)
+$C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant)
 
 [Voiced] (
     k -> g

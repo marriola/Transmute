@@ -30,38 +30,7 @@ Try piping the output from PIE, to Proto-Germanic, to West Germanic, and finally
         ./transmute -x sample/x-sampa/westgermanic.sc - |
         ./transmute -x sample/x-sampa/oldenglish.sc -
 
-### A transformation example: "edge"
-
-#### Proto-Indo-European to Proto-Germanic
-
-| Result    | Rule                                                                                                                 | Rule description                                                      |
-|-----------|----------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| χokʲjˈeχ  |                                                                                                                      | Original word                                                         |
-| χokj̲ˈeχ​   | [+Palatalized] → [-Palatalized]                                                                                      | Merging of palatovelars into velars                                   |
-| o̲kjˈeχ​    | LARYNGEAL → Ø / #_                                                                                                   | Deletion of word-initial laryngeal                                    |
-| okjˈɑ̲ː​    | eχ → ɑː                                                                                                              | e-coloring, deletion of laryngeal, compensatory lengthening           |
-| ox̲jˈɑː​    | [STOP-Voiced] → [+Fricative] / (#\|V\|SONORANT)_                                                                     | Grimm's law - voiceless stops shift become fricatives                 |
-| oɣ̲jˈɑː​    | [+Fricative-Voiced] → [+Voiced] / (C\|#)\[-Stressed-SONORANT\](SONORANT)_(#\|V\|[+Overlong]\|[+Stressed]\|[+Voiced]) | Verner's law - voicing of voiceless fricatives after unstressed vowel |
-| oɣjɑ̲ː​     | [+Stressed] → [-Stressed]                                                                                            | Stopped marking stress because it moved to the initial syllable       |
-| ɑ̲ɣjɑː​     | (o\|a) → ɑ                                                                                                           | Vowel shift (o → ɑ)                                                   |
-| ɑɣjɔ̲ː     | ɑː → ɔː                                                                                                              | Vowel shift (ɔː → ɑː)                                                 |
-
-#### Proto-Germanic to West Germanic
-
-| Result    | Rule                                 | Rule description                                            |
-|-----------|--------------------------------------|-------------------------------------------------------------|
-| æ̲ɣjɔː​     | [-Front] → [+Front] / _C(C)(C)(i\|j) | Umlaut                                                      |
-| æɣju̲​      | [-Short] → [+Short] / _#             | Vowel shift (ɔː -> u)                                       |
-| æg̲gju     | [-Geminate] → [+Geminate] / _j       | Gemination before /j/                                       |
-
-#### West Germanic to Old English
-
-| Result    | Rule                                          | Rule description                                            |
-|-----------|-----------------------------------------------|-------------------------------------------------------------|
-| æd̲ʒju​​     | [-Palatalized] → [+Palatalized] / _(i(ː)\|j)  | Palatalization before /j/                                   |
-| ædʒj​_     | (i\|u) → Ø / (ː\|C)C_#                        | Deleted final vowel                                         |
-| ædʒ​_      | j → Ø / C_#                                   | Deleted final glide                                         |
-| e̲dʒ       | (æ\|i) → e / _(C)(C)(C)#                      | Vowel shift (æ → e)                                         |
+Try out the last step in the [browser demo](https://marriola.github.io/transmute-demo). Click Examples and select West Germanic to Old English.
 
 ## Performance
 

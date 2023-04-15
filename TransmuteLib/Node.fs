@@ -7,6 +7,7 @@
 namespace TransmuteLib
 
 open System.Collections.Generic
+open TransmuteLib.ExceptionHelpers
 open TransmuteLib.Position
 
 type Node =
@@ -83,7 +84,7 @@ type Node =
         | CompoundSetIdentifierNode terms ->
             terms
             |> List.map string
-            |> String.concat ""
+            |> String.concat " "
             |> sprintf "[%s]"
         | SetDefinitionNode (name, members) ->
             members
@@ -98,15 +99,19 @@ type Node =
             |> String.concat "; "
             |> sprintf "[%s] { %s }" name
         | OptionalNode children ->
-            children
-            |> List.map string
-            |> String.concat ""
-            |> sprintf "(%s)"
+            let contents =
+                children
+                |> List.map string
+                |> String.concat ""
+            if contents.Length > 1 then
+                sprintf "( %s )" contents
+            else
+                sprintf "(%s)" contents
         | DisjunctNode branches ->
             branches
             |> List.map stringifyList
-            |> String.concat "|"
-            |> sprintf "(%s)"
+            |> String.concat " | "
+            |> sprintf "( %s )"
         | RuleNode (input, output, environment) ->
             let environmentSection =
                 match environment with
@@ -330,6 +335,8 @@ module Node =
           List.map getSetMembers sets ]
         |> List.collect List.concat
         |> set
+
+    //let invalidSyntax message (offset, line, col) = raise (TransmuteLib.Exceptions.SyntaxError (message, offset, line, col))
 
     /// <summary>
     /// Tries to execute a function that retrieves a type of object (set, feature, etc.). If the function

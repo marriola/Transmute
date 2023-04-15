@@ -15,10 +15,9 @@ namespace TransmuteLib
 open TransmuteLib.Exceptions
 open TransmuteLib.Position
 
-[<AutoOpen>]
 module ExceptionHelpers =
     let syntaxErrorMessage message (Offset offset, Line line, Column column) =
-        $"Syntax error at line {line}, column {column} (offset {offset}): {message}"
+        sprintf "Syntax error at line %d, column %d (offset %d): %s" line column offset message
 
     let invalidSyntax message (offset, line, col) = raise (SyntaxError (message, offset, line, col))
 

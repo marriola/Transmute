@@ -5,7 +5,7 @@
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
-; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, χ and χʷ, respectively, on the basis that I think they're neat.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, ʕ and ʕʷ, respectively, on the basis that I think they're neat.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;                        Rules                        ;;
@@ -33,8 +33,8 @@ Laryngeal → ∅ / #_C
 
 ; e-coloring and dropping of laryngeals in onset
 
-e → o / χʷ(ˈ)_
-e → a / χ(ˈ)_
+e → o / ʕʷ(ˈ)_
+e → a / ʕ(ˈ)_
 Laryngeal → ∅ / _(ˈ)V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
@@ -51,10 +51,10 @@ uu → uːː
 
 ; e-coloring
 
-e → o / _(w|j)χʷ
-e → a / _(w|j)χ
-eχʷ → oː
-eχ → ɑː
+e → o / _(w|j)ʕʷ
+e → a / _(w|j)ʕ
+eʕʷ → oː
+eʕ → ɑː
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
@@ -63,7 +63,7 @@ Laryngeal → ∅ / (V|Sonorant)_
 
 ; Cowgill's law
 
-χʷ → g / (Sonorant)_w
+ʕʷ → g / (Sonorant)_w
 
 ; Vocalization of remaining laryngeals
 
@@ -301,7 +301,7 @@ Nasal (m, n)
 [Glide] (u → w, i → j)
 Approximant (w, j)
 Sonorant (Nasal, Liquid, Approximant)
-Laryngeal (ʔ, χ, χʷ)
+Laryngeal (ʔ, ʕ, ʕʷ)
 Sibilant (s z)
 
 Obstruent (Stop, Fricative)

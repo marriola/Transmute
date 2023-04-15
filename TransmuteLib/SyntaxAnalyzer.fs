@@ -5,6 +5,8 @@
 
 namespace TransmuteLib
 
+open TransmuteLib.ExceptionHelpers
+
 module internal SyntaxAnalyzer =
     let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) result =
         match nodes with

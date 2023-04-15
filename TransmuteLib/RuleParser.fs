@@ -7,13 +7,12 @@
 namespace TransmuteLib
 
 open System.IO
+open TransmuteLib.ExceptionHelpers
 open TransmuteLib.Lexer
 open TransmuteLib.Position
 open TransmuteLib.Token
-open TransmuteLib.Utils
 
 module RuleParser =
-
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
