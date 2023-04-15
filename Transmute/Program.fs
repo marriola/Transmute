@@ -29,10 +29,10 @@ let compileRules options features sets syllableDefinition rules =
             rules
             |> List.sortBy (fun _ -> r.Next()) // Shuffle the workload to keep heavy rules (maybe) evenly distributed
 #if DEBUG
-            |> List.map
+            |> List.mapi
 #else
             |> Array.ofList
-            |> Array.Parallel.map
+            |> Array.Parallel.mapi
 #endif
                 (fun _ (i, node) ->
                     // TODO re-enable showing the NFA here

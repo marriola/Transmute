@@ -356,7 +356,7 @@ module RuleParser =
             match tokens with
             | OfType Whitespace _::xs ->
                 matchSet_Rule xs identifier
-            | xs when identifier.value = "Syllable" ->
+            | OfType Equals _::xs when identifier.value = "Syllable" ->
                 matchSyllableDefinition xs
             | OfType LParen openToken::xs
             | OfType LBrace openToken::xs ->

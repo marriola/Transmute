@@ -2,10 +2,10 @@
 
 ; Why does adding overlong vowels to the nucleus make it infinite loop?
 
-$Syllable (
+$Syllable = (
     $Onset = ((s | $Laryngeal)) ($C) ($C)
     $Nucleus = (") ($V | $Sonorant | $Laryngeal)
-    $Coda = ($C) ([C-Approximant])
+    $Coda = ($C) ([C-Glide])
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
