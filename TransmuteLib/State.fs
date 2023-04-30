@@ -15,11 +15,23 @@ type TransitionResult =
     /// Drops the last N output symbols and adds a new symbol.
     | ReplacesWith of count: int * output: string
 
+    | InsertsBefore of output: string
+
     /// Adds the consumed symbol, followed by a new symbol.
-    | Inserts of output: string
+    | InsertsAfter of output: string
 
     /// Drops the last N output symbols.
     | Deletes of count: int * text: string
+with
+    member this.Or other =
+        match this, other with
+        | OutputDefault, x
+        | x, OutputDefault ->
+            x
+        | x, y when x <> y ->
+            failwithf "Tried to OR two transition results: %O, %O" x y
+        | _ ->
+            this
 
 type State =
     | State of name: string * stateType: StateType

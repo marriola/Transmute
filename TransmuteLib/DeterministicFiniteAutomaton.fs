@@ -8,6 +8,10 @@ namespace TransmuteLib
 
 type Transformation = Transition * TransitionResult
 
+type GenericList<'T> = System.Collections.Generic.List<'T>
+type GenericSet<'T> = System.Collections.Generic.HashSet<'T>
+type GenericStack<'T> = System.Collections.Generic.Stack<'T>
+
 module internal DeterministicFiniteAutomaton =
     type private TransitionType =
         /// A transition with a destination state that needs to be checked for deterministic transitions.
@@ -58,7 +62,7 @@ module internal DeterministicFiniteAutomaton =
     /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
     /// </summary>
     /// <returns>A set of input symbol and state tuples.</returns>
-    let private computePowerSet transitions state =
+    let private computePowerSet transitions (originalResult: TransitionResult) state =
         let rec inner transitions states result =
             match states with
             | [] ->
@@ -80,7 +84,7 @@ module internal DeterministicFiniteAutomaton =
                             input <> OnEpsilon
                             && (origin <% x
                                 || Set.contains origin followStates))
-                    |> List.map (fun ((_, input, To dest), result) -> input, dest, result)
+                    |> List.map (fun ((_, input, To dest), result) -> input, dest, originalResult.Or result)
                 let nextStates =
                     followStates
                     |> Seq.filter (fun s ->
@@ -106,6 +110,12 @@ module internal DeterministicFiniteAutomaton =
     /// Converts an NFA into an equivalent DFA.
     let fromNfa startState errorState (table: Transition list) (transformations: Transformation list) showNfa =
         let table = augment table transformations
+
+        let initialInsertion =
+            table
+            |> List.tryFind (fun ((From origin, inputSymbol, _), _) -> origin = startState && inputSymbol = OnEpsilon)
+            |> Option.map (fun (_, result) -> result)
+            |> Option.defaultValue OutputDefault
 
         let inline hasNonEpsilonTransition state =
             table
@@ -142,13 +152,14 @@ module internal DeterministicFiniteAutomaton =
                                     | (From successor, OnEpsilon, To d2), uResult as u
                                         when successor <% d ->
                                         let result =
-                                            if tResult <> OutputDefault then
-                                                if uResult = OutputDefault then
+                                            match tResult, uResult with
+                                            | OutputDefault, x
+                                            | x, OutputDefault ->
+                                                x
+                                            | x, y when x <> y ->
+                                                failwith "Both transitions have transformation!"
+                                            | _ ->
                                                     tResult
-                                                else
-                                                    failwith "Both transitions have transformation!"
-                                            else
-                                                uResult
                                         Some (MaybeDeterministic ((From current, input, To d2), result))
                                     | _ ->
                                         None)
@@ -183,22 +194,22 @@ module internal DeterministicFiniteAutomaton =
         /// non-epsilon transitions, and create transitions to them from the given state.
         /// </summary>
         /// <returns>A list of deterministric transitions.</returns>
-        let followEpsilonTransitions origin transitions =
+        let followEpsilonTransitions origin originalResult transitions =
             transitions
-            |> List.collect (getDest >> computePowerSet table)
+            |> List.collect (getDest >> computePowerSet table originalResult)
             |> List.distinct
             |> List.map (fun (input, dest, result) -> (From origin, input, To dest), result)
 
         /// Replaces epsilon transitions originating from current with all possible deterministic transitions.
         ///
         /// Also replaces destination states that have epsilon transition with states that can be reached deterministically.
-        let removeNondeterminism current transitions = 
+        let removeNondeterminism current initialInsertion transitions = 
             // Separate epsilon and non-epsilon transitions
             let epsilonTransitions, nonEpsilonTransitions =
                 transitions
                 |> List.partition (getInput >> (=) OnEpsilon)
             // Follow epsilon transitions to the next state with non-epsilon transitions
-            let followedEpsilonTransitions = followEpsilonTransitions current epsilonTransitions
+            let followedEpsilonTransitions = followEpsilonTransitions current initialInsertion epsilonTransitions
             // Combine with followed epsilon transitions, and follow the destination state if it has epsilon transitions.
             let transitions =
                 nonEpsilonTransitions @ followedEpsilonTransitions
@@ -234,19 +245,19 @@ module internal DeterministicFiniteAutomaton =
                     (From current, on, To mergedDest), production)
             single @ merged
 
-        let rec fromNfa' searchStack dfaTransitions =
+        let rec fromNfa' initialInsertion searchStack dfaTransitions =
             match searchStack with
             | [] -> 
                 dfaTransitions
                 |> List.ofSeq
             | x::rest when x = errorState ->
-                fromNfa' rest dfaTransitions
+                fromNfa' initialInsertion rest dfaTransitions
             | current::rest ->
                 // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
                     table
                     |> transitionsFrom current 
-                    |> removeNondeterminism current
+                    |> removeNondeterminism current initialInsertion
                     |> groupTransitions current
                 // Follow transitions that don't go to the current state or a state already in the stack
                 let nextStack =
@@ -259,8 +270,8 @@ module internal DeterministicFiniteAutomaton =
                     transitionsFromCurrent
                     |> Set.ofList
                     |> Set.union dfaTransitions
-                fromNfa' nextStack nextTransitions
+                fromNfa' OutputDefault nextStack nextTransitions
 
         if showNfa then printNfa table
 
-        fromNfa' [startState] Set.empty
+        fromNfa' initialInsertion [startState] Set.empty

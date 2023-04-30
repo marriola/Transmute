@@ -85,7 +85,21 @@ module Transducer =
                     let nextProduction = Replaced (position, s, string symbol) :: value.buffer
                     BufferString.coalesce (skip + 1) nextProduction
 
-                | Inserts s ->
+                | InsertsBefore s ->
+                    let buffer =
+                        match value.buffer with
+                        | Inserted _ :: rest ->
+                            // Drop insertion from an incomplete application
+                            rest
+                        | Unchanged (_, "_") as underscore :: Inserted _ :: rest ->
+                            // Same as above, but preserve intervening X-SAMPA underscore
+                            underscore :: rest
+                        | _ ->
+                            value.buffer
+
+                    Unchanged (position, string symbol) :: Inserted (position + 1, s) :: buffer
+
+                | InsertsAfter s ->
                     let buffer =
                         match value.buffer with
                         | Inserted _ :: rest ->

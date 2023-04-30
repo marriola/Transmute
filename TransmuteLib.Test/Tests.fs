@@ -39,7 +39,7 @@ let testRules format rules inputs (expected: string list) =
 
 [<Fact>]
 let ``Unconditional single phone transformation`` () =
-    testRule IPA "k/t/_" ["ka"] ["ta"]
+    testRule IPA "k → t" ["ka"] ["ta"]
 
 [<Fact>]
 let ``Unconditional set transformation`` () =
@@ -47,13 +47,13 @@ let ``Unconditional set transformation`` () =
     let expected = [ "ga"; "ba"; "da" ]
     let rule =
         """
-        [Voiced] {
-            k -> g
-            p -> b
-            t -> d
+        [Voiced] = {
+            k → g
+            p → b
+            t → d
         }
 
-        [-Voiced]/[+Voiced]/_
+        [-Voiced] → [+Voiced]
         """
     testRule IPA rule input expected
 
@@ -73,13 +73,13 @@ let ``Unconditional set reverse transformation`` () =
     let expected = [ "ka"; "pa"; "ta" ]
     let rule =
         """
-        [Voiced] {
-            k -> g
-            p -> b
-            t -> d
+        [Voiced] = {
+            k → g
+            p → b
+            t → d
         }
 
-        [+Voiced]/[-Voiced]/_
+        [+Voiced] → [-Voiced]
         """
     testRule IPA rule input expected
 
@@ -87,14 +87,48 @@ let ``Unconditional set reverse transformation`` () =
 let ``Deletion`` () =
     let input = ["ha"]
     let expected = ["a"]
-    let rule = "h//_"
+    let rule = "h → ∅"
     testRule IPA rule input expected
 
 [<Fact>]
-let ``Insertion`` () =
-    let input = ["ot"]
-    let expected = ["oit"]
-    let rule = "∅/i/o_t"
+let ``Insertion in the middle`` () =
+    let input = ["it"]
+    let expected = ["ist"]
+    let rule = "∅ → s / i_t"
+    testRule IPA rule input expected
+
+[<Fact>]
+let ``Insertion at the beginning before an utterance`` () =
+    let input = ["t"]
+    let expected = ["it"]
+    let rule = "∅ → i / _t"
+    testRule IPA rule input expected
+
+[<Fact>]
+let ``Insertion at the beginning before a set`` () =
+    let input = ["t"]
+    let expected = ["it"]
+    let rule = """
+    ∅ → i / _C
+    C = (k, p, t)
+    """
+    testRule IPA rule input expected
+
+[<Fact>]
+let ``Insertion at the end after an utterance`` () =
+    let input = ["i"]
+    let expected = ["it"]
+    let rule = "∅ → t / i_"
+    testRule IPA rule input expected
+
+[<Fact>]
+let ``Insertion at the end after a set`` () =
+    let input = ["i"]
+    let expected = ["it"]
+    let rule = """
+    ∅ → t / V_
+    V = (a, e, i, o, u)
+    """
     testRule IPA rule input expected
 
 [<Fact>]
@@ -103,19 +137,20 @@ let ``Addition and replacement after an optional node`` () =
     let expected = ["gʰˈulχʷtom"]
     let rule =
         """
-        DENTAL { t d dʰ θ ð s z }
-        LABIAL { m p b bʰ ɸ β }
-        LABIOVELAR { kʷ gʷ gʷʰ xʷ ɣʷ }
-        VELAR { k g gʰ x ɣ LABIOVELAR }
-        SONORANT { m n l r w j }
-        LIQUID { l r }
-        GLIDE { w j }
-        NASAL { m n }
-        LARYNGEAL { ʔ χ χʷ }
-        SIBILANT { s }
-        C { STOP DENTAL LABIAL VELAR SONORANT LIQUID GLIDE NASAL LARYNGEAL SIBILANT }
-        LARYNGEAL { ʔ χ χʷ }
-        ∅→u/(#|[C-LARYNGEAL])(ˈ)_(m|n|l|r)(#|C)
+        DENTAL = { t d dʰ θ ð s z }
+        LABIAL = { m p b bʰ ɸ β }
+        LABIOVELAR = { kʷ gʷ gʷʰ xʷ ɣʷ }
+        VELAR = { k g gʰ x ɣ LABIOVELAR }
+        SONORANT = { m n l r w j }
+        LIQUID = { l r }
+        GLIDE = { w j }
+        NASAL = { m n }
+        LARYNGEAL = { ʔ χ χʷ }
+        SIBILANT = { s }
+        C = { STOP DENTAL LABIAL VELAR SONORANT LIQUID GLIDE NASAL LARYNGEAL SIBILANT }
+        LARYNGEAL = { ʔ χ χʷ }
+
+        ∅ → u / (#|[C-LARYNGEAL])(ˈ) _ (m|n|l|r)(#|C)
         """
     testRule IPA rule input expected
 
@@ -123,7 +158,7 @@ let ``Addition and replacement after an optional node`` () =
 let ``Disjunct node`` () =
     let input = [ "la"; "ra" ]
     let expected = [ "lo"; "ro" ]
-    let rule = "a/o/(l|r)_"
+    let rule = "a → o / (l|r)_"
     testRule IPA rule input expected
 
 [<Fact>]
@@ -132,27 +167,27 @@ let ``Compound sets`` () =
     let expected = ["a"]
     let rules =
         """
-        STOP { k p t g b d }
-        [Fricative] {
-            k -> x
-            p -> ɸ
-            t -> θ
-            g -> ɣ
-            b -> β
-            d -> ð
+        STOP = { k p t g b d }
+        [Fricative] = {
+            k → x
+            p → ɸ
+            t → θ
+            g → ɣ
+            b → β
+            d → ð
         }
-        [Voiced] {
-            k -> g
-            p -> b
-            t -> d
-            x -> ɣ
-            ɸ -> β
-            θ -> ð
+        [Voiced] = {
+            k → g
+            p → b
+            t → d
+            x → ɣ
+            ɸ → β
+            θ → ð
         }
 
-        [STOP-Voiced]/[+Voiced]/_                ; ka -> ga
-        [+Voiced-Fricative]/[+Fricative]/_       ; ga -> ɣa
-        ɣ→∅                                         ; ɣa -> a
+        [STOP-Voiced] → [+Voiced]                ; ka → ga
+        [+Voiced-Fricative] → [+Fricative]       ; ga → ɣa
+        ɣ → ∅                                    ; ɣa → a
         """
     testRules IPA rules input expected
 
@@ -162,16 +197,16 @@ let ``Multi-phoneme set transformations`` () =
     let expected = [ "ta"; "ta"; "tsa"; "da"; "da" ]
     let rules =
         """
-        [Labialized] {
-            t -> tw
-            d -> dw
+        [Labialized] = {
+            t → tw
+            d → dw
         }
-        [Affricate] {
-            s -> ts
+        [Affricate] = {
+            s → ts
         }
 
-        [+Labialized]/[-Labialized]/_
-        [-Affricate]/[+Affricate]/_
+        [+Labialized] → [-Labialized]
+        [-Affricate] → [+Affricate]
         """
     testRules IPA rules input expected
 
@@ -179,7 +214,7 @@ let ``Multi-phoneme set transformations`` () =
 let ``Repeat simple replacement`` () =
     let input = ["kak"]
     let expected = ["xax"]
-    let rule = "k/x/_"
+    let rule = "k → x"
     testRule IPA rule input expected
 
 [<Fact>]
@@ -188,14 +223,14 @@ let ``Repeat set replacement`` () =
     let expected = ["ɣʷaxʷ"]
     let rule =
         """
-        [Fricative] {
-            k -> x
-            kʷ -> xʷ
-            g -> ɣ
-            gʷ -> ɣʷ
+        [Fricative] = {
+            k → x
+            kʷ → xʷ
+            g → ɣ
+            gʷ → ɣʷ
         }
 
-        [-Fricative]/[+Fricative]/_
+        [-Fricative] → [+Fricative]
         """
     testRule IPA rule input expected
 
@@ -205,13 +240,13 @@ let ``X-SAMPA works`` () =
     let expected = ["p\\aTer"]
     let rule =
         """
-        [$Fricative] (
+        [$Fricative] = (
             k -> x
             p -> p\
             t -> T
         )
 
-        [-$Fricative]/[+$Fricative]/_
+        [-$Fricative] -> [+$Fricative]
         """
     testRule X_SAMPA rule input expected
 
@@ -221,13 +256,13 @@ let ``X-SAMPA diacritics work`` () =
     let expected = ["x_walos"]
     let rule =
         """
-        [$Fricative] (
+        [$Fricative] = (
             k -> x
             k_w -> x_w
             p -> p\
             t -> T
         )
 
-        [-$Fricative]/[+$Fricative]/_
+        [-$Fricative] -> [+$Fricative]
         """
     testRule X_SAMPA rule input expected
