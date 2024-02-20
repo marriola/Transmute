@@ -6,28 +6,20 @@
 
 $V.n -> [+Long +Nasalized] / _$Fricative
 
-(A~:|}~:) -> O~:
+(A~:|{~:) -> O~:
 
 (Ai|Aj) -> A:
 
 ; Anglo-Frisian brightening
 
-A -> } / _[C-/m n/]($C)($C)([V+Front])
-}~ -> A~
-
-; Undo before syllable with back vowel
-;} -> A / _$C($C)($C)[V-Front]
+A -> { / _[C-/m n/]($C)($C)([V+Front])
+{~ -> A~
 
 ; Re-undo before velar consonant
-A -> } / _(x|w|r$C|l$C)
+A -> { / _(x|w|r$C|l$C)
+A -> { / _(x|w|r$C|l$C)
 
-; Undo before syllable with back vowel
-;} -> A / _$C($C)($C)[V-Front]
-
-; Re-undo before velar consonant
-A -> } / _(x|w|r$C|l$C)
-
-[+/} A A~/] // _#
+[+/{ A A~/] // _#
 
 ;;;;;;;;;;;;;;;;;;;
 ;   Old English   ;
@@ -44,16 +36,16 @@ x -> h / (#_ | _$V)
 ; Diphthong height harmonization
 
 [+/Ai Aj/] -> A:
-[+/}u }w/] -> }A
+[+/{u {w/] -> {A
 [+/eu ew/] -> eo
 
 ; A-restoration
 
-} -> A / _[+Geminate]( [C-/j/][V-Front] | # )
+{ -> A / _[+Geminate]( [C-/j/][V-Front] | # )
 
 ; Palatalization of velars
 
-[Palatalized] (k -> tS, g -> dZ, gg -> dZ)
+[Palatalized] = (k -> tS, g -> dZ, gg -> dZ)
 
 [-Palatalized] -> [+Palatalized] / _(i(:)|j)
 [-Palatalized] -> [+Palatalized] / i: _ ($C|#)
@@ -73,7 +65,7 @@ h_w -> hw
 
 ; Loss of short, low vowels in medial syllables
 
-(A|}|e) // $V$C($C)($C)_$C$V
+(A|{|e) // $V$C($C)($C)_$C$V
 
 ; High vowel loss
 
@@ -82,8 +74,8 @@ h_w -> hw
 (i)j // ([V+Long] | $Diphthong)$C($C)($C)_
 (i)j // ([V-Long] | [Diphthong-Long])$C$C($C)($C)_
 
-(i)j // [V+Long+/}A eo iy }A: eo: iy:/]$C($C)($C)_
-(i)j // [V-Long+/}A eo iy/]$C$C($C)($C)_
+(i)j // [V+Long+/{A eo iy {A: eo: iy:/]$C($C)($C)_
+(i)j // [V-Long+/{A eo iy/]$C$C($C)($C)_
 
 j\ -> j
 j // $C_#
@@ -100,7 +92,7 @@ j // $C_#
 
 o: -> A / _($C)($C)($C)#
 u -> o / _$C($C)($C)#
-(}|i) -> e / _($C)($C)($C)#
+({|i) -> e / _($C)($C)($C)#
 
 2 -> e
 iu -> eo
@@ -116,37 +108,37 @@ h -> x / _#
 ;   Sets and features   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-$V ($Long [-Long] $Front [-Front] $Overlong $Nasalized)
-$Stop (k k_w p t g b d)
-$Glide (w j)
-$Liquid (r l)
-$Nasal (m n)
-$Fricative (h x x_w f T G v D s z)
-$Affricate (tS dZ)
-$Sonorant ($Liquid $Nasal $V)
-$C ($Stop $Glide $Liquid $Nasal $Fricative $Affricate)
+$V = ($Long [-Long] $Front [-Front] $Overlong $Nasalized)
+$Stop = (k k_w p t g b d)
+$Glide = (w j)
+$Liquid = (r l)
+$Nasal = (m n)
+$Fricative = (h x x_w f T G v D s z)
+$Affricate = (tS dZ)
+$Sonorant = ($Liquid $Nasal $V)
+$C = ($Stop $Glide $Liquid $Nasal $Fricative $Affricate)
 
-$Diphthong (}A, }A:, eo, eo:, iy, iy:)
+$Diphthong = ({A, {A:, eo, eo:, iy, iy:)
 
-[Voiced] (
+[Voiced] = (
 	x -> G
 	f -> v
 	T -> D
 	s -> z
 )
 
-[Voiced] (
+[Voiced] = (
 	x -> G
 	f -> v
 	T -> D
 	s -> z
 )
 
-[Front] (
-	A -> }
-	A: -> }:
-	}A -> iy
-	}A: -> iy:
+[Front] = (
+	A -> {
+	A: -> {:
+	{A -> iy
+	{A: -> iy:
 	eo -> y
 	eo: -> y:
 	e
@@ -159,8 +151,8 @@ $Diphthong (}A, }A:, eo, eo:, iy, iy:)
 	u: -> y:
 )
 
-[Long] (
-	} -> }:
+[Long] = (
+	{ -> {:
 	A -> A:
 	e -> e:
 	i -> i:
@@ -168,24 +160,24 @@ $Diphthong (}A, }A:, eo, eo:, iy, iy:)
 	2 -> 2:
 	u -> u:
 	y -> y:
-	}A -> }A:
+	{A -> {A:
 	eo -> eo:
 	iy -> iy:
 )
 
-[Overlong] (
+[Overlong] = (
 	A: -> A::
 	A~: -> A~::
 	O: -> O::
 	O~: -> O~::
 )
 
-[Nasalized] (
+[Nasalized] = (
 	A -> A~
 	A: -> A~:
 	A:: -> A~::
-	} -> }~
-	}: -> }~:
+	{ -> {~
+	{: -> {~:
 	e -> e~
 	i -> i~
 	O -> O~
@@ -199,13 +191,13 @@ $Diphthong (}A, }A:, eo, eo:, iy, iy:)
 	y: -> y~:
 )
 
-[Rounded] (
+[Rounded] = (
 	k -> k_w
 	x -> x_w
 	G -> G_w
 )
 
-[Geminate] (
+[Geminate] = (
 	k -> kk
 	p -> pp
 	t -> tt

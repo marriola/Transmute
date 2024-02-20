@@ -6,6 +6,8 @@ $Syllable = (
     $Onset = ((s | $Laryngeal)) ($C) ($C)
     $Nucleus = (") ($V | $Sonorant | $Laryngeal)
     $Coda = ($C) ([C-Glide])
+) or (
+    $Nucleus = }
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
@@ -211,7 +213,7 @@ sr -> str
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-$V (
+$V = (
     @
     A   a   e   i   o       u
     A:  a:  e:  i:  o:  O:  u:
@@ -220,11 +222,11 @@ $V (
     Au eu
 )
 
-[Mid] (e, o)
-[Round] (o, u)
-[High] (i, u)
+[Mid] = (e, o)
+[Round] = (o, u)
+[High] = (i, u)
 
-[Long] (
+[Long] = (
     A -> A:
     a -> a:
     e -> e:
@@ -240,14 +242,14 @@ $V (
     O~:
 )
 
-[Overlong] (
+[Overlong] = (
     a: -> a::
     A: -> A::
     o: -> o::
     O: -> O::
 )
 
-[Nasalized] (
+[Nasalized] = (
     A -> A~
     e -> e~
     i -> i~
@@ -262,7 +264,7 @@ $V (
     o:: -> o~::
 )
 
-[Stressed] (
+[Stressed] = (
     a -> "a
     a: -> "a:
     A -> "A
@@ -290,27 +292,27 @@ $V (
 ; V -> &:
 ;   produces a: e: i: o: u:
 
-$Stop (
+$Stop = (
     k  k'  k_w  p  t
     g  g'  g_w  b  d
     g_h g'_h g_w_h b_h d_h
 )
 
-$Dental (t, d, d_h, T, D, s, z)
-$Labial (m, p, b, b_h, p\, B)
-$Labiovelar (k_w, g_w, g_w_h, x_w, G_w)
-$Velar (k, g, g_h, g'_h, x, G, $Labiovelar)
-$Sonorant (m, n, l, r, w, j)
-$Liquid (l, r)
-[Glide] (u -> w, i -> j)
-$Nasal (m, n)
-$Laryngeal (?, ?\, ?\_w, ?\_)
-$Sibilant (s z)
+$Dental = (t, d, d_h, T, D, s, z)
+$Labial = (m, p, b, b_h, p\, B)
+$Labiovelar = (k_w, g_w, g_w_h, x_w, G_w)
+$Velar = (k, g, g_h, g'_h, x, G, $Labiovelar)
+$Liquid = (l, r)
+$Nasal = (m, n)
+[Glide] = (u -> w, i -> j)
+$Sonorant = ($Nasal, $Liquid, $Glide)
+$Laryngeal = (?, ?\, ?\_w, ?\_)
+$Sibilant = (s z)
 
-$Obstruent ($Stop, Fricative)
-$C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant)
+$Obstruent = ($Stop, Fricative)
+$C = ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant)
 
-[Voiced] (
+[Voiced] = (
     k -> g
     g_h
     x -> G
@@ -329,19 +331,19 @@ $C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $
     $Sonorant
 )
 
-[Palatalized] (
+[Palatalized] = (
     k -> k'
     g -> g'
     g_h -> g'_h
 )
 
-[Labialized] (
+[Labialized] = (
     k -> k_w
     g -> g_w
     g_h -> g_w_h
 )
 
-[Aspirated] (
+[Aspirated] = (
     g -> g_h
     g' -> g'_h
     g_w -> g_w_h
@@ -349,7 +351,7 @@ $C ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $
     d -> d_h
 )
 
-[Fricative] (
+[Fricative] = (
     k -> x
     k_w -> x_w
     p -> p\

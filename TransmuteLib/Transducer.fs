@@ -352,7 +352,7 @@ module Transducer =
 
         let out = System.String.Join("", outChars)
 
-        [ $"%2d{ruleNum}. {out}" ]
+        [ $"%3d{ruleNum}. {out}" ]
 
     let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
         let maxIndex = List.max changes + 1
@@ -362,6 +362,6 @@ module Transducer =
             |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
 
         [
-            $"%2d{ruleNum}. {result}"
-            "    " + System.String.Join("", changeLine)
+            $"%3d{ruleNum}. {result}"
+            "     " + System.String.Join("", changeLine)
         ]

@@ -4,7 +4,7 @@
 
 ; Ingvaeonic nasal spirant law
 
-V n → [+Long +Nasalized] / _Fricative
+V.n → [+Long +Nasalized] / _Fricative
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
@@ -14,21 +14,18 @@ V n → [+Long +Nasalized] / _Fricative
 
 ɑ → æ / _[C-/m n/](C)(C)([V+Front])
 æ̃ → ɑ̃
-æ → ɑ / _C(C)(C)[V-Front]
-æ → ɑ / _C(C)(C)[V-Front]
 
-(æ|ɑ|ɑ̃) → ∅ / _#
+; Undo before syllable with back vowel
+æ → ɑ / _C(C)(C)[V-Front]
 
 ; Redo before velar consonant
 ɑ → æ / _(x|w|rC|lC)
 
-[+/æ ɑ ɑ̃/] → ∅ / _#
+(æ|ɑ|ɑ̃) → ∅ / _#
 
 ;;;;;;;;;;;;;;;;;;;
 ;   Old English   ;
 ;;;;;;;;;;;;;;;;;;;
-
-[+Nasalized] → [-Nasalized]
 
 ; Front vowel breaking
 
@@ -36,9 +33,9 @@ V n → [+Long +Nasalized] / _Fricative
 
 ; Diphthong height harmonization
 
-[+/ɑi ɑj/] → ɑː
-[+/æu æw/] → æɑ
-[+/eu ew/] → eo
+(ɑi|ɑj) → ɑː
+(æu|æw) → æɑ
+(eu|ew) → eo
 
 ; A-restoration
 
@@ -46,7 +43,8 @@ V n → [+Long +Nasalized] / _Fricative
 
 ; Palatalization of velars
 
-[Palatalized] (k → tʃ, g → dʒ)
+[Palatalized] = (k → tʃ, g → dʒ, gg → dʒ)
+
 [-Palatalized] → [+Palatalized] / _(i(ː)|j)
 [-Palatalized] → [+Palatalized] / iː_(C|#)
 ɣ → ʝ / [V+Front]_
@@ -69,13 +67,10 @@ hʷ → hw
 
 ; High vowel loss
 
-[-Front] → [+Front] / _C(C)(C)(i|j)
+(i|u) → ∅ / ([V+Long] | Diphthong | C)C_#
 
 (i)j → ∅ / ([V+Long] | Diphthong)C(C)(C)_
 (i)j → ∅ / ([V-Long] | [Diphthong-Long])C.C(C)(C)_
-
-(i)j → ∅ / [V+Long+/æɑ eo iy æɑː eoː iyː/]C(C)(C)_
-(i)j → ∅ / [V-Long+/æɑ eo iy/]C.C(C)(C)_
 
 ʝ → j
 j → ∅ / C_#
@@ -104,6 +99,7 @@ u → o / V.C(C)(C)_C(C)(C)(V|#)
 iu → eo
 ɣ → g / #_
 
+[Fricative+Voiced] → [-Voiced] / _#
 
 xs → ks
 h → x / _#
@@ -112,33 +108,33 @@ h → x / _#
 ;   Sets and features   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 
-V (Long [-Long] Front [-Front] Overlong Nasalized)
-Stop (k kʷ p t g b d)
-Glide (w j)
-Liquid (r l)
-Nasal (m n)
-Fricative (h x xʷ f θ ɣ v ð s z)
-Affricate (tʃ dʒ)
-Sonorant (Liquid Nasal V)
-C (Stop Glide Liquid Nasal Fricative Affricate)
+V = (Long [-Long] Front [-Front] Overlong Nasalized)
+Stop = (k kʷ p t g b d)
+Glide = (w j)
+Liquid = (r l)
+Nasal = (m n)
+Fricative = (h x xʷ f θ ɣ v ð s z)
+Affricate = (tʃ dʒ)
+Sonorant = (Liquid Nasal V)
+C = (Stop Glide Liquid Nasal Fricative Affricate)
 
-Diphthong (æɑ, æɑː, eo, eoː, iy, iyː)
+Diphthong = (æɑ, æɑː, eo, eoː, iy, iyː)
 
-[Voiced] (
+[Voiced] = (
 	x → ɣ
 	f → v
 	θ → ð
 	s → z
 )
 
-[Voiced] (
+[Voiced] = (
 	x → ɣ
 	f → v
 	θ → ð
 	s → z
 )
 
-[Front] (
+[Front] = (
 	ɑ → æ
 	ɑː → æː
 	æɑ → iy
@@ -156,7 +152,7 @@ Diphthong (æɑ, æɑː, eo, eoː, iy, iyː)
 	uː → yː
 )
 
-[Long] (
+[Long] = (
 	æ → æː
 	ɑ → ɑː
 	e → eː
@@ -171,14 +167,14 @@ Diphthong (æɑ, æɑː, eo, eoː, iy, iyː)
     iy → iyː
 )
 
-[Overlong] (
+[Overlong] = (
 	ɑː → ɑːː
 	ɑ̃ː → ɑ̃ːː
 	ɔː → ɔːː
 	ɔ̃ː → ɔ̃ːː
 )
 
-[Nasalized] (
+[Nasalized] = (
 	ɑ → ɑ̃
 	ɑː → ɑ̃ː
 	ɑːː → ɑ̃ːː
@@ -197,13 +193,13 @@ Diphthong (æɑ, æɑː, eo, eoː, iy, iyː)
 	yː → ỹː
 )
 
-[Rounded] (
+[Rounded] = (
 	k → kʷ
 	x → xʷ
 	ɣ → ɣʷ
 )
 
-[Geminate] (
+[Geminate] = (
 	k → kk
 	p → pp
 	t → tt

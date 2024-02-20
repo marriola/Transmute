@@ -39,7 +39,7 @@ type Node =
     | WordBoundaryNode
 
     /// Represents a phonological rule.
-    | RuleNode of input:Node list * output:Node list * environment:Node list
+    | RuleNode of lineNumber: int * input:Node list * output:Node list * environment:Node list
 
     /// Defines a set of utterances.
     | SetDefinitionNode of name:string * members:Node list
@@ -58,6 +58,8 @@ type Node =
 
     /// Defines the rule used by the syllable boundary detector.
     | SyllableDefinitionNode of onset: Node list * nucleus: Node list * coda: Node list
+
+    | SyllableDefinitionListNode of lineNumber: int * definitions: Node list
 
     /// Represents a node tagged with metadata.
     | TaggedNode of pos: (Offset * Line * Column) * Node
@@ -112,7 +114,7 @@ type Node =
             |> List.map stringifyList
             |> String.concat " | "
             |> sprintf "( %s )"
-        | RuleNode (input, output, environment) ->
+        | RuleNode (_, input, output, environment) ->
             let environmentSection =
                 match environment with
                 | [PlaceholderNode] -> ""
@@ -142,8 +144,8 @@ module Node =
         nodes
         |> List.map untag
         |> List.map (function
-            | RuleNode (input, output, environment) ->
-                RuleNode (untagAll input, untagAll output, untagAll environment)
+            | RuleNode (lineNumber, input, output, environment) ->
+                RuleNode (lineNumber, untagAll input, untagAll output, untagAll environment)
             | CompoundSetIdentifierNode xs ->
                 CompoundSetIdentifierNode (untagAll xs)
             | SetDefinitionNode (name, members) ->
@@ -163,6 +165,13 @@ module Node =
         match node with
         | TaggedNode (position, inner) -> Some (inner, position)
         | _ -> Some (node, (Offset 0, Line 0, Column 0))
+
+    let getLine node =
+        match node with
+        | SyllableDefinitionListNode (line, _)
+        | RuleNode (line, _, _, _) -> line
+        | _ ->
+            failwithf "Expected RuleNode or SyllableDefinitionListNode, got %O" node
 
     /// Gets the left string value of a TransformationNode.
     let getLeft node =

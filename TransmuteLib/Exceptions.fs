@@ -14,6 +14,7 @@ namespace TransmuteLib
 
 open TransmuteLib.Exceptions
 open TransmuteLib.Position
+open System.Text.RegularExpressions
 
 module ExceptionHelpers =
     let syntaxErrorMessage message (Offset offset, Line line, Column column) =
@@ -21,15 +22,19 @@ module ExceptionHelpers =
 
     let invalidSyntax message (offset, line, col) = raise (SyntaxError (message, offset, line, col))
 
+    let RE_LAST_COMMA = new Regex(", ([^,]+)$")
+
     /// <summary>
     /// Raises a <see cref="SyntaxException"/> for an unexpected token.
     /// </summary>
     /// <param name="expected">The types of tokens that were expected.</param>
     /// <param name="got">The unexpected token that was encountered.</param>
     let unexpectedToken (expected: TokenType list) got =
+        let tokenList = expected |> List.map string |> String.concat ", "
+
         let message =
-            sprintf "Expected %s%s, got '%s'"
+            sprintf "Expected %s%s, got %s"
                 (if expected.Length > 1 then "one of " else "")
-                (expected |> List.map string |> String.concat ",")
+                (RE_LAST_COMMA.Replace(tokenList, " or $1"))
                 (string got.tokenType)
         invalidSyntax message got.position

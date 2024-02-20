@@ -106,16 +106,16 @@ Because X-SAMPA clashes with identifiers, when using X-SAMPA you need to use a `
 
 Sets define categories of sounds, e.g. consonants and vowels.
 
-    V (a, e, i, o, u)
+    V = (a, e, i, o, u)
 
 You can put phonemes of any length in a set.
 
-    LABIOVELAR (kʷ, gʷ)
-    OVERLONG (ɑːː, ɔːː)
+    LABIOVELAR = (kʷ, gʷ)
+    OVERLONG = (ɑːː, ɔːː)
 
 Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
-    C (
+    C = (
         p t k
         b d g
         m n ŋ
@@ -123,13 +123,13 @@ Commas are optional. Whitespace is enough to separate phonemes, and you may list
           z
     )
 
-    LARYNGEAL (ʔ χ χʷ)
+    LARYNGEAL = (ʔ χ χʷ)
 
 ### Defining features
 
 Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
 
-    [Fricative] (
+    [Fricative] = (
         k → x
         kʷ → xʷ
         p → ɸ
@@ -143,15 +143,15 @@ Here, four phonemes are defined as having transformation from voiceless stops to
 
 Both sets and features allow you to include other sets or features in them:
 
-    STOP (p t k)
-    FRICATIVE (x f θ)
-    NASAL (m n ŋ)
-    C (STOP FRICATIVE NASAL) ; p t k x f θ m n ŋ
+    STOP = (p t k)
+    FRICATIVE = (x f θ)
+    NASAL = (m n ŋ)
+    C = (STOP FRICATIVE NASAL) ; p t k x f θ m n ŋ
 
-    V (Long [-Long] Front [-Front] Overlong Nasalized)
+    V = (Long [-Long] Front [-Front] Overlong Nasalized)
 
 
-### Defining rules
+### Defining sound change rules
 
 Languages are subject to many changes in their phonology as natural variations in pronunciation become entrenched over long periods of time, and these sound changes are usually regular, i.e. almost universally applied to every applicable word. Such regular sound changes can be described using phonological rules, a convention from the field of linguistics. Defining the sounds of a language in terms of distinctive features allows us to define phonological rules in terms of their presence, absence, removal and addition, rather than explicitly designing a rule multiple times for each phoneme it may apply to. This allows writing expressive and declarative rules that more closely resemble what one may find in an academic paper.
 

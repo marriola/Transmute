@@ -9,19 +9,21 @@ open System
 open System.IO
 open TransmuteLib
 open Utils
+open TransmuteLib.Utils.Operators
 
 let RULES_EXTENSION = ".sc"
 let COMPILED_RULES_EXTENSION = ".scc"
 
-let compileRules options features sets syllableDefinition rules =
+let compileRules options features sets syllableDefinitions rules =
     if options.verbosityLevel > Silent then
         fprintf stderr "Compiling"
 
     let showNfa = options.verbosityLevel = ShowNFA
 
     // TODO re-enable showing the NFA here
-    //let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileSyllableRule showNfa features sets)
-    let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileSyllableRule false features sets)
+    let syllableRules =
+        syllableDefinitions
+        |> List.map (fun (i, node) -> i, RuleCompiler.compileSyllableRule false features sets node)
 
     let rules, rulesTime =
         time (fun () ->
@@ -37,39 +39,52 @@ let compileRules options features sets syllableDefinition rules =
                 (fun _ (i, node) ->
                     // TODO re-enable showing the NFA here
                     //let rule, elapsed = time (fun () -> RuleCompiler.compileRule showNfa features sets node)
+                    let ruleLine = Node.getLine node
                     let rule, elapsed = time (fun () -> RuleCompiler.compileRule false features sets node)
                     if options.verbosityLevel > Silent then
                         fprintf stderr "."
-                    i, (node, rule, elapsed))
+                    ruleLine, (node, rule, elapsed))
             |> List.ofSeq
             |> List.sortBy fst)
 
     if options.verbosityLevel > Silent then
         fprintfn stderr ""
 
-    syllableRule, rules, rulesTime
+    syllableRules, rules, rulesTime
 
-let transformWord options syllableRule rules word =
+/// <summary>
+/// Selects the syllable rule that applies to the given line in the rule set, and detects syllable boundaries and segment locations in the given word.
+/// </summary>
+/// <remark>
+/// When multiple syllable definitions occur in a rule set, each applies to all following rules up to the next syllable definition node, which
+/// replaces the last one from that point on.
+/// </remark>
+let syllabize syllableRules (ruleLine: int) word =
+    match List.tryFind (fst >> (>=) ruleLine) syllableRules with
+    | None ->
+        [], Map.empty
+    | Some (_, syllableRule) ->
+        // TODO: replace false with showNfa
+        SyllableBoundaryDetector.get false syllableRule word
+
+let transformWord options syllableRules rules word =
     let showNfa = options.verbosityLevel >= ShowNFA
-    let syllableBoundaryLocations, segmentLocations =
-        syllableRule
-        |> Option.map (fun rule -> SyllableBoundaryDetector.get showNfa rule word)
-        |> Option.defaultValue ([], Map.empty)
 
     let rec inner (syllableBoundaryLocations: int list, segmentLocations: Map<int, SyllableSegment>) nextWord log totalTime rules =
         match rules with
         | [] ->
             word, nextWord, log, totalTime
 
-        | (i, (_, rule, _))::xs ->
-            let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations showNfa syllableBoundaryLocations rule nextWord)
+        | (i, (node, rule, _))::xs ->
+            // TODO: replace false with showNfa
+            let (result, locations), elapsed = time (fun () -> Transducer.transformWithChangeLocations false (syllableBoundaryLocations, segmentLocations) rule nextWord)
 
             let (syllableBoundaryLocations, segmentLocations), syllableBoundaryTime =
-                if syllableRule <> None && result <> nextWord then
-                    time (fun () ->
-                        syllableRule
-                        |> Option.map (fun rule -> SyllableBoundaryDetector.get showNfa rule result)
-                        |> Option.defaultValue ([], Map.empty))
+                let ruleLine = Node.getLine node
+
+                if result <> nextWord then
+                    // If the word changed, get the new syllable boundaries
+                    time (fun () -> syllabize syllableRules ruleLine result)
                 else
                     (syllableBoundaryLocations, segmentLocations), 0.0
 
@@ -92,7 +107,9 @@ let transformWord options syllableRule rules word =
                             let line = 
                                 seq { 0..result.Length }
                                 |> Seq.map (fun i -> if List.contains i syllableBoundaryLocations then 'S' else ' ')
-                            [ "    " + String.Join("", segmentLine) ] @ [ "    " + String.Join("", line) ]
+
+                            [ "     " + String.Join("", segmentLine)
+                              "     " + String.Join("", line) ]
 
                     if options.format = IPA then
                         log @ syllableLine @ Transducer.getIpaChangeLine i locations result
@@ -103,11 +120,11 @@ let transformWord options syllableRule rules word =
 
             inner (syllableBoundaryLocations, segmentLocations) result log (totalTime + elapsed + syllableBoundaryTime) xs
 
-    inner (syllableBoundaryLocations, segmentLocations) word [] 0.0 rules
+    inner (syllabize syllableRules 1 word) word [] 0.0 rules
 
-let transformLexicon options syllableRule rules lexicon =
-    let inline transformSerial () = lexicon |> Array.map (fun word -> transformWord options syllableRule rules word)
-    let inline transformParallel () = lexicon |> Array.Parallel.map (fun word -> transformWord options syllableRule rules word)
+let transformLexicon options syllableRules rules lexicon =
+    let inline transformSerial () = lexicon |> Array.map (fun word -> transformWord options syllableRules rules word)
+    let inline transformParallel () = lexicon |> Array.Parallel.map (fun word -> transformWord options syllableRules rules word)
 
 #if DEBUG
     let fTransform = transformSerial
@@ -133,7 +150,7 @@ let main argv =
 
     // Compile rules if the compiled rules file is stale or not present, otherwise load the compiled rules file
 
-    let precompiled, ((syllableRule, rules), compileTime) =
+    let precompiled, ((syllableRules, rules), compileTime) =
         let compiledFile =
             if Path.GetExtension options.rulesFile = RULES_EXTENSION
                 then Path.Combine(Path.GetDirectoryName options.rulesFile, Path.GetFileNameWithoutExtension options.rulesFile) + COMPILED_RULES_EXTENSION
@@ -151,12 +168,7 @@ let main argv =
                     else
                         RuleParser.parseRulesFile options.format options.rulesFile
 
-                let syllableDefinition, features, sets, rules =
-                    parseResult
-                    |> Result.mapError (fprintfn stderr "%s")
-                    |> Result.toOption
-                    |> Option.get
-
+                let syllableDefinitions, features, sets, rules = Result.orAbort parseResult
                 let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
 
                 let selectedRules =
@@ -164,7 +176,7 @@ let main argv =
                     |> Option.map (List.map (fun i -> indexedRules[i - 1]))
                     |> Option.defaultValue indexedRules
 
-                let syllableRule, rules, compileTime = compileRules options features sets syllableDefinition selectedRules
+                let syllableRule, rules, compileTime = compileRules options features sets syllableDefinitions selectedRules
 
                 if options.saveRules && options.testRules = None && options.rulesFile <> "-" then
                     RuleCompiler.saveCompiledRules compiledFile (syllableRule, rules) |> ignore
@@ -182,7 +194,7 @@ let main argv =
             if options.verbosityLevel >= ShowTimes then
                 printf $"[%8s{formatTime milliseconds}] "
 
-            printfn $"%2d{i}. {node}"
+            printfn $"%3d{i}. {node}"
 
         printfn ""
 
@@ -237,7 +249,7 @@ let main argv =
 
     // Transform lexicon and report
 
-    let transformedLexicon, totalMilliseconds = transformLexicon options syllableRule rules (Array.ofList lexicon)
+    let transformedLexicon, totalMilliseconds = transformLexicon options syllableRules rules (Array.ofList lexicon)
     let outputStream =
         match options.outputFile with
         | None -> Console.Out

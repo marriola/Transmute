@@ -1,7 +1,9 @@
 ﻿Syllable = (
     Onset = ((s|Laryngeal)) (C) (C)
     Nucleus = (ˈ) ( V | Sonorant | Laryngeal)
-    Coda = C ([C-Approximant])
+    Coda = C ([C-Glide])
+) or (
+    Nucleus = ʉ
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
@@ -207,7 +209,7 @@ sr → str
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
-V (
+V = (
     ə
     ɑ  a  e  i  o     u
     ɑː aː eː iː oː ɔː uː
@@ -216,11 +218,11 @@ V (
     ɑu eu
 )
 
-[Mid] (e, o)
-[Round] (o, u)
-[High] (i, u)
+[Mid] = (e, o)
+[Round] = (o, u)
+[High] = (i, u)
 
-[Long] (
+[Long] = (
     ɑ → ɑː
     a → aː
     e → eː
@@ -236,14 +238,14 @@ V (
     ɔ̃ː
 )
 
-[Overlong] (
+[Overlong] = (
     aː → aːː
     ɑː → ɑːː
     oː → oːː
     ɔː → ɔːː
 )
 
-[Nasalized] (
+[Nasalized] = (
     ɑ → ɑ̃
     e → ẽ
     i → ĩ
@@ -258,7 +260,7 @@ V (
     oːː → õːː
 )
 
-[Stressed] (
+[Stressed] = (
     a → ˈa
     aː → ˈaː
     ɑ → ˈɑ
@@ -286,27 +288,27 @@ V (
 ; V → &ː
 ;   produces aː eː iː oː uː
 
-Stop (
+Stop = (
     k  kʲ  kʷ  p  t
     g  gʲ  gʷ  b  d
     gʰ gʲʰ gʷʰ bʰ dʰ
 )
 
-Dental (t, d, dʰ, θ, ð, s, z)
-Labial (m, p, b, bʰ, ɸ, β)
-Labiovelar (kʷ, gʷ, gʷʰ, xʷ, ɣʷ)
-Velar (k, g, gʰ, gʲʰ, x, ɣ, Labiovelar)
-Liquid (l, r)
-Nasal (m, n)
-[Glide] (u → w, i → j)
-Sonorant (Nasal, Liquid, Glide)
-Laryngeal (ʔ, ʕ, ʕʷ)
-Sibilant (s z)
+Dental = (t, d, dʰ, θ, ð, s, z)
+Labial = (m, p, b, bʰ, ɸ, β)
+Labiovelar = (kʷ, gʷ, gʷʰ, xʷ, ɣʷ)
+Velar = (k, g, gʰ, gʲʰ, x, ɣ, Labiovelar)
+Liquid = (l, r)
+Nasal = (m, n)
+[Glide] = (u → w, i → j)
+Sonorant = (Nasal, Liquid, Glide)
+Laryngeal = (ʔ, ʕ, ʕʷ)
+Sibilant = (s z)
 
-Obstruent (Stop, Fricative)
-C (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative] Palatalized)
+Obstruent = (Stop, Fricative)
+C = (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative] Palatalized)
 
-[Voiced] (
+[Voiced] = (
     k → g
     gʰ
     x → ɣ
@@ -325,19 +327,19 @@ C (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, F
     Sonorant
 )
 
-[Palatalized] (
+[Palatalized] = (
     k → kʲ
     g → gʲ
     gʰ → gʲʰ
 )
 
-[Labialized] (
+[Labialized] = (
     k → kʷ
     g → gʷ
     gʰ → gʷʰ
 )
 
-[Aspirated] (
+[Aspirated] = (
     g → gʰ
     gʲ → gʲʰ
     gʷ → gʷʰ
@@ -345,7 +347,7 @@ C (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, F
     d → dʰ
 )
 
-[Fricative] (
+[Fricative] = (
     k → x
     kʷ → xʷ
     p → ɸ

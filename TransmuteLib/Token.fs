@@ -9,9 +9,6 @@ namespace TransmuteLib
 open TransmuteLib.Position
 
 type TokenType =
-    /// An error token.
-    | Error
-
     /// A whitespace token.
     | Whitespace
 
@@ -80,6 +77,32 @@ type TokenType =
 
     /// A comment token.
     | Comment
+with
+    override this.ToString() =
+        match this with
+        | Whitespace -> "whitespace"
+        | LBrack -> "'['"
+        | RBrack -> "']'"
+        | LBrace -> "'{'"
+        | RBrace -> "'}'"
+        | LParen -> "'('"
+        | RParen -> "')'"
+        | Separator -> "'.'"
+        | Comma -> "','"
+        | Divider -> "'/'"
+        | Arrow -> "'->'"
+        | Empty -> "'∅'"
+        | Placeholder -> "'_'"
+        | WordBoundary -> "'#'"
+        | SyllableBoundary -> "'$'"
+        | Plus -> "'+'"
+        | Minus -> "'-'"
+        | Pipe -> "'|'"
+        | Not -> "'!'"
+        | Equals -> "'='"
+        | Id -> "an identifier"
+        | Utterance -> "an utterance"
+        | Comment -> "a comment"
 
 type Token =
     { tokenType: TokenType

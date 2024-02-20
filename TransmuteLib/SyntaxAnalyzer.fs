@@ -111,7 +111,7 @@ module internal SyntaxAnalyzer =
             |> Result.bind (fun _ ->
                 match rest with
                 | [] -> out
-                | TaggedNode (_, RuleNode (input, output, environment))::xs ->
+                | TaggedNode (_, RuleNode (_, input, output, environment))::xs ->
                     out
                     |> Result.bind (validateRuleNode input output environment)
                     |> validateInternal xs

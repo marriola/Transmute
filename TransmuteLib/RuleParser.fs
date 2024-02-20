@@ -11,6 +11,7 @@ open TransmuteLib.ExceptionHelpers
 open TransmuteLib.Lexer
 open TransmuteLib.Position
 open TransmuteLib.Token
+open TransmuteLib.Utils.Operators
 
 module RuleParser =
     /// <summary>
@@ -39,6 +40,18 @@ module RuleParser =
             match tokens with
             | OfType Whitespace _::xs ->
                 tryMatchToken xs tokenType
+            | { tokenType = t } as x::xs when tokenType = t ->
+                xs, Some t
+            | _ ->
+                tokens, None
+
+        let rec tryMatchTokenOnSameLine tokens tokenType =
+            match tokens with
+            | OfType Whitespace ws::xs ->
+                if ws.value.Contains "\n" then
+                    xs, None
+                else
+                    tryMatchToken xs tokenType
             | { tokenType = t } as x::xs when tokenType = t ->
                 xs, Some t
             | _ ->
@@ -271,10 +284,11 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchRule tokens headPosition =
+            let _, Line startLine, _ = headPosition
             let tokens, input = matchRuleSection tokens
             let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
             let tokens, output = matchRuleSection tokens
-            let tokens, divider = tryMatchToken tokens Divider
+            let tokens, divider = tryMatchTokenOnSameLine tokens Divider
             let tokens, environment =
                 match divider with
                 | Some _ ->
@@ -282,7 +296,7 @@ module RuleParser =
                     tokens, environment
                 | None ->
                     tokens, [PlaceholderNode]
-            tokens, Node.tag (RuleNode (input, output, environment)) headPosition
+            tokens, Node.tag (RuleNode (startLine, input, output, environment)) headPosition
 
 
         /// <summary>
@@ -293,9 +307,10 @@ module RuleParser =
         let matchRuleStartingWithIdentifier tokens identifier =
             let tokens, ruleNode = matchRule tokens identifier.position
             match Node.untag ruleNode with
-            | RuleNode (input, output, environment) ->
+            | RuleNode (lineNumber, input, output, environment) ->
                 tokens, Node.tag
                     (RuleNode (
+                        lineNumber,
                         Node.tag (SetIdentifierNode identifier.value) identifier.position :: input,
                         output,
                         environment))
@@ -310,6 +325,8 @@ module RuleParser =
             tokens, identifier.value, nodes
 
         let matchSyllableDefinition tokens =
+            let startToken = List.head tokens
+
             let rec inner tokens out =
                 match tokens with
                 | []
@@ -322,7 +339,7 @@ module RuleParser =
                     let xs, name, nodes = matchAssignment tokens
                     inner xs ((name, nodes) :: out)
                 | token::_ ->
-                    invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda'; got {token}" _position
+                    invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda', got {token}" token.position
 
             let tokens, _ = matchToken tokens LParen
             let tokens, parts = inner tokens []
@@ -342,11 +359,41 @@ module RuleParser =
                             |> DisjunctNode
                         key, [ disjunctNode ])
 
-            let onset = List.find (fst >> (=) "Onset") parts |> snd
-            let nucleus = List.find (fst >> (=) "Nucleus") parts |> snd
-            let coda = List.find (fst >> (=) "Coda") parts |> snd
+            let findSegmentOrEmpty name parts =
+                parts
+                |> List.tryFind (fst >> (=) name)
+                |> Option.map snd
+                |> Option.defaultValue []
+
+            let onset = findSegmentOrEmpty "Onset" parts
+            let nucleus = findSegmentOrEmpty "Nucleus" parts
+            let coda = findSegmentOrEmpty "Coda" parts
+
+            if onset = [] && nucleus = [] && coda = [] then
+                invalidSyntax "All segments are missing or empty in syllable definition" startToken.position
 
             tokens, SyllableDefinitionNode (onset, nucleus, coda)
+
+        let matchSyllableDefinitions tokens =
+            let rec inner matchedOr out tokens =
+                match tokens with
+                | [] ->
+                    tokens, List.rev out
+
+                | OfType Whitespace ws :: _ when ws.value.Contains "\n" ->
+                    tokens, List.rev out
+
+                | OfType Whitespace _ :: xs ->
+                    inner matchedOr out xs
+
+                | OfType Utterance u :: xs when u.value.Trim().ToLower() = "or" ->
+                    inner true out xs
+
+                | OfType LParen _ :: _ ->
+                    let xs, syllableDefinition = matchSyllableDefinition tokens
+                    inner false (syllableDefinition :: out) xs
+
+            inner false [] tokens
 
         /// <summary>
         /// Matches either a set or a rule.
@@ -354,13 +401,15 @@ module RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let rec matchSet_Rule tokens identifier =
             match tokens with
+            | OfType Separator _::xs
             | OfType Whitespace _::xs ->
                 matchSet_Rule xs identifier
             | OfType Equals _::xs when identifier.value = "Syllable" ->
-                matchSyllableDefinition xs
-            | OfType LParen openToken::xs
-            | OfType LBrace openToken::xs ->
-                // TODO: include members of other sets
+                let _, Line lineNumber, _ = xs.[0].position
+                let xs, syllableDefinitions = matchSyllableDefinitions xs
+                xs, (SyllableDefinitionListNode (lineNumber, syllableDefinitions))
+            | OfType Equals _ :: xs ->
+                let xs, openToken = matchOneOf xs [ LParen; LBrace ]
                 let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
                 let tokens, members = matchMemberList closeToken xs
                 tokens, Node.tag (SetDefinitionNode (identifier.value, members)) identifier.position
@@ -374,7 +423,7 @@ module RuleParser =
             | [] ->
                 failwith "No more input"
             | x::_ ->
-                unexpectedToken [ LBrace; Empty; Divider; Utterance ] x
+                unexpectedToken [ Equals; LBrace; Empty; Divider; Utterance ] x
 
         /// <summary>
         /// Matches a rule when a set identifier has already been matched.
@@ -384,8 +433,8 @@ module RuleParser =
             let tokens, setIdentifier = matchSetIdentifier tokens headPosition
             let tokens, ruleNode = matchRule tokens headPosition
             match Node.untag ruleNode with
-            | RuleNode (input, output, environment) ->
-                tokens, Node.tag (RuleNode (setIdentifier :: input, output, environment)) headPosition
+            | RuleNode (lineNumber, input, output, environment) ->
+                tokens, Node.tag (RuleNode (lineNumber, setIdentifier :: input, output, environment)) headPosition
             | _ ->
                 invalidSyntax "Expected a rule" _position
 
@@ -396,8 +445,8 @@ module RuleParser =
         /// is not a <see cref="RuleNode" />.</exception>
         let prependToRule rule headPosition nodes =
             match Node.untag rule with
-            | RuleNode (input, output, environment) ->
-                Node.tag (RuleNode (nodes @ input, output, environment)) headPosition
+            | RuleNode (lineNumber, input, output, environment) ->
+                Node.tag (RuleNode (lineNumber, nodes @ input, output, environment)) headPosition
             | _ ->
                 invalidArg "rule" "Must be a RuleNode"
 
@@ -408,12 +457,13 @@ module RuleParser =
         /// or when the first element of the input section is not a <see cref="CompoundSetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule headPosition nodes =
             match Node.untag rule with
-            | RuleNode (input, output, environment) ->
+            | RuleNode (lineNumber, input, output, environment) ->
                 match Node.untag input.Head with
                 | CompoundSetIdentifierNode identifiers ->
                     Node.tag
                         (RuleNode
-                            (Node.tag (CompoundSetIdentifierNode (nodes @ identifiers)) headPosition :: input.Tail,
+                            (lineNumber,
+                            Node.tag (CompoundSetIdentifierNode (nodes @ identifiers)) headPosition :: input.Tail,
                             output,
                             environment))
                         headPosition
@@ -427,6 +477,7 @@ module RuleParser =
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let matchFeature tokens headPosition identifier =
+            let tokens, _ = matchToken tokens Equals
             let tokens, openToken = matchOneOf tokens [ LBrace; LParen ]
             let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
             let tokens, memberList = matchMemberList closeToken tokens
@@ -463,17 +514,17 @@ module RuleParser =
                 |> Option.map (fun i -> matchFeature xs headPosition i)
                 // '[' ']' -> syntax error
                 |> Option.defaultWith (fun _ -> unexpectedToken [Id] x)
-            | OfType Id x::xs ->
+            | OfType Id idToken::xs ->
                 identifier
                 // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: input.Tail, output, environment)
                 |> Option.map (fun i ->
-                    let tokens, ruleNode = matchRule tokens x.position
+                    let tokens, ruleNode = matchRule tokens idToken.position
                     tokens, prependToRule ruleNode headPosition
                         [ Node.tag (SetIdentifierNode i.value) i.position
-                          Node.tag (SetIdentifierNode x.value) x.position
+                          Node.tag (SetIdentifierNode idToken.value) idToken.position
                         ])
                 // Store first identifier and see what we get next
-                |> Option.defaultWith (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some x))
+                |> Option.defaultWith (fun _ -> matchFeature_SetIdentifier_Rule xs headPosition (Some idToken))
             | x::_ ->
                 unexpectedToken [ Plus; Minus; Id ] x
 
@@ -550,7 +601,22 @@ module RuleParser =
             |> Result.bind SyntaxAnalyzer.validate
             |> Result.bind (Node.untagAll >> Ok)
 
-        let syllableDefinition = Result.map (List.tryFind (function SyllableDefinitionNode _ -> true | _ -> false)) nodes
+        let syllableDefinitions =
+            nodes
+            |> Result.map (List.collect (function
+                | SyllableDefinitionListNode (line, definitions) ->
+                    List.map (fun d -> line, d) definitions
+                | _ ->
+                    []))
+
+        //let syllableDefinitions =
+        //    nodes
+        //    |> Result.map (List.choose (function
+        //        | SyllableDefinitionListNode (line, definitions) ->
+        //            Some (line, definitions)
+        //        | _ ->
+        //            None))
+
         let features = Result.map Node.getFeatures nodes
         let sets = Result.map Node.getSets nodes
 
@@ -560,7 +626,7 @@ module RuleParser =
                 | RuleNode _ as x -> Some x
                 | _ -> None))
 
-        match syllableDefinition, features, sets, rules with
+        match syllableDefinitions, features, sets, rules with
         | _, _, _, (Result.Error msg)
         | _, _, (Result.Error msg), _
         | _, (Result.Error msg), _, _

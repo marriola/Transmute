@@ -8,30 +8,40 @@ module TransmuteLib.Test.Tests
 open TransmuteLib
 open Xunit
 
+let getLocations syllableRules word =
+    syllableRules
+    |> List.map (fun rule -> SyllableBoundaryDetector.get false rule word)
+    |> List.filter (fun (xs, ys) -> List.length xs > 0)
+    |> List.tryHead
+    |> Option.defaultValue ([], Map.empty)
+
 let testRule format rules inputs expected =
     let actual =
         rules
         |> RuleParser.parseRules format
-        |> Result.map (fun (syllableDefinition, features, sets, rules) ->
-            let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileRule false features sets)
+        |> Result.map (fun (syllableDefinitions, features, sets, rules) ->
+            let syllableRules = [] //syllableDefinitions |> List.map (fun (_, node) -> RuleCompiler.compileSyllableRule false features sets node)
+            let getSyllableBoundaries = getLocations syllableRules
             let rule = RuleCompiler.compileRule false features sets rules[0]
-            syllableRule, rule)
-        |> Result.map (fun (syllableMatcher, rule) -> inputs |> List.map (Transducer.transform false syllableMatcher rule))
+            getSyllableBoundaries, rule)
+        |> Result.map (fun (getBoundaries, rule) ->
+            inputs |> List.map (fun word -> Transducer.transform false (getBoundaries word) rule word))
     Assert.Equal<string>(expected, Result.defaultWith List.singleton actual) 
 
 let testRules format rules inputs (expected: string list) =
     let rules =
         rules
         |> RuleParser.parseRules format
-        |> Result.map (fun (syllableDefinition, features, sets, rules) ->
-            let syllableRule = syllableDefinition |> Option.map (RuleCompiler.compileRule false features sets)
+        |> Result.map (fun (syllableDefinitions, features, sets, rules) ->
+            let syllableRules = [] //syllableDefinitions |> List.map (fun (_, node) -> RuleCompiler.compileSyllableRule false features sets node)
+            let getSyllableBoundaries = getLocations syllableRules
             let rules = RuleCompiler.compileRulesParallel false features sets rules
-            syllableRule, rules)
+            getSyllableBoundaries, rules)
     let transform input =
         rules
-        |> Result.map (fun (syllableMatcher, rules) ->
+        |> Result.map (fun (getSyllableBoundaries, rules) ->
             (input, rules)
-            ||> List.fold (fun input rule -> Transducer.transform false syllableMatcher rule input))
+            ||> List.fold (fun input rule -> Transducer.transform false (getSyllableBoundaries input) rule input))
     let actual =
         inputs
         |> List.map transform
