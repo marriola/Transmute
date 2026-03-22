@@ -1,11 +1,7 @@
-﻿; bad words #12 (Tri:iz) and #66 (s"e?mo::)
-
-; Why does adding overlong vowels to the nucleus make it infinite loop?
-
-$Syllable = (
-    $Onset = ((s | $Laryngeal)) ($C) ($C)
-    $Nucleus = (") ($V | $Sonorant | $Laryngeal)
-    $Coda = ($C) ([C-Glide])
+﻿$Syllable = (
+    $Onset = ((s | $Laryngeal)) ($C) ([C-/? ?\ ?\_w/])
+    $Nucleus = (") ([+Overlong] | $V | [+Syllabic] | $Laryngeal)
+    $Coda = ($C)($C) ([C-/j w/])
 ) or (
     $Nucleus = }
 )
@@ -31,7 +27,8 @@ $Syllable = (
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
 
-/ u / (#|[C-Laryngeal])(")_(m|n|l|r)(#|$C)
+/ u / (#|[C-Laryngeal])(")_[+Syllabic](#|$C)
+[+Syllabic] -> [-Syllabic]
 
 [-Overlong] -> [+Overlong] / _#
 
@@ -45,7 +42,7 @@ $Laryngeal // _(")$V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
 
-; Laryngeal → ∅ / _$
+; Laryngeal // _$
 
 ; Homorganic vowels in hiatus -> long vowel
 
@@ -64,8 +61,8 @@ e?\ -> A:
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
-[-Long]$Laryngeal → [+Long] / _
-$Laryngeal → ∅ / ($V|$Sonorant)_
+[-Long]$Laryngeal -> [+Long] / _
+$Laryngeal // ($V|$Sonorant)_
 
 ; Cowgill's law
 
@@ -127,9 +124,11 @@ g -> G / (#|$Liquid|[+Fricative])_
 
 ; Verner's law
 
-[+Fricative-Voiced] -> [+Voiced] / ($C|#)[-Stressed-Sonorant]($Sonorant)_(#|$V|[+Overlong]|[+Stressed]|[+Voiced])
+;[+Fricative-Voiced] -> [+Voiced] / ($C|#)[-Stressed-Sonorant]($Sonorant)_(#|$V|[+Overlong]|[+Stressed]|[+Voiced])
+;[+Fricative-Voiced] -> [+Voiced] / (#|$Onset)[-Stressed-Syllabic]$Nucleus($C)_
+[+Fricative-Voiced] → [+Voiced] / $NucleusStart [-Stressed] $CodaStart ($Sonorant)_ ; wizsas...
 
-; Undo Verner's law after voiceless consonant
+; Undo Verner's law after voiceless consonants
 
 [+Fricative+Voiced] -> [-Voiced] / [-Voiced]_
 
@@ -157,8 +156,8 @@ zm -> mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 
-e / i / $V([+Glide])($C)($C)_(#|$C)
-e / i / $V([+Glide])($C)($C)_(#|$C)
+e / i / $$_(#|$C)
+e / i / $$_(#|$C)
 (ei|ej) -> i:
 iji -> i:
 ij -> i: / _(C|#)
@@ -189,7 +188,8 @@ e~: -> A~:
 @ -> A
 
 ;t // $V$C($C)($C)$V($C)($C)_#
-t // $V($C)($C)$V($C)_#
+t // $!"$V($C)_#
+gw -> g / n _
 G_w -> w
 
 A: -> O:
@@ -245,8 +245,10 @@ $V = (
 [Overlong] = (
     a: -> a::
     A: -> A::
+    A~: -> A~::
     o: -> o::
     O: -> O::
+    O~: -> O~::
 )
 
 [Nasalized] = (
@@ -263,6 +265,8 @@ $V = (
     A:: -> A~::
     o:: -> o~::
 )
+
+; [Stressed] = "$V
 
 [Stressed] = (
     a -> "a
@@ -282,10 +286,17 @@ $V = (
     u -> "u
     u: -> "u:
     @ -> "@
-    m -> "m
-    n -> "n
-    l -> "l
-    r -> "r
+    m -> "m=
+    n -> "n=
+    l -> "l=
+    r -> "r=
+)
+
+[Syllabic] = (
+    m -> m=
+    n -> n=
+    l -> l=
+    r -> r=
 )
 
 ; TODO map sets
@@ -306,11 +317,11 @@ $Liquid = (l, r)
 $Nasal = (m, n)
 [Glide] = (u -> w, i -> j)
 $Sonorant = ($Nasal, $Liquid, $Glide)
-$Laryngeal = (?, ?\, ?\_w, ?\_)
+$Laryngeal = (?, ?\, ?\_w)
 $Sibilant = (s z)
 
 $Obstruent = ($Stop, Fricative)
-$C = ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant)
+$C = ($Dental, $Labial, $Velar, $Sonorant, $Liquid, [+Glide] $Nasal, $Laryngeal, $Sibilant, Fricative, [-Fricative], Palatalized)
 
 [Voiced] = (
     k -> g

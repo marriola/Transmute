@@ -23,3 +23,4 @@ module String =
     let toLower (s: string) = s.ToLower()
     let trim (s: string) = s.Trim()
     let startsWith (substr: string) (s: string) = s.StartsWith substr
+    let indent n (s: string) = new System.String(' ', n) + s

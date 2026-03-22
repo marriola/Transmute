@@ -8,11 +8,7 @@ namespace TransmuteLib
 
 type Transformation = Transition * TransitionResult
 
-type GenericList<'T> = System.Collections.Generic.List<'T>
-type GenericSet<'T> = System.Collections.Generic.HashSet<'T>
-type GenericStack<'T> = System.Collections.Generic.Stack<'T>
-
-module internal DeterministicFiniteAutomaton =
+module private DeterministicFiniteAutomaton =
     type private TransitionType =
         /// A transition with a destination state that needs to be checked for deterministic transitions.
         | MaybeDeterministic of (Transition * TransitionResult)
@@ -25,7 +21,7 @@ module internal DeterministicFiniteAutomaton =
         | _ when x = y ->
             true
         | (State _ as s), MergedState children
-        | MergedState children, (State _ as s) when List.contains s children ->
+        | MergedState children, (State _ as s) when Array.contains s children ->
             true
         | _ ->
             false
@@ -84,7 +80,8 @@ module internal DeterministicFiniteAutomaton =
                             input <> OnEpsilon
                             && (origin <% x
                                 || Set.contains origin followStates))
-                    |> List.map (fun ((_, input, To dest), result) -> input, dest, originalResult.Or result)
+                    |> List.map (fun ((From origin, input, To dest), result) ->
+                        input, dest, originalResult.Or result)
                 let nextStates =
                     followStates
                     |> Seq.filter (fun s ->
@@ -147,6 +144,7 @@ module internal DeterministicFiniteAutomaton =
                             // move the destination of T forwards to skip it. If any of these lead to deterministic transitions,
                             // they will be accumulated in the next iteration, along with final states.
                             let followedTransitions =
+                                // HOT PATH: ~25% of time spent here
                                 table
                                 |> List.choose (function
                                     | (From successor, OnEpsilon, To d2), uResult as u
@@ -195,10 +193,17 @@ module internal DeterministicFiniteAutomaton =
         /// </summary>
         /// <returns>A list of deterministric transitions.</returns>
         let followEpsilonTransitions origin originalResult transitions =
+            let originIsStartState = State.name origin = "S"
             transitions
             |> List.collect (getDest >> computePowerSet table originalResult)
             |> List.distinct
-            |> List.map (fun (input, dest, result) -> (From origin, input, To dest), result)
+            |> List.map (fun (input, dest, result) ->
+                let dest =
+                    if input = OnAny && originIsStartState then
+                        origin
+                    else
+                        dest
+                (From origin, input, To dest), result)
 
         /// Replaces epsilon transitions originating from current with all possible deterministic transitions.
         ///
@@ -224,7 +229,16 @@ module internal DeterministicFiniteAutomaton =
                 |> List.distinct
                 |> List.groupBy getInput
                 |> List.partition (snd >> List.length >> (=) 1)
-            let single = List.collect snd single
+            let single =
+                single
+                |> List.collect snd
+                |> List.map (function
+                    // Take any merged states looping back to themselves on a catch-all transition that break out of the merged
+                    // state, and redirect them back to the merged state.
+                    | (From (MergedState _ as origin), OnAny, To dest), result when dest <% origin ->
+                        (From origin, OnAny, To origin), result
+                    | t ->
+                        t)
             let merged =
                 multiple
                 |> List.map (fun (on, dests) ->

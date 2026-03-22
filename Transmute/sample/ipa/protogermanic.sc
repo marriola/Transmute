@@ -1,9 +1,11 @@
 ﻿Syllable = (
-    Onset = ((s|Laryngeal)) (C) (C)
-    Nucleus = (ˈ) ( V | Sonorant | Laryngeal)
-    Coda = C ([C-Glide])
+    Onset = ((s|Laryngeal)) (C) ([C-/ʔ ʕ ʕʷ/])
+    Nucleus = (ˈ) ( [+Overlong] | V | [+Syllabic] | Laryngeal)
+    Coda = (C) (C) ([C-/j w/])
 ) or (
+    Onset =
     Nucleus = ʉ
+    Coda =
 )
 
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
@@ -26,8 +28,10 @@
 [+Palatalized] → [-Palatalized]
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
+; TODO: [+Syllabic] -> u[-Syllabic] should match the Syllabic segments together, and not go strictly by position. but will this mess up other rules?
 
-∅ → u / (#|[C-Laryngeal])(ˈ)_(m|n|l|r)(#|C)
+∅ → u / (#|[C-Laryngeal])(ˈ)_[+Syllabic](#|C)
+[+Syllabic] → [-Syllabic]
 
 [-Overlong] → [+Overlong] / _#
 
@@ -41,7 +45,7 @@ Laryngeal → ∅ / _(ˈ)V
 
 ; TODO: implement syllable detection so we can match on syllable boundaries, then we could write the preceding rule like this:
 
-; Laryngeal → ∅ / _$
+; Laryngeal → ∅ / _σσ
 
 ; Homorganic vowels in hiatus → long vowel
 
@@ -89,7 +93,7 @@ Laryngeal → ə
 ; Grimm's law: voiceless stops become fricatives, except after an obstruent
 
 [Stop-Voiced] → [+Fricative] / (#|V|Sonorant)_
-;[Stop-Voiced] → [+Fricative] / !(Obstruent)_
+;[Stop-Voiced] → [+Fricative] / ![C -Nasal -Liquid -Glide]_
 
 ; Undo Grimm's law after s-
 
@@ -123,7 +127,11 @@ g → ɣ / (#|Liquid|[+Fricative])_
 
 ; Verner's law
 
-[+Fricative-Voiced] → [+Voiced] / (C|#)[-Stressed-Sonorant](Sonorant)_(#|V|[+Overlong]|[+Stressed]|[+Voiced])
+;[+Fricative-Voiced] → [+Voiced] / (C|#)[-Stressed-Sonorant](Sonorant)_(#|V|[+Overlong]|[+Stressed]|[+Voiced])
+
+;[+Fricative-Voiced] → [+Voiced] / Onset [-Stressed -/m̩ n̩ l̩ r̩/]Nucleus(C)_
+;[+Fricative-Voiced] → [+Voiced] / Onset [-Stressed-Syllabic](C)_
+[+Fricative-Voiced] → [+Voiced] / NucleusStart [-Stressed] CodaStart (Sonorant)_ ; wizsas...
 
 ; Undo Verner's law after voiceless consonants and before voiceless stops
 
@@ -153,8 +161,10 @@ zm → mm
 
 ; TODO: make this be smart and match short vowels without having to manually specify what could come after
 
-e → i / V([+Glide])(C)(C)_(#|C)
-e → i / V([+Glide])(C)(C)_(#|C)
+;e → i / V([+Glide])(C)(C)_(#|C)
+;e → i / V([+Glide])(C)(C)_(#|C)
+e → i / σσ_(#|C)
+e → i / σσ_(#|C)
 (ei|ej) → iː
 iji → iː
 ij → iː / _(C|#)
@@ -177,7 +187,9 @@ ẽː → ɑ̃ː
 
 ; Stressed schwa becomes /a/
 
-ə → ɑ / #(s)(C)(C)_
+;ə → ɑ / #(s)(C)(C)_
+
+ə → ɑ / # NucleusStart _
 
 ; Unstressed schwa disappears between consonants
 
@@ -185,7 +197,9 @@ ẽː → ɑ̃ː
 ə → ɑ
 
 ;t → ∅ / V.C(C)(C)V(C)(C)_#
-t → ∅ / V(C)(C)V(C)_#
+;t → ∅ / V(C)(C)V(C)_#
+t → ∅ / σ[V-Stressed](C)_#
+gw → g / n_
 ɣʷ → w
 
 ɑː → ɔː
@@ -241,8 +255,10 @@ V = (
 [Overlong] = (
     aː → aːː
     ɑː → ɑːː
+    ɑ̃ː → ɑ̃ːː
     oː → oːː
     ɔː → ɔːː
+    ɔ̃ː → ɔ̃ːː
 )
 
 [Nasalized] = (
@@ -278,10 +294,17 @@ V = (
     u → ˈu
     uː → ˈuː
     ə → ˈə
-    m → ˈm
-    n → ˈn
-    l → ˈl
-    r → ˈr
+	m̩ → ˈm̩
+	n̩ → ˈn̩
+	l̩ → ˈl̩
+	r̩ → ˈr̩
+)
+
+[Syllabic] = (
+    m → m̩
+    n → n̩
+    l → l̩
+    r → r̩
 )
 
 ; TODO map sets
@@ -306,7 +329,7 @@ Laryngeal = (ʔ, ʕ, ʕʷ)
 Sibilant = (s z)
 
 Obstruent = (Stop, Fricative)
-C = (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative] Palatalized)
+C = (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative], Palatalized)
 
 [Voiced] = (
     k → g

@@ -1,7 +1,7 @@
 ﻿// Project:     TransmuteLib
 // Module:      RuleCompiler
 // Description: Rule to finite state transducer converter.
-// Copyright:   (c) 2023 Matt Arriola
+// Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
 namespace TransmuteLib
@@ -10,10 +10,8 @@ open ICSharpCode.SharpZipLib.GZip
 open MBrace.FsPickler
 open System
 open System.IO
-open TransmuteLib.Utils.Operators
 
-module RuleCompiler =
-    let fuck = ()
+module private RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
 
@@ -54,15 +52,17 @@ module RuleCompiler =
 
         /// Indicates whether the placeholder is the next node that will be processed after exiting the subtree
         isPlaceholderNextStack: bool list
+
+        isOptional: bool
     }
     with
-        member this.IsPlaceholderNext = this.isPlaceholderNextStack |> List.reduce (&&)
+        member this.IsPlaceholderNext = List.reduce (&&) this.isPlaceholderNextStack
 
     type private RuleGeneratorState =
         | HasNext of NFAState
         | Done
 
-    let internal buildNfa showNfa statePrefix (features: Map<string, Node>) sets start input output environment =
+    let internal buildNfa showNfa isSyllableDefinitionRule statePrefix (features: Map<string, Node>) sets start input output environment =
         let takeState (states: State seq) =
             Seq.tail states, Seq.head states
 
@@ -104,13 +104,13 @@ module RuleCompiler =
                 | _ ->
                     state, None
 
-            let getNextState makeFinal state =
+            let getNextState state =
                 let states, nextState = takeState state.states
                 { state with states = states }, nextState
 
             /// Creates a transition to a new state that matches an input symbol.
             let matchCharacter c =
-                let state, next = getNextState true state
+                let state, next = getNextState state
                 let transitions = (From state.current, OnChar c, To next) :: state.transitions
 
                 { state with
@@ -120,12 +120,43 @@ module RuleCompiler =
             /// <summary>
             /// Matches one of the boundary characters inserted on either end of the input string, <see cref="Special.START" /> and <see cref="Special.END" />.
             /// </summary>
-            let matchBoundary () =
+            let matchWordBoundary () =
                 let boundaryChar =
                     match state.inputPosition with
-                    | InputInitial -> Special.START
-                    | InputNoninitial -> Special.END
+                    | InputInitial -> Special.WORD_START_BOUNDARY
+                    | InputNoninitial -> Special.WORD_END_BOUNDARY
                 matchCharacter boundaryChar
+
+            let matchSyllableBoundary () =
+                let state, boundaryMatcher = getNextState state
+                let state, next = getNextState state
+
+                let nextTransitions =
+                    [ From state.current, OnEpsilon, To boundaryMatcher
+                      From boundaryMatcher, OnChar Special.SYLLABLE_START_BOUNDARY, To next
+                      From boundaryMatcher, OnChar Special.SYLLABLE_END_BOUNDARY, To next
+                      From boundaryMatcher, OnAny, To boundaryMatcher ]
+
+                { state with
+                    transitions = nextTransitions @ state.transitions
+                    current = next }
+
+            /// <summary>
+            /// 
+            /// </summary>
+            let matchSyllableSegment boundaryType =
+                let state, boundaryMatcher = getNextState state
+                let state, next = getNextState state
+                let boundaryChar = SyllableBoundaryType.BoundaryTypeToChar.[boundaryType]
+
+                let nextTransitions =
+                    [ From state.current, OnEpsilon, To boundaryMatcher
+                      From boundaryMatcher, OnAny, To boundaryMatcher
+                      From boundaryMatcher, OnChar boundaryChar, To next ]
+
+                { state with
+                    transitions = nextTransitions @ state.transitions
+                    current = next }
 
             /// Takes a segment, applies a series of transformations to it, and finally adds a transformation to the given transition.
             let addFeatureTransformations transition transformations features depth originalSegment =
@@ -175,7 +206,7 @@ module RuleCompiler =
                         { innerState with transformations = transformations }
 
                     | c::xs ->
-                        let nextNfaState, next = getNextState (xs = []) innerState
+                        let nextNfaState, next = getNextState innerState
 
                         matchUtterance' xs
                             { nextNfaState with
@@ -189,9 +220,9 @@ module RuleCompiler =
             /// If any categories specify transformations that match the output of the rule,
             /// these will be added to the transformation list.
             let matchSet setDesc =
-                let state, terminator = getNextState true state
+                let state, terminator = getNextState state
 
-                let rec matchSet' state tree =
+                let rec matchSet' tree state =
                     match tree with
                     | PrefixTree.Leaf _ ->
                         state
@@ -208,13 +239,12 @@ module RuleCompiler =
                                         // Create a node for this input symbol and a transition to it, and visit the children.
                                         let states, nextState = takeState innerState.states
                                         let transitions = (From state.current, OnChar c, To nextState) :: innerState.transitions
-                                        let nextInnerState = {
-                                            innerState with
+                                        let nextInnerState =
+                                            { innerState with
                                                 states = states
                                                 transitions = transitions
-                                                current = nextState
-                                        }
-                                        let nextInnerState = matchSet' nextInnerState n
+                                                current = nextState }
+                                            |> matchSet' n
                                         { innerState with
                                             states = nextInnerState.states
                                             transitions = nextInnerState.transitions
@@ -252,10 +282,10 @@ module RuleCompiler =
 
                         { nextState with current = terminator }
 
-                let nextState =
-                    setDesc
-                    |> PrefixTree.fromSetIntersection features sets
-                    |> matchSet' state
+                // Add transitions to match and transform the set
+
+                let phonemes, prefixTree = PrefixTree.fromSetIntersection features sets setDesc
+                let nextState = matchSet' prefixTree state
 
                 { nextState with
                     outputNodes =
@@ -275,23 +305,25 @@ module RuleCompiler =
 
                 { nextState with currentSection = EnvironmentSection }
 
-            /// Optionally match a sequence of nodes. Continue even if no match possible.
+            /// Optionally match a sequence of nodes. Continue even if no match is possible.
             let matchOptional nodes =
-                let state, terminator = getNextState true state
+                let state, terminator = getNextState state
                 let nextState =
                     buildStateMachine'
                         { state with
                             currentNodes = nodes
-                            inputPosition = InputNoninitial }
+                            inputPosition = InputNoninitial
+                            isOptional = true }
                 let transitions =
                     [ From state.current, OnEpsilon, To terminator
                       From nextState.current, OnEpsilon, To terminator ]
                     @ nextState.transitions
                 { nextState with
                     transitions = transitions
-                    current = terminator }
+                    current = terminator
+                    isOptional = false }
 
-            let matchDisjunctBranch nodes (branchState::_ as acc) = 
+            let matchAlternationBranch nodes (branchState::_ as acc) = 
                 let nextState =
                     buildStateMachine'
                         { state with
@@ -303,14 +335,14 @@ module RuleCompiler =
                 nextState :: acc
 
             /// Match exactly one of many sequences of nodes.
-            let matchDisjunct branches =
+            let matchAlternation branches =
                 // Create a common exit point for all subtrees
-                let state, terminator = getNextState true state
+                let state, terminator = getNextState state
 
                 // Build a subtree for each branch
                 let out =
                     List.foldBack
-                        matchDisjunctBranch
+                        matchAlternationBranch
                         branches
                         [ state ]
 
@@ -340,12 +372,28 @@ module RuleCompiler =
                     transitions = subtreeFinalToLastState @ state.transitions
                     transformations = state.transformations @ insertions }
 
+            let matchNegation node =
+                let state, terminator = getNextState state
+                // need to make sure if the match fails somewhere in here, it needs to go to the terminator instead of ERROR
+                let nextState = buildStateMachine' { state with currentNodes = [ node ] }
+                    
+                { nextState with
+                    current = terminator
+                    transitions =
+                        [ From nextState.current, OnEpsilon, To ERROR
+                          From state.current, OnEpsilon, To terminator ]
+                        @ nextState.transitions }
+
             let generatorState =
                 match state.currentNodes with
                 | [] ->
                     Done
                 | WordBoundaryNode::_ ->
-                    HasNext (matchBoundary ())
+                    HasNext (matchWordBoundary ())
+                | SyllableBoundaryNode SyllableStart::_ ->
+                    HasNext (matchSyllableBoundary ())
+                | SyllableBoundaryNode boundaryType :: _ ->
+                    HasNext (matchSyllableSegment boundaryType)
                 | (UtteranceNode utterance)::_ ->
                     HasNext (matchUtterance utterance)
                 | (CompoundSetIdentifierNode setDesc)::_  ->
@@ -356,8 +404,10 @@ module RuleCompiler =
                     HasNext (matchInput ())
                 | (OptionalNode children)::_ ->
                     HasNext (matchOptional children)
-                | (DisjunctNode branches)::_ ->
-                    HasNext (matchDisjunct branches)
+                | (AlternationNode branches)::_ ->
+                    HasNext (matchAlternation branches)
+                | (NegationNode node)::_ ->
+                    HasNext (matchNegation node)
                 | x::_ ->
                     failwithf "Unexpected %O" x
 
@@ -381,6 +431,7 @@ module RuleCompiler =
             currentSection = EnvironmentSection
             inputPosition = InputInitial
             isPlaceholderNextStack = []
+            isOptional = false
         }
 
         // Add initial transformation
@@ -435,7 +486,7 @@ module RuleCompiler =
             let input = Node.untagAll input
             let output = Node.untagAll output
             let environment = Node.untagAll environment
-            buildNfa showNfa "q" features sets START input output environment
+            buildNfa showNfa false "q" features sets START input output environment
             |> toDfa showNfa START
         | _ ->
             invalidArg "rule" "Must be a RuleNode"
@@ -474,8 +525,7 @@ module RuleCompiler =
         gzip.Write(BitConverter.GetBytes(pickle.Length), 0, 4)
         gzip.Write(pickle, 0, pickle.Length)
 
-    let readCompiledRules filename =
-        use f = File.Open(filename, FileMode.Open, FileAccess.Read)
+    let readCompiledRulesFromStream f =
         use gzip = new GZipInputStream(f)
 
         let lengthBuffer: byte[] = Array.zeroCreate 4
@@ -487,4 +537,8 @@ module RuleCompiler =
 
         let serializer = FsPickler.CreateBinarySerializer()
         serializer.UnPickle(buffer)
+
+    let readCompiledRules filename =
+        use f = File.Open(filename, FileMode.Open, FileAccess.Read)
+        readCompiledRulesFromStream f
 #endif

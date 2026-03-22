@@ -1,6 +1,6 @@
 ﻿// Project:     TransmuteLib
 // Module:      Lexer
-// Copyright:   (c) 2023 Matt Arriola
+// Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
 namespace TransmuteLib
@@ -17,7 +17,7 @@ with
         | IPA -> "IPA"
         | X_SAMPA -> "X-SAMPA"
 
-module internal Lexer =
+module private Lexer =
     type Result =
         | OK of Token list
         | SyntaxError of string * Offset * Line * Column
@@ -36,19 +36,18 @@ module internal Lexer =
     let private Q_Separator = State.make "Q_Separator" |> State.makeFinal
     let private Q_Comma = State.make "Q_Comma" |> State.makeFinal
     let private Q_Divider = State.make "Q_Divider" |> State.makeFinal
-    let private Q0 = State.make "Q0"
-    let private Q_Arrow = State.make "Q_Arrow" |> State.makeFinal
+    let private Q_Arrow = State.make "Q_Arrow"
+    let private Q_ArrowFinal = State.make "Q_ArrowFinal" |> State.makeFinal
     let private Q_Empty = State.make "Q_Empty" |> State.makeFinal
     let private Q_Placeholder = State.make "Q_Placeholder" |> State.makeFinal
     let private Q_WordBoundary = State.make "Q_WordBoundary" |> State.makeFinal
-    let private Q_SyllableBoundary = State.make "Q_SyllableBoundary"
-    let private Q_SyllableBoundaryFinal = State.make "Q_SyllableBoundaryFinal" |> State.makeFinal
+    let private Q_Dollar = State.make "Q_Dollar"
+    let private Q_SyllableBoundary = State.make "Q_SyllableBoundaryFinal" |> State.makeFinal
     let private Q_Plus = State.make "Q_Plus" |> State.makeFinal
     let private Q_Minus = State.make "Q_Minus" |> State.makeFinal
     let private Q_Pipe = State.make "Q_Pipe" |> State.makeFinal
     let private Q_Not = State.make "Q_Not" |> State.makeFinal
-    let private Q_Equals = State.make "Q_Equals"
-    let private Q_EqualsFinal = State.make "Q_EqualsFinal" |> State.makeFinal
+    let private Q_Equals = State.make "Q_EqualsFinal" |> State.makeFinal
     let private Q_Identifier = State.make "Q_Identifier"
     let private Q_IdentifierFinal = State.make "Q_IdentifierFinal" |> State.makeFinal
     let private Q_Utterance = State.make "Q_Utterance"
@@ -84,10 +83,7 @@ module internal Lexer =
         // Defines the transition table for the lexer.
         let table =
             let beginIdentifierTransitions =
-                if inputFormat = IPA then
-                    onMany [ seq { 'A'..'Z' } ] Q_Identifier
-                else
-                    [ To Q_Identifier, OnChar '$' ]
+                onMany [ seq { 'A'..'Z' } ] Q_Identifier
 
             let identifierTransitions =
                 onMany
@@ -100,7 +96,7 @@ module internal Lexer =
                         [ seq { 'a'..'z' }
                           seq { '\u0250'..'\u0341' }
                           "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
-                          "æœðøçɸβθχŋ" :> char seq
+                          "æœðøçɸβθχŋ̩" :> char seq
                         ]
                         Q_Utterance
                 else
@@ -109,7 +105,7 @@ module internal Lexer =
                           seq { 'A'..'Z' }
                           seq { '0'..'9' }
                           "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
-                          @"?&@{}""%:_\<>`'~" :> char seq
+                          @"?&@{}""%:_\<>`'~=" :> char seq
                         ]
                         Q_Utterance
 
@@ -133,6 +129,8 @@ module internal Lexer =
                   makeTransitions (From Q_Whitespace) whitespaceTransitions
                   makeTransitions (From Q_Whitespace) [ To Q_WhitespaceFinal, OnEpsilon ]
 
+                  // Single character symbols
+
                   makeTransitions (From START)
                     [ To Q_Comma, OnChar ','
                       To Q_Separator, OnChar '.'
@@ -143,39 +141,52 @@ module internal Lexer =
                       To Q_LParen, OnChar '('
                       To Q_RParen, OnChar ')'
                       To Q_Divider, OnChar '/'
-                      To Q_Arrow, OnChar '→'
+                      To Q_ArrowFinal, OnChar '→'
                       To Q_Empty, OnChar '∅'
                       To Q_Empty, OnChar 'Ø'
                       To Q_Placeholder, OnChar '_'
                       To Q_WordBoundary, OnChar '#'
+                      To Q_SyllableBoundary, OnChar 'σ'
                       To Q_Plus, OnChar '+'
                       To Q_Pipe, OnChar '|'
                       To Q_Not, OnChar '!'
-                  ]
+                      To Q_Equals, OnChar '='
+                    ]
 
-                  makeTransitions (From START) [ To Q0, OnChar '-' ]
-                  makeTransitions (From Q0) [ To Q_Arrow, OnChar '>' ]
-                  makeTransitions (From Q0) [ To Q_Minus, OnEpsilon ]
+                  // Arrow symbol, ASCII variant (->)
 
-                  makeTransitions (From START) [ To Q_Equals, OnChar '=' ]
-                  makeTransitions (From Q_Equals) [ To Q_EqualsFinal, OnEpsilon ]
+                  makeTransitions (From START) [ To Q_Arrow, OnChar '-' ]
+                  makeTransitions (From Q_Arrow) [ To Q_ArrowFinal, OnChar '>' ]
+                  makeTransitions (From Q_Arrow) [ To Q_Minus, OnEpsilon ]
 
-                  makeTransitions (From START) [ To Q_SyllableBoundary, OnChar '$' ]
-                  makeTransitions (From Q_SyllableBoundary) identifierTransitions
-                  makeTransitions (From Q_SyllableBoundary) [ To Q_SyllableBoundaryFinal, OnEpsilon ]
+                  // Syllable boundary symbol, ASCII variant ($)
+                  // Doubles as a sigil for identifiers in X-SAMPA mode
+
+                  makeTransitions (From START) [ To Q_Dollar, OnChar '$' ]
+                  makeTransitions (From Q_Dollar) [ To Q_SyllableBoundary, OnEpsilon ]
+
+                  // Identifier
+
+                  if inputFormat = IPA then
+                    makeTransitions (From START) beginIdentifierTransitions
 
                   if inputFormat = X_SAMPA then
+                      makeTransitions (From Q_Dollar) identifierTransitions
                       makeTransitions (From Q_LBrack) identifierTransitions
                       makeTransitions (From Q_Plus) identifierTransitions
                       makeTransitions (From Q_Minus) identifierTransitions
 
-                  makeTransitions (From START) beginIdentifierTransitions
                   makeTransitions (From Q_Identifier) identifierTransitions
                   makeTransitions (From Q_Identifier) [ To Q_IdentifierFinal, OnEpsilon ]
+
+                  // Utterance
 
                   makeTransitions (From START) beginUtteranceTransitions
                   makeTransitions (From Q_Utterance) utteranceTransitions
                   makeTransitions (From Q_Utterance) [ To Q_UtteranceFinal, OnEpsilon ]
+
+                  // Comment
+
                   makeTransitions (From START) [ To Q_Comment, OnChar ';' ]
                   makeTransitions (From Q_Comment) [ To Q_Comment, OnAny ]
                   makeTransitions (From Q_Comment) [ To Q_CommentFinal, OnChar '\n' ]
@@ -193,16 +204,16 @@ module internal Lexer =
               Q_LParen, LParen.id
               Q_RParen, RParen.id
               Q_Divider, Divider.id
-              Q_Arrow, Arrow.id
+              Q_ArrowFinal, Arrow.id
               Q_Empty, Empty.id
               Q_Placeholder, Placeholder.id
               Q_WordBoundary, WordBoundary.id
-              Q_SyllableBoundaryFinal, SyllableBoundary.id
+              Q_SyllableBoundary, SyllableBoundary.id
               Q_Plus, Plus.id
               Q_Minus, Minus.id
               Q_Pipe, Pipe.id
               Q_Not, Not.id
-              Q_EqualsFinal, Equals.id
+              Q_Equals, Equals.id
               Q_IdentifierFinal, Id.apply (trimSigil '$')
               Q_UtteranceFinal, Utterance.apply (trimSigil '.')
               Q_CommentFinal, Comment.apply trimComment

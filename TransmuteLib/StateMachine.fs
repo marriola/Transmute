@@ -6,8 +6,6 @@
 
 namespace TransmuteLib
 
-open TransmuteLib.Utils.Operators
-
 type Origin = From of State
 
 type InputSymbol =
@@ -41,7 +39,7 @@ type StateTransition =
       Transitions: (Destination * InputSymbol) list
     }
 
-module internal StateMachine =
+module private StateMachine =
     let inline getOrigin (From origin, _, _) = origin
     let inline getInput (_, on, _) = on
     let inline getDest (_, _, To dest) = dest
@@ -85,8 +83,10 @@ module internal StateMachine =
 
     /// Represents the action to take after transitioning to the error state
     type ErrorAction<'TValue, 'TResult> =
-        /// Reprocess the same input from the start state
+        /// Jump to the start state and reprocess the same input symbol
         | Restart of 'TValue
+        /// Continue processing from the next input symbol.
+        | Continue of 'TValue
         /// Stop processing input
         | Stop of 'TResult
 
@@ -155,106 +155,6 @@ module internal StateMachine =
           config.fTransition(),
           config.fFinish() )
 
-    let inline private give x = fun () -> x
-
-    /// <summary>
-    /// Runs the specified NFA.
-    /// </summary>
-    /// <param name="input">The input to iterate over.</param>
-    /// <param name="config">The state machine configuration.</param>
-    let runNFA<'TValue, 'TResult>
-        (input: string)
-        (config: Config<'TValue, 'TResult>)
-        : 'TResult =
-        let ( transitionTable,
-              startState,
-              errorState,
-              initialValue,
-              fError,
-              fTransition,
-              fFinish
-            ) = completeConfig config
-
-        // Group the transition table first by state, then by input symbol so we know when an alternate path can be taken
-        let transitionTable =
-            transitionTable
-            |> Map.toList
-            |> List.groupBy (fst >> fst)
-            |> List.map (fun (key, ts) -> key, List.groupBy (fst >> snd) ts |> Map.ofList)
-            |> Map.ofList
-
-        let step currentState inputSymbol =
-            let charInput = OnChar inputSymbol
-            let transitionsFromCurrent = Map.tryFind currentState transitionTable |> Option.defaultValue Map.empty
-            let inputTransitions = Map.tryFind charInput transitionsFromCurrent |> Option.defaultValue []
-            let epsilonTransitions = Map.tryFind OnEpsilon transitionsFromCurrent |> Option.defaultValue []
-            let anyTransitions = Map.tryFind OnAny transitionsFromCurrent |> Option.defaultValue []
-
-            (inputTransitions @ epsilonTransitions @ anyTransitions)
-            |> List.map (fun ((origin, input), dest) -> From origin, input, To dest)
-
-        let rec inner visited stack =
-            match stack with
-            | (currentValue, _, _, [])::_ ->
-                fFinish (currentValue())
-            | (currentValue, currentState, position, (nextSymbol::inputRest as input))::stackRest ->
-                let currentValue = currentValue()
-                let machineState =
-                    { position = position
-                      currentState = currentState
-                      currentValue = currentValue }
-                let getNextValue t value = { machineState with currentValue = value } |> fTransition nextSymbol t
-                let transitions = step currentState nextSymbol
-                let branches =
-                    transitions
-                    |> List.mapi (fun i ((_, matchSymbol, To nextState) as transition) ->
-                        let isEpsilonTransition = matchSymbol = OnEpsilon
-                        let nextPosition, nextInput = if isEpsilonTransition then position, input else position + 1, inputRest
-                        //if i > 0 then printf " "
-                        (getNextValue transition, nextState, nextPosition, nextInput))
-
-                if List.isEmpty transitions then
-                    let nextPosition = position + 1
-                    let nextInput = input.[1..input.Length - 1]
-                    let matchSymbol = OnChar nextSymbol
-
-                    match fError nextSymbol machineState with
-                    | Stop result ->
-                        result
-                    | Restart value ->
-                        if stackRest.Length > 0 && not (State.isFinal currentState) then
-                            match stackRest with
-                            | (_, s, _, _)::_ ->
-                                // Backtrack to the next branch if there is one and we haven't already been there
-                                //printfn "*** BACKTRACK to %O,%O - %d left ***" matchSymbol s (List.length stackRest - 1)
-                                if Set.contains (matchSymbol, s) visited then
-                                    inner visited stackRest.[1..stackRest.Length - 1]
-                                else
-                                    inner (Set.add (matchSymbol, s) visited) stackRest
-                            | _ ->
-                                fFinish value
-                        elif currentState <> startState then
-                            // Reprocess the same input unless we're on the start state
-                            inner Set.empty ((give value, startState, position, input) :: stackRest)
-                        elif not (List.isEmpty inputRest) then
-                            // Process the next input if there is one
-                            inner Set.empty ((give value, startState, nextPosition, nextInput) :: stackRest)
-                        else
-                            // Nothing left, just finish
-                            fFinish value
-                else
-                    let (getNextValue, nextState, nextPosition, nextInput) :: alternateBranches = branches
-                    let alternateBranches =
-                        alternateBranches
-                        |> List.map (fun (getNextValue, nextState, nextPosition, nextInput) ->
-                            (fun () -> getNextValue currentValue), nextState, nextPosition, nextInput)
-                    let nextValue = fun () -> getNextValue currentValue
-                    let stackRest = alternateBranches @ stackRest
-                    let stackTop = nextValue, nextState, nextPosition, nextInput
-                    inner visited (stackTop :: stackRest)
-
-        inner Set.empty [ (give initialValue, startState, 0, List.ofSeq input) ]
-
     /// <summary>
     /// Runs the specified DFA.
     /// </summary>
@@ -273,33 +173,41 @@ module internal StateMachine =
               fFinish
             ) = completeConfig config
 
-        let step currentState inputSymbol =
-            let transition = Map.tryFind (currentState, OnChar inputSymbol) transitionTable
-            let transitionOnEpsilon = Map.tryFind (currentState, OnEpsilon) transitionTable
-            let transitionOnAny = Map.tryFind (currentState, OnAny) transitionTable
-            let next =
-                match transition, transitionOnEpsilon, transitionOnAny with
-                | Some t, _, _ -> Some (OnChar inputSymbol, t)
-                | _, Some t, _ -> Some (OnEpsilon, t)
-                | _, _, Some t -> Some (OnAny, t)
-                | _ -> None
-            next
-            |> Option.map (fun (inputSymbol, dest) -> From currentState, inputSymbol, To dest)
-            
+        let inline step currentState inputSymbol =
+            match Map.tryFind (currentState, OnChar inputSymbol) transitionTable with
+            | Some dest -> Some (From currentState, OnChar inputSymbol, To dest)
+            | _ ->
+            match Map.tryFind (currentState, OnEpsilon) transitionTable with
+            | Some dest -> Some (From currentState, OnEpsilon, To dest)
+            | _ ->
+            match Map.tryFind (currentState, OnAny) transitionTable with
+            | Some dest (* when not (Special.SyllableBoundarySymbols.Contains inputSymbol) *) -> Some (From currentState, OnAny, To dest)
+            | _ -> None
 
         let rec inner currentValue currentState position input =
             match input with
             | [] ->
                 fFinish currentValue
             | nextSymbol::rest ->
+                let transition = step currentState nextSymbol
+
+                let nextState, nextInput =
+                    match transition with
+                    | Some (_, matchSymbol, To dest) ->
+                        dest, if matchSymbol = OnEpsilon then input else rest
+                    | _ ->
+                        errorState, rest
+
+                let nextPosition =
+                    if Special.Symbols.Contains nextSymbol then
+                        position
+                    else
+                        position + 1
+
                 let machineState =
                     { position = position
                       currentState = currentState
                       currentValue = currentValue }
-                let transition = step currentState nextSymbol
-                let nextState = transition |> Option.map (fun (_, _, To dest) -> dest) |> Option.defaultValue errorState
-                let isEpsilonTransition = transition |> Option.map (fun (_, matchSymbol, _) -> matchSymbol = OnEpsilon) |> Option.defaultValue false
-                let nextInput = if isEpsilonTransition then input else rest
 
                 if transition = None then
                     match fError nextSymbol machineState with
@@ -308,15 +216,17 @@ module internal StateMachine =
                         inner value startState position input
                     | Restart value when rest <> [] ->
                         // Process the next input if there is one
-                        inner value startState (position + 1) nextInput
+                        inner value startState nextPosition nextInput
                     | Restart value ->
                         // Nothing left, just finish
                         fFinish value
+                    | Continue value ->
+                        inner value currentState nextPosition nextInput
                     | Stop result ->
                         result
                 else
                     let transition = Option.get transition
-                    inner (fTransition nextSymbol transition machineState) nextState (position + 1) nextInput
+                    inner (fTransition nextSymbol transition machineState) nextState nextPosition nextInput
 
         input
         |> List.ofSeq

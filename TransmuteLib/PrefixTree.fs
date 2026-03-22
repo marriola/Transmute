@@ -6,12 +6,12 @@
 
 namespace TransmuteLib
 
-type internal PrefixTree =
+type private PrefixTree =
     | Root of children: PrefixTree list
     | Node of prefix: string * value: char * children: PrefixTree list
     | Leaf of utterance: string * depth: int
 
-module internal PrefixTree =
+module private PrefixTree =
     // maketree [ "k"; "kw"; "g"; "gw"; "p"; "b"; "t"; "d" ]
 
     //                Ø
@@ -68,6 +68,6 @@ module internal PrefixTree =
     /// <param name="setIdentifier">The CompoundSetIdentifierNode listing the sets and features to intersect.</param>
     let fromSetIntersection (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
         let alphabet = Node.getAlphabet features sets
-        setDescriptor
-        |> Node.setIntersection alphabet features sets
-        |> makeTree
+        let phonemes = Node.setIntersection alphabet features sets setDescriptor
+        let tree = makeTree phonemes
+        phonemes, tree

@@ -1,14 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net7.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
 
     <IsPackable>false</IsPackable>
     <GenerateProgramFile>false</GenerateProgramFile>
+    <Configurations>Debug;Release;Debug Verbose</Configurations>
   </PropertyGroup>
 
   <ItemGroup>
     <Compile Include="Tests.fs" />
+    <Compile Include="SyllableDetectorTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

@@ -38,6 +38,8 @@ type Node =
     /// Represents a word boundary in the environment section.
     | WordBoundaryNode
 
+    | SyllableBoundaryNode of boundaryType: SyllableBoundaryType
+
     /// Represents a phonological rule.
     | RuleNode of lineNumber: int * input:Node list * output:Node list * environment:Node list
 
@@ -54,7 +56,10 @@ type Node =
     | OptionalNode of Node list
 
     /// Defines a set of lists of nodes, of which only one may be matched.
-    | DisjunctNode of Node list list
+    | AlternationNode of Node list list
+
+    /// Defines a negative match.
+    | NegationNode of Node
 
     /// Defines the rule used by the syllable boundary detector.
     | SyllableDefinitionNode of onset: Node list * nucleus: Node list * coda: Node list
@@ -72,6 +77,14 @@ type Node =
             node.ToString()
         | PlaceholderNode -> "_"
         | WordBoundaryNode -> "#"
+        | SyllableBoundaryNode SyllableStart 
+        | SyllableBoundaryNode SyllableEnd -> "σ"
+        | SyllableBoundaryNode OnsetStart
+        | SyllableBoundaryNode OnsetEnd -> "Onset"
+        | SyllableBoundaryNode NucleusStart
+        | SyllableBoundaryNode NucleusEnd -> "Nucleus"
+        | SyllableBoundaryNode CodaStart
+        | SyllableBoundaryNode CodaEnd -> "Coda"
         | CommentNode text -> sprintf "; %s" text
         | UtteranceNode value
         | SetIdentifierNode value
@@ -109,11 +122,13 @@ type Node =
                 sprintf "( %s )" contents
             else
                 sprintf "(%s)" contents
-        | DisjunctNode branches ->
+        | AlternationNode branches ->
             branches
             |> List.map stringifyList
             |> String.concat " | "
             |> sprintf "( %s )"
+        | NegationNode node ->
+            sprintf "!%O" node
         | RuleNode (_, input, output, environment) ->
             let environmentSection =
                 match environment with
@@ -127,23 +142,66 @@ type Node =
                 (if output = [] then "Ø" else stringifyList output)
                 environmentSection
 
+and SyllableBoundaryType =
+    | SyllableStart
+    | SyllableEnd
+    | OnsetStart
+    | OnsetEnd
+    | NucleusStart
+    | NucleusEnd
+    | CodaStart
+    | CodaEnd
+
+module SyllableBoundaryType =
+    let BoundaryTypeToChar = Map.ofList [
+        SyllableStart, Special.SYLLABLE_START_BOUNDARY
+        OnsetStart, Special.ONSET_START_BOUNDARY
+        OnsetEnd, Special.ONSET_END_BOUNDARY
+        NucleusStart, Special.NUCLEUS_START_BOUNDARY
+        NucleusEnd, Special.NUCLEUS_END_BOUNDARY
+        CodaStart, Special.CODA_START_BOUNDARY
+        CodaEnd, Special.CODA_END_BOUNDARY
+        SyllableEnd, Special.SYLLABLE_END_BOUNDARY
+    ]
+
+    // key[0]   syllable boundary identifier token value
+    // key[1]   false = token was found in the input section, true = token was found in the environment section
+
+    let NameToBoundaryType = Map.ofList [
+        ("onset", false), OnsetEnd
+        ("onset", true), OnsetStart
+        ("nucleus", false), NucleusEnd
+        ("nucleus", true), NucleusStart
+        ("coda", false), CodaEnd
+        ("coda", true), CodaStart
+
+        ("onsetstart", false), OnsetStart
+        ("onsetstart", true), OnsetStart
+        ("onsetend", false), OnsetEnd
+        ("onsetend", true), OnsetEnd
+        ("nucleusstart", false), NucleusStart
+        ("nucleusstart", true), NucleusStart
+        ("nucleusend", false), NucleusEnd
+        ("nucleusend", true), NucleusEnd
+        ("codastart", false), CodaStart
+        ("codastart", true), CodaStart
+        ("codaend", false), CodaEnd
+        ("codaend", true), CodaEnd
+    ]
+
 /// Provides functions on the Node type.
 module Node =
     let tag node position =
         TaggedNode (position, node)
 
     /// Retrieves the inner node of a tagged node.
-    let inline untag taggedNode =
+    let rec untag taggedNode =
         match taggedNode with
         | TaggedNode (_, node) ->
             node
         | x ->
             x
-
-    let rec untagAll nodes =
-        nodes
-        |> List.map untag
-        |> List.map (function
+        |> function
             | RuleNode (lineNumber, input, output, environment) ->
                 RuleNode (lineNumber, untagAll input, untagAll output, untagAll environment)
             | CompoundSetIdentifierNode xs ->
@@ -156,10 +214,16 @@ module Node =
                 TransformationNode (untag input, untag output)
             | OptionalNode xs ->
                 OptionalNode (untagAll xs)
-            | DisjunctNode xs ->
-                DisjunctNode (List.map untagAll xs)
+            | AlternationNode xs ->
+                AlternationNode (List.map untagAll xs)
+            | NegationNode node ->
+                NegationNode (untag node)
             | x ->
-                x)
+                x
+
+    and untagAll nodes =
+        nodes
+        |> List.map untag
 
     let (|Untag|_|) node =
         match node with
@@ -371,7 +435,7 @@ module Node =
     /// <param name="features">The available features.</param>
     /// <param name="setIdentifier"></param>
     let setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
-        let rec inner (terms: Node list) (result: Set<string>) =
+        let rec inner (terms: Node list) first plus (result: Set<string>) =
             let addToSet isPresent s =
                 if isPresent
                     then Set.intersect result s
@@ -381,6 +445,11 @@ module Node =
             | [] ->
                 result
             | x::xs ->
+                let plus =
+                    plus &&
+                    match x with
+                    | Untag (FeatureIdentifierNode (isPresent, _), _) when not isPresent -> false
+                    | _ -> true
                 let nextSet =
                     match x with
                     | Untag (SegmentIdentifierNode (isPresent, segments), _) ->
@@ -393,10 +462,14 @@ module Node =
                         |> set
                         |> addToSet true
                     | Untag (FeatureIdentifierNode (isPresent, name), _) ->
-                        if features.ContainsKey(name) then
-                            getFeatureMembers isPresent features.[name]
-                            |> set
-                            |> Set.intersect result
+                        if features.ContainsKey name then
+                            if first then
+                                getFeatureMembers isPresent features.[name] |> set
+                            else
+                                let setMembers = getFeatureMembers true features.[name] |> set
+                                if isPresent
+                                    then Set.intersect result setMembers
+                                    else Set.difference result setMembers
                         elif sets.ContainsKey(name) then
                             let setMembers = getSetMembers sets.[name] |> set
                             if isPresent
@@ -406,7 +479,7 @@ module Node =
                             failwithf "%s is not defined" name
                     | Untag (node, position) ->
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
-                inner xs nextSet
+                inner xs false plus nextSet
         
         let segmentsOnly =
             setDescriptor
@@ -418,7 +491,8 @@ module Node =
             |> List.collect (function SegmentIdentifierNode (isPresent, segments) -> if isPresent then segments else [])
             |> List.distinct
         else
-            inner setDescriptor alphabet |> List.ofSeq
+            inner setDescriptor true true alphabet
+            |> List.ofSeq
 
     /// <summary>
     /// <para>Resolves references to other features/sets in a feature/set by adding their members to it.</para>

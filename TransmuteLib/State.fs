@@ -9,18 +9,19 @@ namespace TransmuteLib
 type StateType = Final | NonFinal
 
 type TransitionResult =
-    /// Output the same symbol that was consumed.
+    /// Output the same input symbol that was consumed.
     | OutputDefault
 
     /// Drops the last N output symbols and adds a new symbol.
     | ReplacesWith of count: int * output: string
 
+    /// Adds a new symbol, followed by the consumed input symbol.
     | InsertsBefore of output: string
 
-    /// Adds the consumed symbol, followed by a new symbol.
+    /// Adds the consumed input symbol, followed by a new symbol.
     | InsertsAfter of output: string
 
-    /// Drops the last N output symbols.
+    /// Drops the last N symbols.
     | Deletes of count: int * text: string
 with
     member this.Or other =
@@ -34,32 +35,39 @@ with
             this
 
 type State =
-    | State of name: string * stateType: StateType
-    | MergedState of State list
+    | State of name: string * ordinal: int * stateType: StateType
+    | MergedState of State array
     with
         /// Returns the state's name.
         static member name = function
-            | State (name, _) -> name
+            | State (name, _, _) -> name
             | MergedState states ->
                 states
                 |> Seq.map State.name
                 |> String.concat ""
 
+        static member withSuffix suffix = function
+            | State (name, ordinal, isFinal) -> State (name + suffix, ordinal, isFinal)
+            | x -> failwithf "%O is a merged state" x
+
         /// Returns the ordinal part of a state's name (e.g. "q5" -> 5), -1 if the state name contains no ordinal part,
         /// or throws an exception if given a merged state.
         static member ord = function
-            | State (name, _) ->
-                if name.StartsWith "S" then -1 else int (name.Substring(1))
+            | State (_, ordinal, _) ->
+                ordinal
             | MergedState _ ->
                 failwith "Merged states have no ordinal"
 
         /// Creates a non-final state marked as matching a symbol in the input section.
-        static member make name = State (name, NonFinal)
+        static member make (name: string) =
+            let mutable ordinal = -1
+            System.Int32.TryParse(name.Substring(1), ref ordinal) |> ignore
+            State (name, ordinal, NonFinal)
     
         /// Marks a state as being final.
         static member makeFinal = function
-            | State (name, _) ->
-                State (name, Final)
+            | State (name, ordinal, _) ->
+                State (name, ordinal, Final)
             | MergedState _ as state ->
                 failwithf "%s is a merged state; it cannot be made final" (string state)
         
@@ -68,13 +76,13 @@ type State =
             let statesToMerge =
                 states
                 |> Seq.collect (function
-                    | State _ as state -> [ state ]
+                    | State _ as state -> [| state |]
                     | MergedState states -> states)
                 |> Seq.distinct
                 |> Seq.sortBy State.ord
-                |> List.ofSeq
+                |> Array.ofSeq
             match statesToMerge with
-            | [state] -> state
+            | [| state |] -> state
             | _ -> MergedState statesToMerge
 
         static member isMerged = function
@@ -83,10 +91,10 @@ type State =
 
         /// Returns a boolean indicating whether the state is final.
         static member isFinal = function
-            | State (_, Final) -> true
-            | State (_, NonFinal) -> false
+            | State (_, _, Final) -> true
+            | State (_, _, NonFinal) -> false
             | MergedState states ->
-                List.exists State.isFinal states
+                Array.exists State.isFinal states
 
         override this.ToString() =
             let leftParen, rightParen = if State.isFinal this then "(", ")" else "", ""

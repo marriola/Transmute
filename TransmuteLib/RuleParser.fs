@@ -11,9 +11,8 @@ open TransmuteLib.ExceptionHelpers
 open TransmuteLib.Lexer
 open TransmuteLib.Position
 open TransmuteLib.Token
-open TransmuteLib.Utils.Operators
 
-module RuleParser =
+module internal RuleParser =
     /// <summary>
     /// Parses the next node in the list of tokens.
     /// </summary>
@@ -22,7 +21,7 @@ module RuleParser =
         let mutable _position = Offset 0, Line 1, Column 1
 
         /// <summary>
-        /// Matches a token to a specific type.
+        /// Matches the next token to a specific type and consumes it.
         /// <summary>
         /// <exception cref="SyntaxException">Thrown when the token at the head of the list does not match the given type.</exception>
         let rec matchToken tokens tokenType =
@@ -36,6 +35,9 @@ module RuleParser =
             | x::_ ->
                 unexpectedToken [tokenType] x
 
+        /// <summary>
+        /// Attempts to match the next token to a specific type, and consumes it if matched. Otherwise, returns the original tokens list unchanged.
+        /// </summary>
         let rec tryMatchToken tokens tokenType =
             match tokens with
             | OfType Whitespace _::xs ->
@@ -45,6 +47,10 @@ module RuleParser =
             | _ ->
                 tokens, None
 
+        /// <summary>
+        /// Attempts to match the next token to a specific type, and consumes it if matched. Otherwise, returns the original tokens list unchanged.
+        /// If a newline is reached before matching the target token type, the match fails.
+        /// </summary>
         let rec tryMatchTokenOnSameLine tokens tokenType =
             match tokens with
             | OfType Whitespace ws::xs ->
@@ -57,6 +63,7 @@ module RuleParser =
             | _ ->
                 tokens, None
 
+        /// <summary>
         /// Matches a token to one of a list of token types, automatically skipping over any whitespace.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
@@ -157,77 +164,113 @@ module RuleParser =
 
         /// <summary>
         /// Matches a rule section, i.e. a list of <see cref="SetIdentifierNode" />, <see cref="UtteranceNode" />,
-        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="CompoundSetIdentifierNode" />,
-        /// <see cref="OptionalNode" /> or <see cref="DisjunctNode" />.
+        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="SyllableBoundaryNode" />,
+        /// <see cref="CompoundSetIdentifierNode" />, <see cref="OptionalNode" /> and <see cref="AlternationNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
         let rec matchRuleSection tokens =
             /// <summary>
-            /// Matches a <see cref="DisjunctNode" />.
+            /// Matches an <see cref="AlternationNode" />.
             /// </summary>
             /// <param name="tokens">The list of tokens.</param>
             /// <param name="out">The contents of the node.</param>
-            let rec matchDisjunct tokens startToken out =
+            let rec matchAlternation tokens startToken out =
                 match tokens with
                 | OfType Empty _::xs ->
-                    matchDisjunct xs startToken out
+                    matchAlternation xs startToken out
                 | NewlineWhitespace _::_ ->
                     invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
                 | OfType Whitespace _::xs ->
-                    matchDisjunct xs startToken out
+                    matchAlternation xs startToken out
                 | OfType RParen _::xs ->
-                    xs, Node.tag (DisjunctNode (List.rev out)) startToken.position
+                    xs, Node.tag (AlternationNode (List.rev out)) startToken.position
                 | OfType Pipe _::xs ->
-                    matchDisjunct xs startToken out
+                    matchAlternation xs startToken out
                 | _ ->
                     let tokens, ruleSection = matchRuleSection tokens
                     ruleSection :: out
-                    |> matchDisjunct tokens startToken
+                    |> matchAlternation tokens startToken
 
             /// <summary>
-            /// Matches either an <see cref="OptionalNode" /> or a <see cref="DisjunctNode" />.
+            /// Matches either an <see cref="OptionalNode" /> or an <see cref="AlternationNode" />.
             /// </summary>
             /// <param name="tokens">The list of tokens.</param>
-            let matchOptional_Disjunct tokens =
+            let matchOptional_Alternation tokens =
                 let tokens, lparen = matchToken tokens LParen
-                let rec matchOptional_DisjunctInteral tokens out =
+                let rec matchOptional_AlternationInteral tokens out =
                     match tokens with
                     | NewlineWhitespace _::_ ->
                         invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
                     | OfType Whitespace _::xs ->
-                        matchOptional_DisjunctInteral xs out
+                        matchOptional_AlternationInteral xs out
                     | OfType RParen _::xs ->
                         xs, Node.tag (OptionalNode (List.rev out)) lparen.position
                     | OfType Pipe _::xs ->
-                        matchDisjunct xs lparen [out]
+                        matchAlternation xs lparen [out]
                     | _ ->
                         let tokens, ruleSection = matchRuleSection tokens
-                        matchOptional_DisjunctInteral tokens (ruleSection @ out)
-                matchOptional_DisjunctInteral tokens []
+                        matchOptional_AlternationInteral tokens (ruleSection @ out)
+                matchOptional_AlternationInteral tokens []
 
             let rec inner tokens out =
-                match tokens with
-                | OfType Empty _ :: xs
-                | OfType Separator _ :: xs ->
-                    inner xs out
-                | NonNewlineWhitespace _ :: xs ->
-                    inner xs out
-                | OfType Id x :: xs ->
-                    inner xs (Node.tag (SetIdentifierNode x.value) x.position :: out)
-                | OfType Utterance x :: xs ->
-                    inner xs (Node.tag (UtteranceNode x.value) x.position :: out)
-                | OfType Placeholder x :: xs ->
-                    inner xs (Node.tag PlaceholderNode x.position :: out)
-                | OfType WordBoundary x :: xs ->
-                    inner xs (Node.tag WordBoundaryNode x.position :: out)
-                | OfType LBrack x :: xs ->
-                    let tokens, setIdentifier = matchSetIdentifier xs x.position
-                    inner tokens (setIdentifier :: out)
-                | OfType LParen _ :: _ ->
-                    let tokens, optional = matchOptional_Disjunct tokens
-                    inner tokens (optional :: out)
-                | _ ->
-                    tokens, List.rev out
+                let inline hasPlaceholder x = List.exists (function TaggedNode (_, PlaceholderNode) -> true | _ -> false) x
+                
+                let rec matchNext tokens =
+                    match tokens with
+                    | OfType Empty _ :: xs
+                    | OfType Separator _ :: xs ->
+                        matchNext xs
+
+                    | NonNewlineWhitespace _ :: xs ->
+                        matchNext xs
+
+                    | OfType Id x :: xs ->
+                        match Map.tryFind (x.value.ToLower(), hasPlaceholder out) SyllableBoundaryType.NameToBoundaryType with
+                        | None ->
+                            xs, Some (Node.tag (SetIdentifierNode x.value) x.position)
+                        | Some boundaryType ->
+                            xs, Some (Node.tag (SyllableBoundaryNode boundaryType) x.position)
+
+                    | OfType Utterance x :: xs ->
+                        xs, Some (Node.tag (UtteranceNode x.value) x.position)
+
+                    | OfType Placeholder x :: xs ->
+                        xs, Some (Node.tag PlaceholderNode x.position)
+
+                    | OfType WordBoundary x :: xs ->
+                        xs, Some (Node.tag WordBoundaryNode x.position)
+
+                    | OfType SyllableBoundary x :: xs ->
+                        let boundaryType = if hasPlaceholder out then SyllableEnd else SyllableStart
+
+                        xs, Some (Node.tag (SyllableBoundaryNode boundaryType) x.position)
+
+                    | OfType LBrack x :: xs ->
+                        let tokens, setIdentifier = matchSetIdentifier xs x.position
+                        tokens, Some setIdentifier
+
+                    | OfType LParen _ :: _ ->
+                        let tokens, optional = matchOptional_Alternation tokens
+                        tokens, Some optional
+
+                    | OfType Not _ :: xs ->
+                        let negationPosition = _position
+                        match matchNext xs with
+                        | xs, Some next ->
+                            xs, Some (Node.tag (NegationNode next) negationPosition)
+
+                        | _ ->
+                            invalidSyntax ("Unexpected " + (xs |> List.head |> string)) _position
+
+                    | _ ->
+                        tokens, None
+
+                match matchNext tokens with
+                | xs, Some next ->
+                    inner xs (next :: out)
+
+                | xs, None ->
+                    xs, List.rev out
 
             inner tokens []
 
@@ -274,6 +317,7 @@ module RuleParser =
                     xs, List.rev out
                 | OfType LBrack x::xs ->
                     let tokens, id = matchSetIdentifier xs x.position
+                    let tokens, _ = tryMatchToken tokens Comma
                     matchMemberListInternal tokens (id :: out)
                 | x::_ ->
                     unexpectedToken [Utterance] x
@@ -342,32 +386,27 @@ module RuleParser =
                     invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda', got {token}" token.position
 
             let tokens, _ = matchToken tokens LParen
-            let tokens, parts = inner tokens []
+            let tokens, definitions = inner tokens []
             let tokens, _ = matchToken tokens RParen
 
-            let parts =
-                parts
+            let definitions =
+                definitions
                 |> List.groupBy fst
-                |> List.map (fun (key, parts) ->
+                |> Map.ofList
+                |> Map.map (fun _ parts ->
                     match parts with
-                    | [] -> key, []
-                    | [_, nodes] -> key, nodes
+                    | [] -> []
+                    | [_, nodes] -> nodes
                     | _ -> 
-                        let disjunctNode =
+                        let alternationNode =
                             parts
                             |> List.map (fun (_, nodes) -> nodes)
-                            |> DisjunctNode
-                        key, [ disjunctNode ])
+                            |> AlternationNode
+                        [ alternationNode ])
 
-            let findSegmentOrEmpty name parts =
-                parts
-                |> List.tryFind (fst >> (=) name)
-                |> Option.map snd
-                |> Option.defaultValue []
-
-            let onset = findSegmentOrEmpty "Onset" parts
-            let nucleus = findSegmentOrEmpty "Nucleus" parts
-            let coda = findSegmentOrEmpty "Coda" parts
+            let onset = Map.tryFind "Onset" definitions |> Option.defaultValue []
+            let nucleus = Map.tryFind "Nucleus" definitions |> Option.defaultValue []
+            let coda = Map.tryFind "Coda" definitions |> Option.defaultValue []
 
             if onset = [] && nucleus = [] && coda = [] then
                 invalidSyntax "All segments are missing or empty in syllable definition" startToken.position
@@ -554,7 +593,8 @@ module RuleParser =
                 | OfType Empty x::_
                 | OfType Divider x::_
                 | OfType Utterance x::_
-                | OfType LParen x::_ ->
+                | OfType LParen x::_
+                | OfType Not x::_ ->
                     Ok (matchRule tokens x.position)
                 | OfType Id x::xs ->
                     Ok (matchSet_Rule xs x)

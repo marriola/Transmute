@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.4.33213.308
+# Visual Studio Version 18
+VisualStudioVersion = 18.3.11520.95 d18.3
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute", "Transmute\Transmute.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
 EndProject
@@ -11,17 +11,24 @@ Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib.Test", "Transm
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{20BF81DB-D7B6-44C6-BD1F-F106ED66CE95}"
 	ProjectSection(SolutionItems) = preProject
+		HOW.md = HOW.md
 		README.md = README.md
 	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug Verbose|Any CPU = Debug Verbose|Any CPU
+		Debug Verbose|x86 = Debug Verbose|x86
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x86 = Debug|x86
 		Release|Any CPU = Release|Any CPU
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug Verbose|Any CPU.ActiveCfg = Debug Verbose|Any CPU
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug Verbose|Any CPU.Build.0 = Debug Verbose|Any CPU
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug Verbose|x86.ActiveCfg = Debug Verbose|x86
+		{E909825E-D739-4690-A5A1-E136FB506007}.Debug Verbose|x86.Build.0 = Debug Verbose|x86
 		{E909825E-D739-4690-A5A1-E136FB506007}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{E909825E-D739-4690-A5A1-E136FB506007}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E909825E-D739-4690-A5A1-E136FB506007}.Debug|x86.ActiveCfg = Debug|x86
@@ -30,6 +37,10 @@ Global
 		{E909825E-D739-4690-A5A1-E136FB506007}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E909825E-D739-4690-A5A1-E136FB506007}.Release|x86.ActiveCfg = Release|x86
 		{E909825E-D739-4690-A5A1-E136FB506007}.Release|x86.Build.0 = Release|x86
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug Verbose|Any CPU.ActiveCfg = Debug Verbose|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug Verbose|Any CPU.Build.0 = Debug Verbose|Any CPU
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug Verbose|x86.ActiveCfg = Debug Verbose|x86
+		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug Verbose|x86.Build.0 = Debug Verbose|x86
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Debug|x86.ActiveCfg = Debug|x86
@@ -38,6 +49,10 @@ Global
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Release|Any CPU.Build.0 = Release|Any CPU
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Release|x86.ActiveCfg = Release|x86
 		{9C287E6C-7305-47B2-89C3-52983FC49A7D}.Release|x86.Build.0 = Release|x86
+		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug Verbose|Any CPU.ActiveCfg = Debug Verbose|Any CPU
+		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug Verbose|Any CPU.Build.0 = Debug Verbose|Any CPU
+		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug Verbose|x86.ActiveCfg = Debug Verbose|Any CPU
+		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug Verbose|x86.Build.0 = Debug Verbose|Any CPU
 		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}.Debug|x86.ActiveCfg = Debug|Any CPU

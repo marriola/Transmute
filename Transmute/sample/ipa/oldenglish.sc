@@ -1,4 +1,10 @@
-﻿;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+﻿Syllable = (
+    Onset = (s)(C)(C)
+    Nucleus = (ˈ)V
+    Coda = (C)(C)(C)(C)
+)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   Ingvaeonic and Anglo-Frisian   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -8,18 +14,21 @@ V.n → [+Long +Nasalized] / _Fricative
 
 (ɑ̃ː|æ̃ː) → ɔ̃ː
 
+ɑː → æː / _!(m|n)
 (ɑi|ɑj) → ɑː
 
 ; Anglo-Frisian brightening
 
-ɑ → æ / _[C-/m n/](C)(C)([V+Front])
-æ̃ → ɑ̃
+;ɑ → æ / _[C-/m n/](C)(C)([V+Front])
+;æ̃ → ɑ̃
 
 ; Undo before syllable with back vowel
-æ → ɑ / _C(C)(C)[V-Front]
+;æ → ɑ / _C(C)(C)[V-Front]
 
 ; Redo before velar consonant
-ɑ → æ / _(x|w|rC|lC)
+;ɑ → æ / _(x|w|rC|lC)//
+
+ɑ!ː → æ / _!(m|n)
 
 (æ|ɑ|ɑ̃) → ∅ / _#
 
@@ -29,7 +38,8 @@ V.n → [+Long +Nasalized] / _Fricative
 
 ; Front vowel breaking
 
-∅ → u / [V+Front-/y/]_((x|h|w)(V|#) | rC | lC)
+∅ → u / [V+Front-/y/]_((x|h|w) | rC | lC)
+teuxun → texun
 
 ; Diphthong height harmonization
 
@@ -61,16 +71,15 @@ hʷ → hw
 
 [-Front] → [+Front] / _[C-/j ʝ/] ([C-/j ʝ/])([C-/j ʝ/])(i|j|ʝ)
 
-; Loss of short, low vowels in medial syllables
-
-(ɑ|æ|e) → ∅ / V.C(C)(C)_C.V
-
 ; High vowel loss
 
 (i|u) → ∅ / ([V+Long] | Diphthong | C)C_#
 
-(i)j → ∅ / ([V+Long] | Diphthong)C(C)(C)_
-(i)j → ∅ / ([V-Long] | [Diphthong-Long])C.C(C)(C)_
+;(i)j → ∅ / ([V+Long] | Diphthong)C(C)(C)_
+;(i)j → ∅ / ([V-Long] | [Diphthong-Long])C.C(C)(C)_
+
+(i)j → ∅ / ([V+Long] | Diphthong)C_σ
+(i)j → ∅ / ([V-Long] | [Diphthong-Long])C.C_σ
 
 ʝ → j
 j → ∅ / C_#
@@ -79,7 +88,8 @@ j → ∅ / C_#
 
 ; H-loss
 
-(h|x) → ∅ / (V|l|r)_V
+V.h → [+Long] / ((r|l))_V
+;(h|x) → ∅ / (V|l|r)_V
 
 ; Palatal umlaut
 
@@ -90,10 +100,18 @@ j → ∅ / C_#
 ɔː → u / _#
 oː → ɑ / _(C)(C)(C)#
 [+Nasalized] → [-Nasalized]
-[V+Long] → [-Long] / V.C(C)(C)_(C)(C)(C)(V|#)
-u → o / V.C(C)(C)_C(C)(C)(V|#)
-(æ|i) → e / _(C)(C)(C)#
+;[V+Long] → [-Long] / V.C(C)(C)_(C)(C)(C)(V|#)
+[V+Long] → [-Long] / _(C C C|C C σσ)
+;u → o / V.C(C)(C)_C(C)(C)(V|#)
+u → o / _Cσ#
+;(æ|i) → e / _(C)(C)(C)#
+(æ|i) → e / _Cσ#
 ɔ → o
+
+; Loss of short, low vowels in medial syllables
+
+;(ɑ|æ|e) → ∅ / V.C(C)(C)_C.V
+(ɑ|æ|e) → ∅ / $$_$V
 
 ø → e
 iu → eo
@@ -103,6 +121,7 @@ iu → eo
 
 xs → ks
 h → x / _#
+lθ → ld
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;   Sets and features   ;
@@ -134,6 +153,8 @@ Diphthong = (æɑ, æɑː, eo, eoː, iy, iyː)
 	s → z
 )
 
+High = (i, iː, u, uː, y, yː, iy, iyː)
+
 [Front] = (
 	ɑ → æ
 	ɑː → æː
@@ -158,6 +179,7 @@ Diphthong = (æɑ, æɑː, eo, eoː, iy, iyː)
 	e → eː
 	i → iː
 	o → ɔː
+	o → oː	
 	ø → øː
 	ø̃ → ø̃ː
 	u → uː

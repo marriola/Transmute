@@ -7,7 +7,7 @@ namespace TransmuteLib
 
 open TransmuteLib.ExceptionHelpers
 
-module internal SyntaxAnalyzer =
+module private SyntaxAnalyzer =
     let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) result =
         match nodes with
         | [] -> Ok result
@@ -74,7 +74,7 @@ module internal SyntaxAnalyzer =
                 match nodes with
                 | TaggedNode (_, OptionalNode children)::[] ->
                     inner children
-                | TaggedNode (position, DisjunctNode branches)::[] ->
+                | TaggedNode (position, AlternationNode branches)::[] ->
                     match List.tryFind (inner >> function Ok _ -> true | _ -> false) branches with
                     | Some _ -> Ok result
                     | None -> Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
@@ -87,11 +87,55 @@ module internal SyntaxAnalyzer =
             match nodes with
             | [] -> Ok result
             | Node.Untag (OptionalNode [], position)::_ ->
-                Result.Error (syntaxErrorMessage "Optional node may not be empty" position)
-            | Node.Untag (DisjunctNode [], position)::_ ->
-                Result.Error (syntaxErrorMessage "Disjunct node may not be empty" position)
+                Result.Error (syntaxErrorMessage "Optional may not be empty" position)
+            | Node.Untag (AlternationNode [], position)::_ ->
+                Result.Error (syntaxErrorMessage "Alternation may not be empty" position)
             | _::rest ->
                 validateInternal rest
+        validateInternal nodes
+
+    let private syllableSegmentsMustBeDefinedBeforeUse allNodes nodes result =
+        let (hasOnset, hasNucleus, hasCoda) =
+            allNodes
+            |> List.collect (fun node ->
+                match node with
+                | Node.Untag (SyllableDefinitionListNode (_, definitions), _) ->
+                    definitions
+                    |> List.choose (function
+                        SyllableDefinitionNode (onset, nucleus, coda) ->
+                            Some (onset <> [], nucleus <> [], coda <> [])
+                        | _ ->
+                            None)
+                | _ ->
+                    [])
+            |> List.fold
+                (fun (hasOnset, hasNucleus, hasCoda) (hasOnsetAlso, hasNucleusAlso, hasCodaAlso) ->
+                    (hasOnset || hasOnsetAlso), (hasNucleus || hasNucleusAlso), (hasCoda || hasCodaAlso))
+                (false, false, false)
+
+        let rec validateInternal (nodes: Node list) =
+            match nodes with
+            | [] ->
+                Ok result
+            | Node.Untag (SyllableBoundaryNode SyllableEnd, position)::_
+            | Node.Untag (SyllableBoundaryNode SyllableStart, position)::_ when not hasOnset && not hasNucleus && not hasCoda ->
+                Result.Error (syntaxErrorMessage "Syllable definition must be provided" position)
+            | Node.Untag (SyllableBoundaryNode OnsetStart, position)::_
+            | Node.Untag (SyllableBoundaryNode OnsetEnd, position)::_ when not hasOnset ->
+                Result.Error (syntaxErrorMessage "Syllable onset definition must be provided" position)
+            | Node.Untag (SyllableBoundaryNode NucleusStart, position)::_
+            | Node.Untag (SyllableBoundaryNode NucleusEnd, position)::_ when not hasNucleus ->
+                Result.Error (syntaxErrorMessage "Syllable nucleus definition must be provided" position)
+            | Node.Untag (SyllableBoundaryNode CodaStart, position)::_
+            | Node.Untag (SyllableBoundaryNode CodaEnd, position)::_ when not hasCoda ->
+                Result.Error (syntaxErrorMessage "Syllable coda definition must be provided" position)
+            | Node.Untag (OptionalNode optionalNodes, _):: _ ->
+                validateInternal optionalNodes
+            | Node.Untag (AlternationNode alternations, _):: _ ->
+                validateInternal (List.concat alternations)
+            | _::rest ->
+                validateInternal rest
+
         validateInternal nodes
 
     let private validateRuleNode input output environment nodes =                
@@ -104,6 +148,7 @@ module internal SyntaxAnalyzer =
         |> Result.bind (onlyOnePlaceholderNodeIsAllowed environment)
         |> Result.bind (boundaryMayOnlyAppearAtEnds (BoundedList.fromList environment))
         |> Result.bind (optionalNodeMayNotBeEmpty environment)
+        |> Result.bind (syllableSegmentsMustBeDefinedBeforeUse nodes environment)
 
     let validate nodes =
         let rec validateInternal rest out =

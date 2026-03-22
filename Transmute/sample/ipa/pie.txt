@@ -13,41 +13,41 @@ trˈejes         ; three * (broken)
 petwˈoːr        ; four
 pˈempe          ; five
 sˈekʲs          ; six
-sepˈmd          ; seven
+sepˈm̩d          ; seven
 okʲtˈoːw        ; eight
-ʔnˈewnd         ; nine
-dˈekʲmd         ; ten
-kʲmtˈom         ; hundred
+ʔnˈewn̩d         ; nine
+dˈekʲm̩d         ; ten
+kʲm̩tˈom         ; hundred
 ʕʷdˈonts        ; tooth, nom.sg.
 ʕʷdˈontes       ; tooth, nom.pl.
-ʕʷdˈontm        ; tooth, acc.sg.
-ʕʷdˈontms       ; tooth, acc.pl.
-ʕʷdntˈes        ; tooth, gen.sg.
-ʕʷdntˈoʔom      ; tooth, gen.pl. *
-ʕʷdntˈej        ; tooth, dat.sg.
-ʕʷdntmˈos       ; tooth, dat.pl.
-ʕʷdntˈeʔ        ; tooth, inst.sg.
+ʕʷdˈontm̩        ; tooth, acc.sg.
+ʕʷdˈontm̩s       ; tooth, acc.pl.
+ʕʷdn̩tˈes        ; tooth, gen.sg.
+ʕʷdn̩tˈoʔom      ; tooth, gen.pl. *
+ʕʷdn̩tˈej        ; tooth, dat.sg.
+ʕʷdn̩tm̩ˈos       ; tooth, dat.pl.
+ʕʷdn̩tˈeʔ        ; tooth, inst.sg.
 widonom         ; know, inf.
 wˈojdʕe         ; know, 1sg.
 wˈojdtʕe        ; know, 2sg. *
 wˈojde          ; know, 3sg.
 widtˈos         ; know, pp.
-plʔnˈos         ; full, masc.
-plʔnˈom         ; full, neut.
-plʔnˈeʕ         ; full, fem.
+pl̩ʔnˈos         ; full, masc.
+pl̩ʔnˈom         ; full, neut.
+pl̩ʔnˈeʕ         ; full, fem.
 kʷˈekʷlom       ; wheel, nom.sg.
 kʷekʷlˈeʕ       ; wheel, collective
 suʔrˈos         ; sour
-wˈrmis          ; worm
+wˈr̩mis          ; worm
 dʰrˈogʰonom     ; drag, inf.
 sprˈegonom      ; speak, inf.
 lipjˈonom       ; live, inf.
 ʕkʲʕowsjˈonom   ; hear, inf.
 bʰˈendʰonom     ; bind, inf.
 ʕpʕʷˈelʔnonom   ; fall, inf.
-dngʲʰwˈeʕn      ; tongue
+dn̩gʲʰwˈeʕn      ; tongue
 bʰolgʲʰis       ; belly
-gʲʰˈlʕʷtom      ; gold
+gʲʰˈl̩ʕʷtom      ; gold
 bʰrˈonkʲtos     ; brought
 gʷʰˈiʕbʰʕ       ; wife
 songʷʰos        ; song
@@ -56,8 +56,8 @@ pˈoːds          ; foot, nom.sg.
 pˈoːdes         ; foot, nom.pl
 pˈekʲu          ; fee (cattle)
 ʕentˈi          ; and
-kʲrʕnˈom        ; horn
-ʔnˈrtros        ; north
+kʲr̩ʕnˈom        ; horn
+ʔnˈr̩tros        ; north
 sʕˈuntros       ; south
 ʕˈewsros        ; east
 bʰˈergʲtos      ; bright

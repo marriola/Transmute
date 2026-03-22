@@ -9,16 +9,8 @@ namespace TransmuteLib
 open TransmuteLib.StateMachine
 open TransmuteLib.Utils.Operators
 
-module Transducer =
-    /// Returns the original value if input is the special begin or end symbol.
-    /// Otherwise, returns the result of fTransform.
-    let private addChar constructor symbol xs  =
-        if symbol = Special.START || symbol = Special.END then
-            xs
-        else
-            constructor (string symbol) :: xs
-
-    /// An input symbol tagged with the action taken when processing it
+module internal Transducer =
+    /// An input symbol tagged with the action taken to transform it, the result, and the information needed to undo it.
     type internal BufferString =
         | Unchanged of position: int * symbol: string
         | Replaced of position: int * symbol: string * original: string
@@ -80,6 +72,7 @@ module Transducer =
                 match production with
                 | ReplacesWith (count, s) ->
                     // If this is a non-initial part of a multi-character match, drop the last replacement
+                    // and combine the contents of both.
                     let bufferLength = List.length value.buffer
                     let skip = min bufferLength count
                     let nextProduction = Replaced (position, s, string symbol) :: value.buffer
@@ -215,7 +208,7 @@ module Transducer =
     /// <param name="verbose">If true, displays the state of the state machine at each step.</param>
     /// <param name="rule">The rule to apply.</param>
     /// <param name="word">The word to transform.</param>
-    let private transformInternal reportChangeLocations verbose syllableBoundaryLocations rule word =
+    let private transformInternal reportChangeLocations verbose (segmentLocations, segmentedWord) rule word =
         // Debug output columns
         //  is valid transition
         //  position in word
@@ -224,13 +217,9 @@ module Transducer =
         //  output buffer
         //  production buffer
 
-        let transitions, transformations = rule
-        //let word =
-        //    syllableBoundaryLocations
-        //    |> List.fold (fun (s: string) i -> s[..i - 1] + (string Special.SYLLABLE_SEPARATOR) + s[i..]) word
+        let segmentedWord = if String.length segmentedWord = 0 then word else segmentedWord
 
-        if verbose then
-            printfn "%s" (new System.String('-', 80))
+        let transitions, transformations = rule
 
         stateMachineConfig()
         |> withTransitions transitions
@@ -248,7 +237,9 @@ module Transducer =
             let position = position - 1
 
             let nextOutput =
-                if value.isPartialMatch then
+                if Special.SyllableBoundarySymbols.Contains input then
+                    value.output
+                elif value.isPartialMatch then
                     if value.wasLastFinal then
                         // The rule failed to match completely, but what did match was enough to commit the production (i.e. any remaining nodes were optional).
                         BufferString.apply value.buffer @ value.output
@@ -257,10 +248,10 @@ module Transducer =
                         BufferString.undo value.buffer @ value.output
                 else
                     // The rule has not yet begun to match.
-                    if input <> Special.START && input <> Special.END && input <> Special.SYLLABLE_SEPARATOR then
-                        string input :: value.output
-                    else
+                    if Special.Symbols.Contains input then
                         value.output
+                    else
+                        string input :: value.output
 
             let nextOffset, nextLocations =
                 if reportChangeLocations && value.isPartialMatch && value.wasLastFinal then
@@ -271,34 +262,54 @@ module Transducer =
 
             if verbose then
                 let nextOutputStr = nextOutput |> List.rev |> List.map string |> String.concat ""
-                printf $"   %2d{position} %c{input}: "
+                if value.isPartialMatch && not value.wasLastFinal then
+                    printf " ❌"
+                else
+                    printf "   "
+
+                printf $"%2d{position} %c{input}: "
                 printfn $"Error at %-25O{current} | %-20s{nextOutputStr}"
 
-            Restart {
-                value with
-                    isPartialMatch = false
-                    locations = nextLocations
-                    locationOffset = nextOffset
-                    buffer = []
-                    output = nextOutput
-            })
+            if Special.SyllableBoundarySymbols.Contains input then
+                Continue value
+            else
+                Restart {
+                    value with
+                        isPartialMatch = false
+                        locations = nextLocations
+                        locationOffset = nextOffset
+                        buffer = []
+                        output = nextOutput
+                })
         |> onTransition (fun symbol t machineState ->
             let (_, _, To nextState) = t
             let { position = position; currentState = current; currentValue = value } = machineState
             let { buffer = production; output = output } = value
-            let position = position - 1
             let isNextFinal = State.isFinal nextState
             let tf = Map.tryFind t transformations
 
             if verbose then
-                printf $" • %2d{position} %c{symbol}: "
+                if isNextFinal then
+                    printf " ✔ "
+                else
+                    printf " • "
+
+                printf $"%2d{position} %c{symbol}: "
 
             let nextProduction =
                 match tf with
-                | None ->
-                    addChar (tuple2 position >> Unchanged) symbol production
                 | Some tf ->
                     BufferString.addProduction position value symbol tf
+
+                | None when symbol = '_' && production[0].IsDeleted ->
+                    // Make sure X-SAMPA underscore inside a deletion also gets deleted
+                    BufferString.addProduction position value symbol (Deletes (1, "_"))
+
+                | None when not (Special.Symbols.Contains symbol) ->
+                    Unchanged (position, string symbol) :: production
+
+                | _ ->
+                    production
 
             if verbose then
                 let transition = $"{current} -> {nextState}"
@@ -319,10 +330,12 @@ module Transducer =
                     let locations = value.locations @ changes
                     out, locations
                 else
-                    value.output, value.locations
+                    let out = BufferString.undo value.buffer @ value.output
+                    out, value.locations
+                    //value.output, value.locations
             let output = outputBuffer |> List.rev |> String.concat ""
             output, locations)
-        |> runDFA (string Special.START + word + string Special.END)
+        |> runDFA (string Special.WORD_START_BOUNDARY + segmentedWord + string Special.WORD_END_BOUNDARY)
 
     /// Applies a rule to a word.
     let transform verbose syllableBoundaryLocations rule word =
@@ -352,16 +365,17 @@ module Transducer =
 
         let out = System.String.Join("", outChars)
 
-        [ $"%3d{ruleNum}. {out}" ]
+        [ $"%3d{ruleNum}: {out}" ]
 
     let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
         let maxIndex = List.max changes + 1
 
         let changeLine =
             Array.create maxIndex ' '
-            |> Array.mapi (fun i _ -> if List.contains i changes then '^' else ' ')
+            |> Array.mapi (fun i _ -> if List.contains i changes then "^" else " ")
+            |> String.concat ""
 
         [
-            $"%3d{ruleNum}. {result}"
-            "     " + System.String.Join("", changeLine)
+            $"%3d{ruleNum}: {result}"
+            String.indent 5 changeLine
         ]

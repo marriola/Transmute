@@ -5,12 +5,12 @@
 
 namespace TransmuteLib
 
-type BoundedList<'a> =
+type private BoundedList<'a> =
     | Begin
     | Item of 'a
     | End
 
-type BoundedList<'a> with
+type private BoundedList<'a> with
     static member fromList (xs: 'a list) =
         List.concat
             [ [ Begin ]

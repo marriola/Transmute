@@ -141,14 +141,14 @@ module Token =
         | _ ->
             None
 
-    let (|NewlineWhitespace|_|) ({ tokenType = tokenType; value = value } as token) =
-        if tokenType = Whitespace && value.Contains "\n" then
+    let (|NewlineWhitespace|_|) token =
+        if token.tokenType = Whitespace && token.value.Contains "\n" then
             Some token
         else
             None
 
-    let (|NonNewlineWhitespace|_|) ({ tokenType = tokenType; value = value } as token) =
-        if tokenType = Whitespace && not (value.Contains "\n") then
+    let (|NonNewlineWhitespace|_|) token =
+        if token.tokenType = Whitespace && not (token.value.Contains "\n") then
             Some token
         else
             None

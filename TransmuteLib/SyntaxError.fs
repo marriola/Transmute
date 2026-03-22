@@ -14,4 +14,4 @@ namespace TransmuteLib.Exceptions
 
 open TransmuteLib.Position
 
-exception SyntaxError of string * Offset * Line * Column
+exception internal SyntaxError of string * Offset * Line * Column

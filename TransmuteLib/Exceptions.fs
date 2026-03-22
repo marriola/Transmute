@@ -16,9 +16,9 @@ open TransmuteLib.Exceptions
 open TransmuteLib.Position
 open System.Text.RegularExpressions
 
-module ExceptionHelpers =
+module private ExceptionHelpers =
     let syntaxErrorMessage message (Offset offset, Line line, Column column) =
-        sprintf "Syntax error at line %d, column %d (offset %d): %s" line column offset message
+        System.String.Format("Syntax error at line {0}, column {1} (offset {2}): {3}", line, column, offset, message)
 
     let invalidSyntax message (offset, line, col) = raise (SyntaxError (message, offset, line, col))
 

@@ -1,9 +1,42 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <Platforms>AnyCPU;x86</Platforms>
+    <Configurations>Debug;Release;Debug Verbose</Configurations>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Verbose|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+    <DefineConstants>$(DefineConstants);VERBOSE;DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x86'">
+    <IsAotCompatible>True</IsAotCompatible>
+    <DefineConstants>$(DefineConstants);DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug Verbose|x86'">
+    <IsAotCompatible>True</IsAotCompatible>
+    <DefineConstants>$(DefineConstants);VERBOSE;DEBUG</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x86'">
+    <IsAotCompatible>True</IsAotCompatible>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Remove="Resources.resx" />
+  </ItemGroup>
 
   <ItemGroup>
     <None Include="LICENSE" />
@@ -15,6 +48,7 @@
     <Compile Include="SyntaxError.fs" />
     <Compile Include="Token.fs" />
     <Compile Include="Exceptions.fs" />
+    <Compile Include="Special.fs" />
     <Compile Include="Node.fs" />
     <Compile Include="State.fs" />
     <Compile Include="StateMachine.fs" />
@@ -22,11 +56,13 @@
     <Compile Include="SyntaxAnalyzer.fs" />
     <Compile Include="RuleParser.fs" />
     <Compile Include="PrefixTree.fs" />
-    <Compile Include="Special.fs" />
     <Compile Include="DeterministicFiniteAutomaton.fs" />
+    <Compile Include="RuleCombinators.fs" />
+    <Compile Include="SyllableRuleCompiler.fs" />
     <Compile Include="RuleCompiler.fs" />
     <Compile Include="SyllableBoundaryDetector.fs" />
     <Compile Include="Transducer.fs" />
+    <Compile Include="RulesFile.fs" />
   </ItemGroup>
 
   <ItemGroup>

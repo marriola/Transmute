@@ -41,7 +41,6 @@ Because X-SAMPA rules have to create and process about 50% more states for every
 ## To do
 
 * α variables
-* Syllable detection
 * Replace the explicit transformation-based approach with a feature matrix-based approach and a built in standard matrix
 
 ## Command line options
@@ -56,19 +55,21 @@ Files can be specified using switches, or without switches based on their file e
 
 A filename of `-` stands for standard input.
 
-| Switch                 | Short form | Description                                              |
-| -----------------------|------------|----------------------------------------------------------|
-| --lexicon FILE         | -l         | Load lexicon from FILE.                                  |
-| --list-rules           | -lr        | Print the numbered rule list and quit.                   |
-| --no-save              | -ns        | Don't save compiled rules.                               |
-| --out                  | -o         | Output file path. If not given, prints to the console.   |
-| --rules FILE           | -r         | Load rules from FILE.                                    |
-| --recompile            | -rc        | Recompile rules file instead of loading compiled rules.  |
-| --show-transformations | -v 2       | Shows the result of each rule that applies to each word. |
-| --test-rules N1,N2,... |            | Run only the rules listed.                               |
-| --test-words N1,N2,... |            | Transform only the words listed.                         |
-| --verbose N            | -v         | Set verbosity level                                      |
-| --x-sampa              | -x         | Use X-SAMPA instead of IPA.                              |
+| Switch                 | Short form | Description                                                          |
+| -----------------------|------------|--------------------------------------------------------------------- |
+| --lexicon FILE         | -l         | Load lexicon from FILE.                                              |
+| --list-rules           | -lr        | Print the numbered rule list and quit.                               |
+| --no-save              | -ns        | Don't save compiled rules.                                           |
+| --out                  | -o         | Output file path. If not given, prints to the console.               |
+| --rules FILE           | -r         | Load rules from FILE.                                                |
+| --recompile            | -rc        | Recompile rules file instead of loading compiled rules.              |
+| --show-transformations | -v 2       | Shows the result of each rule that applies to each word.             |
+| --debug                | -d         | Shows transducer state while transforming words.                     |
+| --debug-syllabizer     | -ds        | Shows transducer state while detecting syllable boundaries in words. |
+| --test-rules N1,N2,... |            | Run only the rules listed.                                           |
+| --test-words N1,N2,... |            | Transform only the words listed.                                     |
+| --verbose N            | -v         | Set verbosity level                                                  |
+| --x-sampa              | -x         | Use X-SAMPA instead of IPA.                                          |
 
 ### Verbosity levels
 
@@ -77,7 +78,7 @@ A filename of `-` stands for standard input.
 2. Show transformations
 3. Show rule compilation and transformation times
 4. Show DFA
-5. Show NFA and rule machine state
+5. Show NFA
     - These last three verbosity levels are really for debugging purposes. They're cumulative, so this last one absolutely floods the console if you have a lot of rules. Though if you pick a single word to transform, the rule machine state is kind of entertaining to look over.
 
 ## Rule files
@@ -96,11 +97,11 @@ Because X-SAMPA clashes with identifiers, when using X-SAMPA you need to use a `
 
     ; IPA rule
 
-    [STOP-Voiced] / [+Fricative] / (#|V|SONORANT)_
+    [Stop-Voiced] / [+Fricative] / (#|V|Sonorant)_
 
     ; X-SAMPA rule
 
-    [STOP-Voiced] / [+Fricative] / (#|$V|$SONORANT)_
+    [Stop-Voiced] / [+Fricative] / (#|$V|$Sonorant)_
 
 ### Defining sets
 
@@ -110,8 +111,8 @@ Sets define categories of sounds, e.g. consonants and vowels.
 
 You can put phonemes of any length in a set.
 
-    LABIOVELAR = (kʷ, gʷ)
-    OVERLONG = (ɑːː, ɔːː)
+    Labiovelar = (kʷ, gʷ)
+    Overlong = (ɑːː, ɔːː)
 
 Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
@@ -123,7 +124,7 @@ Commas are optional. Whitespace is enough to separate phonemes, and you may list
           z
     )
 
-    LARYNGEAL = (ʔ χ χʷ)
+    Laryngeal = (ʔ χ χʷ)
 
 ### Defining features
 
@@ -143,10 +144,10 @@ Here, four phonemes are defined as having transformation from voiceless stops to
 
 Both sets and features allow you to include other sets or features in them:
 
-    STOP = (p t k)
-    FRICATIVE = (x f θ)
-    NASAL = (m n ŋ)
-    C = (STOP FRICATIVE NASAL) ; p t k x f θ m n ŋ
+    Stop = (p t k)
+    Fricative = (x f θ)
+    Nasal = (m n ŋ)
+    C = (Stop Fricative Nasal) ; p t k x f θ m n ŋ
 
     V = (Long [-Long] Front [-Front] Overlong Nasalized)
 
@@ -169,20 +170,29 @@ A rule consists of at least two parts. An unconditional rule has only an **input
 
 ##### Conditional rules
 
-A conditional rule has a third section, the **environment** in which the rule applies, separated by a `/`. There are also two tokens that may appear only in the environment:
-
-| Token | Purpose                                        |
-|-------|----------------------------------------------- |
-| `_`   | Matches what is specified in the input section |
-| `#`   | Matches the beginning or end of the word       |
-
-For example, the rule
+A conditional rule has a third section, the **environment** in which the rule applies, separated by a `/`. In the environment, the placeholder symbol `_` stands for the input being transformed. For example:
 
     ; Laryngeal consonant becomes a schwa between consonants
 
-    LARYNGEAL → ə / C_C
+    Laryngeal → ə / C_C
 
-will first match any consonant `C`, then a `LARYNGEAL`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
+The rule will first match any consonant `C`, then a `LARYNGEAL`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
+
+**Note:** `_` is a valid X-SAMPA character, so make sure your placeholder has spaces around it if you're using X-SAMPA mode.
+
+###### Matching boundaries
+
+In the environment section you can also match on word or syllable boundaries:
+
+| Symbol  | Boundary type     |
+| ------- | ----------------- |
+| #       | Word boundary     |
+| σ or $  | Syllable boundary |
+| Onset   | Syllable onset    |
+| Nucleus | Syllable nucleus  |
+| Coda    | Syllable coda     |
+
+**Note:** To match on syllable boundaries, a syllable definition rule must be given first. See [Defining syllable rules](#defining-syllable-rules) below.
 
 ##### Insertion rules
 
@@ -232,12 +242,12 @@ A compound set matches all phonemes that share all of the listed features. Wheth
 
 More concretely, given the following sets and features
 
-    Stop (
+    Stop = (
         p t k kʷ
         b d g gʷ
     )
     
-    [Voiced] (
+    [Voiced] = (
         p → b
         t → d
         k → g
@@ -247,7 +257,7 @@ More concretely, given the following sets and features
         ŋ
     )
 
-    [Fricative] (
+    [Fricative] = (
         p → ɸ
         t → θ
         k → x
@@ -277,7 +287,7 @@ You can also construct a set out of only segments:
 
 The same notation used to match either the presence or absence of a feature can also be used in the output section of the rule. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
 
-More than one feature can be changed. In the following rule, /n/ is deleted after a vowel undergoes nasalization and compensatory lengthening before /x/:
+More than one feature can be changed. In the following rule, /n/ is deleted after a vowel undergoes nasalization and compensatory lengthening, all before /x/:
 
     [-Nasalized]n → [+Nasalized +Long] / _x
 
@@ -305,3 +315,41 @@ One of several different sequences of sounds can be matched by enclosing them in
 This type of match can also be used in the input section:
 
     (o|a) → ɑ
+
+### Defining syllable rules
+
+Use syllable rules to define your syllable structure so that you can match on syllable boundaries in your sound change rules. If your syllable structure changes, you can redefine the syllable rule, which will apply to all following rules until redefined again.
+
+Once you define a syllable rule, you can match on syllable boundaries. Again you have a choice here: either `σ`, or the easier to type `$`.
+You can also use `Onset`, `Nucleus` and `Coda` in your rules to match those parts of a syllable. Keep in mind that in X-SAMPA mode you need to prefix these identifiers with `$` as well.
+
+
+    ; Syllable structure is (C)V(C)
+    
+    Syllable = (
+        Onset = (C)
+        Nucleus = V
+        Coda = (C)
+    )
+
+    ; Drop word final /e a o/ in a multisyllabic word.
+	; Note that we have two σ symbols here: the second matches the beginning of the syllable containing our vowel, and the first matches the end of the preceding syllable.
+    
+    (e|a|o) → ∅ / σσ_#
+
+    ; or in X-SAMPA
+    
+    (e|a|o) // $$_#
+	
+You can define more than one syllable structure at a time, and the first applicable one will be used on each word.
+
+    ; Syllables can only end with a consonant when the nucleus is a short vowel
+
+    Syllable = (
+        Onset = (C)
+        Nucleus = [V -Long]
+        Coda = C
+    ) or (
+        Onset = (C)
+        Nucleus = [V +Long]
+    )

@@ -1,69 +1,69 @@
-﻿p?\t"e:r
-me?\t"e:r
-b_hr"e?\te:r
-sw"este:r
-su?n"us
-d_hukt"e:r
-l"eg_hjeti
-"ojnos		; masc.
-"ojne?\		; fem.
-"ojnom		; neut.
-dw"oj
-tr"ejes
-petw"o:r
-p"empe
-s"ek's
-sep"md
-ok't"o:w
-?n"ewnd
-d"ek'md
-k'mt"om
-?\_wd"onts	; nom.sg.
-?\_wd"ontes	; nom.pl.
-?\_wd"ontm	; acc.sg.
-?\_wd"ontms	; acc.pl.
-?\_wdnt"es	; gen.sg.
-?\_wdnt"o?om	; gen.pl.
-?\_wdnt"ej	; dat.sg.
-?\_wdntm"os	; dat.pl.
-?\_wdnt"e?	; inst.sg.
-widonom		; inf.
-w"ojd?\e		; 1sg.
-w"ojdt?\e	; 2sg.
-w"ojde		; 3sg.
-widt"os
-pl?n"os
-pl?n"om
-pl?n"e?\
-k_w"ek_wlom	; nom.sg.
-k_wek_wl"e?\	; collective
-su?r"os
-w"rmis
-d_hr"og_honom
-spr"egonom
-lipj"onom
-?\k'?\owsj"onom
-b_h"end_honom
-?\p?\_w"el?nonom
-dng'_hw"e?\n
-b_holg'_his
-g'_h"l?\_wtom
-b_hr"onk'tos
-g_w_h"i?\b_h?\
-song_w_hos
-d_h"ed_he?m
-p"o:ds
-p"o:des
-p"ek'u
-?\ent"o
-k'r?\n"om
-?n"rtros
-s?\"untros
-?\"ewsros
-b_h"erg'tos
-g_h"ostejes
-d_hews"om
-kn"udes
-s"e?\gjonom
-s"e?\gtom
-?\ok'j"e?\
+﻿p?\t"e:r		; father
+me?\t"e:r		; mother
+b_hr"e?\te:r	; brother
+sw"este:r		; sister
+su?n"us			; son
+d_hukt"e:r		; daughter
+l"eg_hjeti		; lay (past tense of lie)
+"ojnos			; masc.
+"ojne?\			; fem.
+"ojnom			; neut.
+dw"oj			; two
+tr"ejes			; three
+petw"o:r		; four
+p"empe			; five
+s"ek's			; six
+sep"m=d			; seven
+ok't"o:w		; eight
+?n"ewn=d		; nine
+d"ek'm=d		; ten
+k'm=t"om		; hundred
+?\_wd"onts		; tooth, nom.sg.
+?\_wd"ontes		; tooth, nom.pl.
+?\_wd"ontm=		; tooth, acc.sg.
+?\_wd"ontm=s	; tooth, acc.pl.
+?\_wdn=t"es		; tooth, gen.sg.
+?\_wdn=t"o?om	; tooth, gen.pl.
+?\_wdn=t"ej		; tooth, dat.sg.
+?\_wdn=tm"os	; tooth, dat.pl.
+?\_wdn=t"e?		; tooth, inst.sg.
+widonom			; know, inf.
+w"ojd?\e		; know, 1sg.
+w"ojdt?\e		; know, 2sg.
+w"ojde			; know, 3sg.
+widt"os			; know, pp.
+pl=?n"os		; full, masc.
+pl=?n"om		; full, neut.
+pl=?n"e?\		; full, fem.
+k_w"ek_wlom		; wheel, nom.sg.
+k_wek_wl"e?\	; wheel, collective
+su?r"os			; sour
+w"r=mis			; worm
+d_hr"og_honom	; drag, inf.
+spr"egonom		; speak, inf.
+lipj"onom		; live, inf.
+?\k'?\owsj"onom	; hear, inf.
+b_h"end_honom	; bind, inf.
+?\p?\_w"el?nonom ; fall, inf.
+dn=g'_hw"e?\n	; tongue
+b_holg'_his		; belly
+g'_h"l=?\_wtom	; gold
+b_hr"onk'tos	; brought
+g_w_h"i?\b_h?\	; wife
+song_w_hos		; song
+d_h"ed_he?m		; did
+p"o:ds			; foot, sg.
+p"o:des			; foot, pl.
+p"ek'u			; fee (cattle)
+?\ent"o			; and
+k'r=?\n"om		; horn
+?n"r=tros		; north
+s?\"untros		; south
+?\"ewsros		; east
+b_h"erg'tos		; bright
+g_h"ostejes		; guest
+d_hews"om		; deer
+kn"udes			; nut
+s"e?\gjonom		; seek, inf.
+s"e?\gtom		; sought
+?\ok'j"e?\		; edge
