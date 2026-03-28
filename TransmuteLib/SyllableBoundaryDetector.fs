@@ -85,22 +85,20 @@ module private SyllableBoundaryDetector =
 
     /// Classifies each segment in a word as belonging to either the onset, nucleus or coda.
     let private classifySegments (rule: string -> string) word =
-        let segments = rule word
-        let syllableBoundaries =
-            ([], Seq.indexed segments)
-            ||> Seq.fold (fun out (i, segment) ->
-                if segment = '.' then
-                    (i - List.length out) :: out
-                else
-                    out)
-        let segments = segments.Replace(".", "")
-        Seq.toList segments
+        (rule word).Replace(".", "")
+        |> Seq.toList
+
+    let private isValidSyllableSegment = function
+        | 'N' -> false
+        | 'C' -> false
+        | 'O' -> false
+        | _ -> true
 
     /// Inserts syllable boundary markers into a word.
     let findBoundaries (rule: string -> string) (word: string) =
         let segments = classifySegments rule word
 
-        if List.exists (fun c -> c <> 'O' && c <> 'N' && c <> 'C') segments then
+        if List.exists isValidSyllableSegment segments then
             // if the syllabizer returned any leftover segments, the syllable rule wasn't able to match the whole word
             let segments =
                 segments
@@ -114,9 +112,5 @@ module private SyllableBoundaryDetector =
                 segments
                 |> findSegmentBoundaryLocations
                 |> insertSyllableBoundaries allBoundaryTypes word
-
-#if VERBOSE
-            System.Diagnostics.Debug.WriteLine segmentedWord
-#endif
 
             Result.Ok (segmentLocations, segmentedWord)

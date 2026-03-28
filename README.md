@@ -103,54 +103,6 @@ Because X-SAMPA clashes with identifiers, when using X-SAMPA you need to use a `
 
     [Stop-Voiced] / [+Fricative] / (#|$V|$Sonorant)_
 
-### Defining sets
-
-Sets define categories of sounds, e.g. consonants and vowels.
-
-    V = (a, e, i, o, u)
-
-You can put phonemes of any length in a set.
-
-    Labiovelar = (kʷ, gʷ)
-    Overlong = (ɑːː, ɔːː)
-
-Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
-
-    C = (
-        p t k
-        b d g
-        m n ŋ
-          s
-          z
-    )
-
-    Laryngeal = (ʔ χ χʷ)
-
-### Defining features
-
-Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
-
-    [Fricative] = (
-        k → x
-        kʷ → xʷ
-        p → ɸ
-        t → θ
-        s
-    )
-
-Here, four phonemes are defined as having transformation from voiceless stops to fricatives. /s/ is just a fricative, and has no corresponding transformation.
-
-### Composing sets and features
-
-Both sets and features allow you to include other sets or features in them:
-
-    Stop = (p t k)
-    Fricative = (x f θ)
-    Nasal = (m n ŋ)
-    C = (Stop Fricative Nasal) ; p t k x f θ m n ŋ
-
-    V = (Long [-Long] Front [-Front] Overlong Nasalized)
-
 
 ### Defining sound change rules
 
@@ -180,20 +132,6 @@ The rule will first match any consonant `C`, then a `LARYNGEAL`, and then anothe
 
 **Note:** `_` is a valid X-SAMPA character, so make sure your placeholder has spaces around it if you're using X-SAMPA mode.
 
-###### Matching boundaries
-
-In the environment section you can also match on word or syllable boundaries:
-
-| Symbol  | Boundary type     |
-| ------- | ----------------- |
-| #       | Word boundary     |
-| σ or $  | Syllable boundary |
-| Onset   | Syllable onset    |
-| Nucleus | Syllable nucleus  |
-| Coda    | Syllable coda     |
-
-**Note:** To match on syllable boundaries, a syllable definition rule must be given first. See [Defining syllable rules](#defining-syllable-rules) below.
-
 ##### Insertion rules
 
 An insertion rule is written with the input section either empty or containing only `∅`. Insertion rules are conditional only.
@@ -211,7 +149,61 @@ A deletion rule is written with the output section either empty or containing on
     ; Delete /j/ before /e a o/ at the end of a word
     j//_(e|a|o)#
 
-#### Matching phonemes in a set
+#### Matching
+
+The simplest type of match is literal IPA/X-SAMPA symbols.
+
+    ; Match zm and change it to mm
+    
+    zm → mm
+
+##### Matching boundaries
+
+In the environment section you can also match on word or syllable boundaries to limit where your rule applies.
+
+| Symbol  | Boundary type     |
+| ------- | ----------------- |
+| #       | Word boundary     |
+| σ or $  | Syllable boundary |
+| Onset   | Syllable onset    |
+| Nucleus | Syllable nucleus  |
+| Coda    | Syllable coda     |
+
+**Note:** To match on syllable boundaries, a syllable definition rule must be given first. See [Defining syllable rules](#defining-syllable-rules) below.
+
+    ; Change gʷ to b, but only at the beginning of a word
+    
+    gʷ → b / #_
+
+    ; Drop word final /e a o/ in a multisyllabic word.
+	; Note that we have two σ symbols here: the second matches the beginning of the syllable containing our vowel, and the first matches the end of the preceding syllable.
+    
+    (e|a|o) → ∅ / σσ_#
+
+    ; or in X-SAMPA
+    
+    (e|a|o) // $$_#
+
+#### Optional matches
+
+Phonemes contained in parentheses may be matched if present, but may also be skipped over if necessary to make the rule match. For example, in this rule a schwa becomes /ɑ/ when preceded by the word boundary, an optional /s/, and up to two other consonants:
+
+    ə → ɑ / #(s)(C)(C)_
+
+#### Alternation matches
+
+One of several different sequences of sounds can be matched by enclosing them in parentheses and separating them with `|`. For example, in the Germanic spirant law, stops followed by either a `t` or an `s` become fricatives:
+
+    ; e-coloring
+    ; Change e to a before ʕ when either a w or j comes between them
+
+    e → a / _(w|j)ʕ
+
+This type of match can also be used in the input section:
+
+    (o|a) → ɑ
+
+##### Matching phonemes in a set
 
 In the simplest case, one phoneme out of a set can be matched using only its identifier:
 
@@ -230,7 +222,7 @@ If you need to use two identifiers in a row in a rule, you can separate them wit
 
     t // $V$C($C)($C)$V($C)($C)_#
 
-#### Matching phonemes satisfying one or more characteristics
+##### Matching phonemes satisfying one or more characteristics
 
 A compound set matches all phonemes that share all of the listed features. Whether to match the presence or absence of a feature is indicated by a `+` or a `-`, respectively. A few examples:
 
@@ -285,7 +277,7 @@ You can also construct a set out of only segments:
 
 #### Transforming a sound by changing features
 
-The same notation used to match either the presence or absence of a feature can also be used in the output section of the rule. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
+The same notation used to match the presence or absence of features can also be used in the output section of the rule. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
 
 More than one feature can be changed. In the following rule, /n/ is deleted after a vowel undergoes nasalization and compensatory lengthening, all before /x/:
 
@@ -293,36 +285,58 @@ More than one feature can be changed. In the following rule, /n/ is deleted afte
 
     ; brɑnxtɑz -> brɑ̃ːxtɑz
 
-#### Optional matches
+#### Defining sets
 
-Phonemes contained in parentheses may be matched if present, but may also be skipped over if necessary to make the rule match. For example, in this rule a schwa becomes /ɑ/ when preceded by the word boundary, an optional /s/, and up to two other consonants:
+Sets define categories of sounds, e.g. consonants and vowels.
 
-    ə → ɑ / #(s)(C)(C)_
+    V = (a, e, i, o, u)
 
-#### Alternation matches
+You can put phonemes of any length in a set.
 
-One of several different sequences of sounds can be matched by enclosing them in parentheses and separating them with `|`. For example, in the Germanic spirant law, stops followed by either a `t` or an `s` become fricatives:
+    Labiovelar = (kʷ, gʷ)
+    Overlong = (ɑːː, ɔːː)
 
-    ; Affects p b bʰ
-    [Stop+Labial] → ɸ / _(t|s)
+Commas are optional. Whitespace is enough to separate phonemes, and you may list them in any arrangement desired.
 
-    ; Affects t d dʰ
-    [Stop+Dental] → ts / _(t|s)
-    
-    ; Affects k g gʰ
-    [Stop+Velar] → x / _(t|s)
+    C = (
+        p t k
+        b d g
+        m n ŋ
+          s
+          z
+    )
 
-This type of match can also be used in the input section:
+    Laryngeal = (ʔ χ χʷ)
 
-    (o|a) → ɑ
+#### Defining features
+
+Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
+
+    [Fricative] = (
+        k → x
+        kʷ → xʷ
+        p → ɸ
+        t → θ
+        s
+    )
+
+Here, four phonemes are defined as having transformation from voiceless stops to fricatives. /s/ is just a fricative, and has no corresponding transformation.
+
+#### Composing sets and features
+
+Both sets and features allow you to include other sets or features in them:
+
+    Stop = (p t k)
+    Fricative = (x f θ)
+    Nasal = (m n ŋ)
+    C = (Stop Fricative Nasal) ; p t k x f θ m n ŋ
+
+    V = (Long [-Long] Front [-Front] Overlong Nasalized)
+
 
 ### Defining syllable rules
 
-Use syllable rules to define your syllable structure so that you can match on syllable boundaries in your sound change rules. If your syllable structure changes, you can redefine the syllable rule, which will apply to all following rules until redefined again.
-
-Once you define a syllable rule, you can match on syllable boundaries. Again you have a choice here: either `σ`, or the easier to type `$`.
-You can also use `Onset`, `Nucleus` and `Coda` in your rules to match those parts of a syllable. Keep in mind that in X-SAMPA mode you need to prefix these identifiers with `$` as well.
-
+Use syllable rules to define your syllable structure so that you can match on syllable boundaries in your sound change rules. If your syllable structure changes, you can define a new syllable rule further down your rules file, and it will apply to all following rules until redefined again.
 
     ; Syllable structure is (C)V(C)
     
@@ -331,15 +345,6 @@ You can also use `Onset`, `Nucleus` and `Coda` in your rules to match those part
         Nucleus = V
         Coda = (C)
     )
-
-    ; Drop word final /e a o/ in a multisyllabic word.
-	; Note that we have two σ symbols here: the second matches the beginning of the syllable containing our vowel, and the first matches the end of the preceding syllable.
-    
-    (e|a|o) → ∅ / σσ_#
-
-    ; or in X-SAMPA
-    
-    (e|a|o) // $$_#
 	
 You can define more than one syllable structure at a time, and the first applicable one will be used on each word.
 

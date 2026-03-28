@@ -52,7 +52,7 @@ let ``Syllable boundary detected at the beginning`` () =
     Tests.testRules IPA rule input expected
 
 [<Fact>]
-let ``Syllable boundary detected at the end`` () =
+let ``Detect additional syllables`` () =
     let input = ["tatai"]
     let expected = ["tɐtai"]
     let rule =
@@ -66,7 +66,7 @@ let ``Syllable boundary detected at the end`` () =
         C = (k, p, t, s, m, n, ʔ)
         V = (a, ɐ, e, i, o, u)
 
-        a → ɐ / _σ
+        a → ɐ / _σσ
         """
     Tests.testRules IPA rule input expected
 

@@ -66,7 +66,7 @@ module private Lexer =
         { token with
             value =
                 if token.value.Length > 0 && token.value.[0] = sigil then
-                    token.value.[1..token.value.Length - 1]
+                    token.value.[1..]
                 else
                     token.value }
 
