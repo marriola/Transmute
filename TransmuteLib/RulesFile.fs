@@ -9,6 +9,7 @@ namespace TransmuteLib
 open System
 open System.IO
 open TransmuteLib.Utils.Operators
+open System.Collections.Concurrent
 
 type SyllableDefinitionRule = int * (string -> string)
 
@@ -72,12 +73,33 @@ module RulesFile =
         result, milliseconds
 
     let private compileRules options features sets syllableDefinitions rules =
-        if not options.silent then
-            fprintf stderr "Compiling"
-
         let syllableRules =
             syllableDefinitions
             |> List.map (fun (i, node) -> i, SyllableRuleCompiler.compile features sets node)
+
+        let isProgressCompleteQueue = new ConcurrentQueue<bool>()
+
+        if not options.silent then
+            let ruleCount = List.length rules
+            let numDigits = ruleCount |> Math.Log10 |> Math.Ceiling |> int
+            let spacing = numDigits * 2 + 1
+
+            Console.Error.Write (String.Format("[{0}] Compiling...\r", String.replicate spacing " "))
+
+            async {
+                let mutable doContinue = true
+                let mutable completedCount = 0
+                while doContinue do
+                    if isProgressCompleteQueue.TryDequeue &doContinue then
+                        if doContinue then
+                            completedCount <- completedCount + 1
+                            let progress = $"{completedCount}/{ruleCount}".PadLeft spacing
+                            Console.Error.Write $"[{progress}]\r"
+                    else
+                        doContinue <- true
+                ()
+            }
+            |> Async.Start
 
         let rules, rulesTime =
             time (fun () ->
@@ -85,17 +107,16 @@ module RulesFile =
                 rules
                 |> List.sortBy (fun _ -> r.Next()) // Shuffle the workload to keep heavy rules (maybe) evenly distributed
     #if DEBUG
-                |> List.mapi
+                |> List.map
     #else
                 |> Array.ofList
-                |> Array.Parallel.mapi
+                |> Array.Parallel.map
     #endif
-                    (fun _ (i, node) ->
+                    (fun node ->
                         let rule, elapsed = time (fun () -> RuleCompiler.compile options.showNfa features sets node)
-                        let ruleLine = Node.getLine node
                         if not options.silent then
-                            fprintf stderr "."
-                        { lineNumber = ruleLine
+                            isProgressCompleteQueue.Enqueue true
+                        { lineNumber = Node.getLine node
                           compileTime = elapsed
                           node = node
                           rule = rule })
@@ -103,7 +124,8 @@ module RulesFile =
                 |> List.sortBy (fun result -> result.lineNumber))
 
         if not options.silent then
-            fprintfn stderr ""
+            isProgressCompleteQueue.Enqueue false
+            Console.Error.WriteLine ""
 
         syllableRules, rules, rulesTime
 
@@ -112,12 +134,13 @@ module RulesFile =
             let text = (new StreamReader(options.source)).ReadToEnd()
             let parseResult = RuleParser.parseRules options.format text
             let syllableDefinitions, features, sets, rules = Result.orAbort parseResult
-            let indexedRules = List.mapi (fun i n -> (i + 1), n) rules
 
             let selectedRules =
-                options.testRules
-                |> Option.map (List.map (fun i -> indexedRules[i - 1]))
-                |> Option.defaultValue indexedRules
+                match options.testRules with
+                | None -> rules
+                | Some testRules ->
+                    rules
+                    |> List.filter (function RuleNode (lineNumber, _, _, _) -> List.contains lineNumber testRules)
 
             let syllableRules, rules, compileTime = compileRules options features sets syllableDefinitions selectedRules
 
