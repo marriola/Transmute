@@ -409,25 +409,6 @@ module Node =
         |> List.collect List.concat
         |> set
 
-    //let invalidSyntax message (offset, line, col) = raise (TransmuteLib.Exceptions.SyntaxError (message, offset, line, col))
-
-    /// <summary>
-    /// Tries to execute a function that retrieves a type of object (set, feature, etc.). If the function
-    /// throws a KeyNotFoundException, throws a SyntaxException.
-    /// </summary>
-    /// <param name="fn">The function to try.</param>
-    /// <param name="kind">The kind of object being retrieved.</param>
-    /// <param name="node">The node naming the object to retrieve.</param>
-    /// <param name="name">The name of the object being retireved.</param>
-    let private tryFindSetOrFeature fn kind node name =
-        try fn()
-        with
-            | :? KeyNotFoundException ->
-                let msg = sprintf "'%s' '%s' not defined" kind name
-                match node with
-                | TaggedNode (pos, _) -> invalidSyntax msg pos
-                | _ -> invalidSyntax msg (Offset 0, Line 1, Column 1)
-
     /// <summary>
     /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.
     /// </summary>
@@ -440,6 +421,21 @@ module Node =
                 if isPresent
                     then Set.intersect result s
                     else Set.difference result s
+
+            let addFeature isPresent name =
+                if features.ContainsKey name then
+                    if first then
+                        getFeatureMembers isPresent features.[name] |> set
+                    else
+                        getFeatureMembers true features.[name]
+                        |> set
+                        |> addToSet isPresent
+                elif sets.ContainsKey(name) then
+                    getSetMembers sets.[name]
+                    |> set
+                    |> addToSet isPresent
+                else
+                    failwithf "feature '%s' is not defined" name
 
             match terms with
             | [] ->
@@ -456,27 +452,19 @@ module Node =
                         if isPresent
                             then segments |> Set.ofList |> Set.union result
                             else segments |> Set.ofList |> Set.difference result
-                    | Untag (TermIdentifierNode name, _)
-                    | Untag (SetIdentifierNode name, _) ->
-                        tryFindSetOrFeature (fun _ -> getSetMembers sets.[name]) "Set" x name
-                        |> set
-                        |> addToSet true
+                    | Untag (TermIdentifierNode name, pos)
+                    | Untag (SetIdentifierNode name, pos) ->
+                        match Map.tryFind name sets with
+                        | Some setNode ->
+                            getSetMembers setNode
+                            |> set
+                            |> addToSet true
+                        | None when features.ContainsKey name ->
+                            addFeature true name
+                        | _ ->
+                            invalidSyntax $"set '{name}' is not defined" pos
                     | Untag (FeatureIdentifierNode (isPresent, name), _) ->
-                        if features.ContainsKey name then
-                            if first then
-                                getFeatureMembers isPresent features.[name] |> set
-                            else
-                                let setMembers = getFeatureMembers true features.[name] |> set
-                                if isPresent
-                                    then Set.intersect result setMembers
-                                    else Set.difference result setMembers
-                        elif sets.ContainsKey(name) then
-                            let setMembers = getSetMembers sets.[name] |> set
-                            if isPresent
-                                then Set.intersect result setMembers
-                                else Set.difference result setMembers
-                        else
-                            failwithf "%s is not defined" name
+                        addFeature isPresent name
                     | Untag (node, position) ->
                         invalidSyntax (sprintf "Unexpected token '%O'" node) position
                 inner xs false plus nextSet
