@@ -184,13 +184,13 @@ In the environment section you can also match on word or syllable boundaries to 
     
     (e|a|o) // $$_#
 
-#### Optional matches
+##### Optional matches
 
 Phonemes contained in parentheses may be matched if present, but may also be skipped over if necessary to make the rule match. For example, in this rule a schwa becomes /ɑ/ when preceded by the word boundary, an optional /s/, and up to two other consonants:
 
     ə → ɑ / #(s)(C)(C)_
 
-#### Alternation matches
+##### Alternation matches
 
 One of several different sequences of sounds can be matched by enclosing them in parentheses and separating them with `|`. For example, in the Germanic spirant law, stops followed by either a `t` or an `s` become fricatives:
 
@@ -275,7 +275,7 @@ You can also construct a set out of only segments:
 
     [+/ɑ ɑ̃/] → ∅ / _#
 
-#### Transforming a sound by changing features
+##### Transforming a sound by changing features
 
 The same notation used to match the presence or absence of features can also be used in the output section of the rule. In the previous example, a voiceless stop was changed to a voiceless fricative using the transformations defined in the feature `[Fricative]`.
 
@@ -285,7 +285,7 @@ More than one feature can be changed. In the following rule, /n/ is deleted afte
 
     ; brɑnxtɑz -> brɑ̃ːxtɑz
 
-#### Defining sets
+### Defining sets
 
 Sets define categories of sounds, e.g. consonants and vowels.
 
@@ -308,7 +308,7 @@ Commas are optional. Whitespace is enough to separate phonemes, and you may list
 
     Laryngeal = (ʔ χ χʷ)
 
-#### Defining features
+### Defining features
 
 Features have a similar syntax to sets. In a feature definition, the identifier is enclosed in brackets to reflect its usage in a phonological rule. A feature consists of a list of transformations from a sound that does not have the feature to a sound that does. Transformations may be defined using either `->` or the Unicode U+2192 `→` character. Like a set, a feature can also contain sounds with no transformation, only membership.
 
