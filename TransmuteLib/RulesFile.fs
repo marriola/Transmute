@@ -8,8 +8,9 @@ namespace TransmuteLib
 
 open System
 open System.IO
-open TransmuteLib.Utils.Operators
 open System.Collections.Concurrent
+
+open TransmuteLib.Utils.Operators
 
 type SyllableDefinitionRule = int * (string -> string)
 
@@ -17,7 +18,7 @@ type CompileRuleResult =
     { lineNumber: int
       compileTime: float
       node: Node
-      rule: RuleCompiler.CompiledRule }
+      compiledRule: RuleCompiler.CompiledRule }
 
 module RulesFile =
     type Options =
@@ -26,6 +27,7 @@ module RulesFile =
           recompile: bool
           silent: bool
           showNfa: bool
+          parallelism: int
           testRules: int list option
           format: InputFormat
           source: Stream }
@@ -36,6 +38,7 @@ module RulesFile =
               recompile = true
               silent = true
               showNfa = false
+              parallelism = System.Environment.ProcessorCount
               testRules = None
               format = IPA
               source = Console.OpenStandardInput() }
@@ -45,6 +48,7 @@ module RulesFile =
         static member withRecompile b options = { options with recompile = b }
         static member withSilent b options = { options with silent = b }
         static member withNfaDump b options = { options with showNfa = b }
+        static member withParallelism value options = { options with parallelism = value }
         static member withTestRules ruleNumbers options = { options with testRules = ruleNumbers }
         static member withInputFormat format options = { options with format = format }
         static member withSource stream options = { options with source = stream }
@@ -56,12 +60,9 @@ module RulesFile =
 
     type RulesFile =
         { format: InputFormat
-          rules: RuleCompiler.CompiledRule list
-          ruleNodes: Node list
-          lineNumbers: int list
+          rules: CompileRuleResult list
           syllableRules: SyllableDefinitionRule list
           totalCompileTime: float
-          compileTimes: float list
           recompiled: bool
           debug: bool }
 
@@ -72,15 +73,42 @@ module RulesFile =
         let milliseconds = (stop - start).TotalMilliseconds
         result, milliseconds
 
-    let private compileRules options features sets syllableDefinitions rules =
-        let syllableRules =
-            syllableDefinitions
-            |> List.map (fun (i, node) -> i, SyllableRuleCompiler.compile features sets node)
+    /// Estimates the complexity of a rule by counting the number of times sets or features are used.
+    let private countSets (RuleNode (_, input, _, environment)) =
+        let rec inner nodes cost =
+            match nodes with
+            | [] ->
+                cost
+            | PlaceholderNode :: rest
+            | UtteranceNode _ :: rest
+            | WordBoundaryNode :: rest
+            | SyllableBoundaryNode _ :: rest ->
+                inner rest cost
+            | CompoundSetIdentifierNode _ :: rest
+            | SetIdentifierNode _ :: rest ->
+                inner rest (cost + 1)
+            | NegationNode node :: rest ->
+                inner rest (inner [node] 1 + cost)
+            | OptionalNode optionalNodes :: rest ->
+                inner rest (inner optionalNodes 1 + cost)
+            | AlternationNode alternations :: rest ->
+                let avgCost =
+                    alternations
+                    |> List.map (fun branch -> inner branch 1 |> float)
+                    |> List.average
+                    |> int
+                inner rest (avgCost + cost)
+            | x :: _ ->
+                failwithf "%O" x
 
-        let isProgressCompleteQueue = new ConcurrentQueue<bool>()
+        inner input 0
+        |> inner environment
+
+    let private startProgress options max =
+        let progressQueue = new BlockingCollection<bool>()
 
         if not options.silent then
-            let ruleCount = List.length rules
+            let ruleCount = max
             let numDigits = ruleCount |> Math.Log10 |> Math.Ceiling |> int
             let spacing = numDigits * 2 + 1
 
@@ -90,42 +118,76 @@ module RulesFile =
                 let mutable doContinue = true
                 let mutable completedCount = 0
                 while doContinue do
-                    if isProgressCompleteQueue.TryDequeue &doContinue then
-                        if doContinue then
-                            completedCount <- completedCount + 1
-                            let progress = $"{completedCount}/{ruleCount}".PadLeft spacing
-                            Console.Error.Write $"[{progress}]\r"
-                    else
-                        doContinue <- true
+                    doContinue <- progressQueue.Take()
+                    if doContinue then
+                        completedCount <- completedCount + 1
+                        let progress = $"{completedCount}/{ruleCount}".PadLeft spacing
+                        Console.Error.Write $"[{progress}]\r"
                 ()
             }
             |> Async.Start
 
-        let rules, rulesTime =
-            time (fun () ->
-                let r = new Random()
-                rules
-                |> List.sortBy (fun _ -> r.Next()) // Shuffle the workload to keep heavy rules (maybe) evenly distributed
-    #if DEBUG
-                |> List.map
-    #else
-                |> Array.ofList
-                |> Array.Parallel.map
-    #endif
-                    (fun node ->
-                        let rule, elapsed = time (fun () -> RuleCompiler.compile options.showNfa features sets node)
-                        if not options.silent then
-                            isProgressCompleteQueue.Enqueue true
-                        { lineNumber = Node.getLine node
-                          compileTime = elapsed
-                          node = node
-                          rule = rule })
-                |> List.ofSeq
-                |> List.sortBy (fun result -> result.lineNumber))
+        let addProgress() = progressQueue.Add true
+        let completeProgress() = progressQueue.Add false
+
+        addProgress, completeProgress
+
+    let private compileRules options features sets syllableDefinitions rules =
+        let syllableRules =
+            syllableDefinitions
+            |> List.map (fun (i, node) -> i, SyllableRuleCompiler.compile features sets node)
+
+        let addProgress, completeProgress = startProgress options (List.length rules)
+
+        // Sort rules in descending order of estimated complexity and distribute the compilation across each processor core
+
+#if DEBUG
+        let parallelism = 1
+        let ruleBins = [ rules ]
+#else
+        let parallelism = options.parallelism
+
+        let ruleBins =
+            rules
+            |> List.sortByDescending countSets
+            |> List.map Some
+            |> List.chunkBySize parallelism
+            |> List.map (fun chunk ->
+                // Make sure every chunk is the same size to keep List.transpose happy
+                let difference = parallelism - chunk.Length
+                if difference > 0
+                    then chunk @ List.replicate difference None
+                    else chunk)
+            |> List.transpose
+            |> List.map (List.choose id)
+#endif
+
+        let compiledRules = new ConcurrentBag<CompileRuleResult>()
+
+        let rec compileBin = function
+            | [] -> ()
+            | node :: rest ->
+                let rule, elapsed = time (fun () -> RuleCompiler.compile options.showNfa features sets node)
+                if not options.silent then
+                    addProgress()
+                compiledRules.Add
+                    { lineNumber = Node.getLine node
+                      compileTime = elapsed
+                      node = node
+                      compiledRule = rule }
+                compileBin rest
+
+        let opts = new System.Threading.Tasks.ParallelOptions(MaxDegreeOfParallelism = parallelism)
+        let _, rulesTime = time (fun () -> System.Threading.Tasks.Parallel.ForEach(ruleBins, opts, compileBin))
 
         if not options.silent then
-            isProgressCompleteQueue.Enqueue false
-            Console.Error.WriteLine ""
+            completeProgress()
+            Console.Error.WriteLine "\n"
+
+        let rules =
+            compiledRules
+            |> Seq.sortBy (fun result -> result.lineNumber)
+            |> Seq.toList
 
         syllableRules, rules, rulesTime
 
@@ -155,11 +217,8 @@ module RulesFile =
               recompiled = true
               debug = options.debug
               totalCompileTime = compileTime
-              compileTimes = rules |> List.map (fun rule -> rule.compileTime)
               syllableRules = syllableRules
-              ruleNodes = rules |> List.map (fun rule -> rule.node)
-              lineNumbers = rules |> List.map (fun rule -> rule.lineNumber)
-              rules = rules |> List.map (fun rule -> rule.rule) }
+              rules = rules }
         else
             fprintfn stderr "Loading rules..."
             let (syllableRules, rules), loadTime =
@@ -169,10 +228,7 @@ module RulesFile =
               recompiled = false
               debug = options.debug
               totalCompileTime = loadTime
-              compileTimes = []
               syllableRules = syllableRules
-              ruleNodes = List.map fst rules
-              lineNumbers = [] // TODO save line numbers in the compiled rules file. But do I really care to re-enable that if AOT is so fast?
               rules = List.map snd rules }
 
     let private DIVIDER = new System.String('-', 80)
@@ -203,7 +259,7 @@ module RulesFile =
         { original: string
           nextWord: string
           changes: string list
-          errors: string list
+          errors: (int * string) list
           totalTime: float }
 
     let private transformWord (rulesFile: RulesFile) word =
@@ -216,7 +272,7 @@ module RulesFile =
                   errors = errors
                   totalTime = totalTime }
 
-            | (lineNumber, node, rule)::xs ->
+            | { lineNumber = lineNumber; node = node; compiledRule = rule }::xs ->
                 let (result, locations), elapsed = time (fun () ->
                     if rulesFile.debug then
                         printfn "%s" DIVIDER
@@ -236,7 +292,7 @@ module RulesFile =
 
                             result, errors, ms
                         | Error message, ms ->
-                            (Map.empty, ""), (message :: errors), ms
+                            (Map.empty, ""), ((lineNumber, message) :: errors), ms
                     else
                         syllables, errors, 0.0
 
@@ -254,12 +310,10 @@ module RulesFile =
                 inner (segmentLocations, segmentedWord) result changes (totalTime + elapsed + syllableBoundaryTime) errors xs
 
         let initialSyllables =
-            syllabizeWord rulesFile.debug rulesFile.syllableRules rulesFile.lineNumbers[0] word
+            syllabizeWord rulesFile.debug rulesFile.syllableRules rulesFile.rules[0].lineNumber word
             |> Result.defaultValue (Map.empty, "")
 
-        (rulesFile.lineNumbers, rulesFile.ruleNodes, rulesFile.rules)
-        |||> List.zip3
-        |> inner initialSyllables word [] 0.0 []
+        inner initialSyllables word [] 0.0 [] rulesFile.rules
     
     let transformLexicon rulesFile lexicon =
         let inline transformSerial () = lexicon |> Array.map (fun word -> transformWord rulesFile word)
@@ -277,10 +331,10 @@ module RulesFile =
 
         time fTransform
 
-    let dumpRules rules =
-        for i, (node, rule) in rules do
-            let transitions, transformations = rule
-            printfn $"\nRule {i}: {node}"
+    let dumpRules (rules: CompileRuleResult list) =
+        for rule in rules do
+            let transitions, transformations = rule.compiledRule
+            printfn $"\nRule {rule.lineNumber}: {rule.node}"
 
             transitions
             |> Map.toList

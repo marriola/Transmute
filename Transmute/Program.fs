@@ -30,20 +30,18 @@ let main argv =
         |> RulesFile.Options.withInputFormat options.format
         |> RulesFile.Options.withTestRules options.testRules
         |> RulesFile.Options.withSilent (options.verbosityLevel = Silent)
+        |> RulesFile.Options.withParallelism options.parallelism
         |> RulesFile.load
 
     // List selected rules
 
     if options.listRules || options.verbosityLevel >= ShowTransformations then
-        fprintfn stderr ""
-
-        (rulesFile.lineNumbers, rulesFile.ruleNodes, rulesFile.compileTimes)
-        |||> List.zip3
-        |> List.iter (fun (lineNumber, node, milliseconds) ->
+        rulesFile.rules
+        |> List.iter (fun rule ->
             if options.verbosityLevel >= ShowTimes then
-                printf $"[%8s{formatTime milliseconds}] "
+                printf $"[%8s{formatTime rule.compileTime}] "
 
-            printfn $"%3d{lineNumber}: {node}")
+            printfn $"%3d{rule.lineNumber}: {rule.node}")
 
         printfn ""
 
@@ -53,10 +51,7 @@ let main argv =
     // Dump rule DFAs
 
     if options.verbosityLevel >= ShowDFA then
-        (rulesFile.ruleNodes, rulesFile.rules)
-        ||> List.zip
-        |> List.zip rulesFile.lineNumbers
-        |> RulesFile.dumpRules
+        RulesFile.dumpRules rulesFile.rules
 
         printfn ""
 
@@ -89,7 +84,8 @@ let main argv =
     let errors = transformedLexicon |> Seq.collect (fun result -> result.errors)
 
     if not (Seq.isEmpty errors) then
-        Console.WriteLine (String.concat "\n" errors)
+        errors
+        |> Seq.iter (fun (lineNumber, message) -> Console.WriteLine $"{lineNumber}: {message}")
         printfn ""
 
     for result in transformedLexicon do
@@ -125,7 +121,7 @@ let main argv =
             |> Array.sumBy (fun result -> int (result.totalTime))
             |> float
 
-        let totalCompileMilliseconds = List.sum rulesFile.compileTimes
+        let totalCompileMilliseconds = List.sumBy (fun rule -> rule.compileTime) rulesFile.rules
 
         let numRules = float rulesFile.rules.Length
         let numWords = float lexicon.Length

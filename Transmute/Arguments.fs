@@ -38,7 +38,8 @@ type Options =
       debugSyllabizer: bool
       verbosityLevel: VerbosityLevel
       testRules: int list option
-      testWords: int list option }
+      testWords: int list option
+      parallelism: int }
 
 and SourceFile =
     | RulesFileSource of string
@@ -115,7 +116,8 @@ let defaultOptions =
       debugSyllabizer = false
       verbosityLevel = Normal
       testRules = None
-      testWords = None }
+      testWords = None
+      parallelism = System.Environment.ProcessorCount }
 
 let parse (argv: string[]) =
     let rec parse' args options =
@@ -195,6 +197,14 @@ let parse (argv: string[]) =
         | "-x"::xs
         | "--x-sampa"::xs ->
             parse' xs { options with format = X_SAMPA }
+
+        | "-p"::parallelism::xs
+        | "--parallelism"::parallelism::xs ->
+            let options =
+                match System.Int32.TryParse parallelism with
+                | true, n -> { options with parallelism = n }
+                | false, _ -> options
+            parse' xs options
 
         | filename::xs when filename.EndsWith ".sc" ->
             parse' xs { options with rulesFile = File (RulesFileSource filename) }
