@@ -4,6 +4,8 @@ set outdir=%~p0out
 set project=project.json
 if not "%~1" == "" set project=%1
 
+echo Compiling %project%...
+
 mkdir "%outdir%"
 python3 split.py %project%
 if errorlevel 1 exit /b

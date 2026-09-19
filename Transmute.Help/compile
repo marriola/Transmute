@@ -1,11 +1,14 @@
-#!/bin/sh
+#!/bin/bash
 project=project.json
-
+sourcedir=$(pwd)/source
 outdir=out
+
 if [ -n "$1" ]; then
 	project=$1
 	outdir=$(dirname $1)
 fi
+
+echo Compiling $project...
 
 python3 split.py project.json
 echo
@@ -17,20 +20,20 @@ author=$(jq -r .author $project)
 
 i=0
 
-mkdir out
+mkdir $outdir
 
-for f in *.md; do
+for f in $outdir/*.md; do
 	title=$(jq -r .sections[$i].title $project)
 	base=${f%.*}
 	
 	echo converting $f...
-	pandoc -f markdown -t html -M "author-meta=$author" -M "pagetitle=$title" -M "title-prefix=$titlePrefix" --template "$template" --lua-filter nowidths.lua !filename! > "$outdir/$base.html"
+	pandoc -f markdown -t html -M "author-meta=$author" -M "pagetitle=$title" -M "title-prefix=$titlePrefix" --template "$template" --lua-filter nowidths.lua $f > "$base.html"
 	
 	i=$((i + 1))
 done
 
 pushd $outdir
-cp ../styles.css ../help.js ../toc.json .
+cp $sourcedir/styles.css $sourcedir/help.js .
 tar czf help.tar.gz *.html styles.css help.js toc.json
 popd
 cp $outdir/help.tar.gz "$destination"

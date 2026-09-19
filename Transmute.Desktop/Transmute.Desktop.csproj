@@ -27,6 +27,18 @@
     <AvaloniaXamlCreateSourceInfo>False</AvaloniaXamlCreateSourceInfo>
   </PropertyGroup>
 
+  <!-- Recompile help.tar.gz when README.md changes -->
+
+  <ItemGroup>
+    <ins Include="../README.md" />
+    <outs Include="help.tar.gz" />
+  </ItemGroup>
+
+  <Target Name="CompileHelp" BeforeTargets="BeforeBuild" Inputs="@(ins)" Outputs="@(outs)">
+    <Exec Command="../Transmute.Help/compile" WorkingDirectory="../Transmute.Help" />
+    <Touch Files="Help.resx" />
+  </Target>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
