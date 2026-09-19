@@ -5,7 +5,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:m="using:Transmute.Desktop.Models"
              xmlns:vm="using:Transmute.Desktop.ViewModels"
-             xmlns:te="using:TransmuteLib"
+             xmlns:te="using:Transmute.Engine"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
              x:DataType="vm:OutputPaneViewModel"
              x:Name="OutputPanel"

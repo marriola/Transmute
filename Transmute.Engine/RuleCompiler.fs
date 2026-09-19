@@ -1,0 +1,482 @@
+﻿// Project:     Transmute.Engine
+// Module:      RuleCompiler
+// Description: Rule to finite state transducer converter.
+// Copyright:   (c) 2026 Matt Arriola
+// License:     MIT
+
+namespace Transmute.Engine
+
+module internal RuleCompiler =
+    let internal START = State.make "S"
+    let internal ERROR = State.make "Error"
+
+    type SoundChangeRule = TransitionTable * Map<Transition, TransitionResult>
+
+    type private InputPosition =
+        | InputInitial
+        | InputNoninitial
+
+    type private RuleSection =
+        | InputSection
+        | EnvironmentSection
+
+    type private NFAState = {
+        /// The current origin state from which transitions will be created.
+        current: State
+
+        /// An infinite sequence of states.
+        states: State seq
+
+        /// The tokens from the section currently being processed.
+        currentNodes: Node list
+
+        /// The tokens from the output section.
+        outputNodes: Node list
+
+        /// Accumulates key-value pairs that will create the transition table.
+        transitions: Transition list
+
+        /// Accumulates transformations produced by matching transitions.
+        transformations: (Transition * TransitionResult) list
+
+        /// Specifies the rule section being compiled (environment or placeholder).
+        currentSection: RuleSection
+
+        /// Specifies the position in the input tokens list (initial or non-initial).
+        inputPosition: InputPosition
+
+        /// Indicates whether the placeholder is the next node that will be processed after exiting the subtree
+        isPlaceholderNextStack: bool list
+
+        isOptional: bool
+    }
+    with
+        member this.IsPlaceholderNext = List.reduce (&&) this.isPlaceholderNextStack
+
+    type private RuleGeneratorState =
+        | HasNext of NFAState
+        | Done
+
+    let internal buildNfa statePrefix (features: Map<string, Node>) sets start input output environment =
+        let takeState (states: State seq) =
+            Seq.tail states, Seq.head states
+
+        let featureTransformations =
+            features
+            |> Seq.map (fun kvp -> kvp.Key, Node.getTransformations kvp.Value)
+            |> Map.ofSeq
+
+        /// <param name="state">The internal NFA state.</param>
+        let rec buildStateMachine' state : NFAState =
+            let state =
+                { state with
+                    isPlaceholderNextStack =
+                        match state.currentNodes with
+                        | [ PlaceholderNode ] ->
+                            false :: state.isPlaceholderNextStack
+                        | _ ->
+                            let b =
+                                state.currentNodes
+                                |> Seq.skip (min 1 state.currentNodes.Length)
+                                |> Seq.takeWhile (function PlaceholderNode -> false | _ -> true)
+                                |> Seq.filter (function OptionalNode _ -> false | _ -> true)
+                                |> Seq.isEmpty
+                            b :: state.isPlaceholderNextStack }
+
+            /// <summary>
+            /// When visiting input nodes, and when visiting environment nodes when the input is empty and the last required
+            /// node before the placeholder has been consumed, consumes a single symbol and returns a node representing it.
+            /// Otherwise consumes nothing and gives nothing.
+            /// </summary>
+            let giveOutput state =
+                match state.currentSection, state.outputNodes, input with
+                | InputSection, node::xs, _ ->
+                    let nextState = { state with outputNodes = xs }
+                    nextState, Some node
+                | _, node::xs, [] when state.IsPlaceholderNext ->
+                    let nextState = { state with outputNodes = xs }
+                    nextState, Some node
+                | _ ->
+                    state, None
+
+            let getNextState state =
+                let states, nextState = takeState state.states
+                { state with states = states }, nextState
+
+            /// Creates a transition to a new state that matches an input symbol.
+            let matchCharacter c =
+                let state, next = getNextState state
+                let transitions = (From state.current, OnChar c, To next) :: state.transitions
+
+                { state with
+                    transitions = transitions
+                    current = next }
+
+            /// <summary>
+            /// Matches one of the boundary characters inserted on either end of the input string, <see cref="Special.START" /> and <see cref="Special.END" />.
+            /// </summary>
+            let matchWordBoundary () =
+                let boundaryChar =
+                    match state.inputPosition with
+                    | InputInitial -> Special.WORD_START_BOUNDARY
+                    | InputNoninitial -> Special.WORD_END_BOUNDARY
+                matchCharacter boundaryChar
+
+            // TODO: evaluate the possibility of having a syntax toggle on boundary symbols to make it act like a normal symbol
+            let matchSyllableBoundary () =
+                let state, boundaryMatcher = getNextState state
+                let state, next = getNextState state
+
+                let nextTransitions =
+                    [ From state.current, OnEpsilon, To boundaryMatcher
+                      From boundaryMatcher, OnChar Special.SYLLABLE_START_BOUNDARY, To next
+                      From boundaryMatcher, OnChar Special.SYLLABLE_END_BOUNDARY, To next
+                      From boundaryMatcher, OnAny, To boundaryMatcher ]
+
+                { state with
+                    transitions = nextTransitions @ state.transitions
+                    current = next }
+
+            /// <summary>
+            /// 
+            /// </summary>
+            let matchSyllableSegment boundaryType =
+                let state, boundaryMatcher = getNextState state
+                let state, next = getNextState state
+                let boundaryChar = SyllableBoundaryType.BoundaryTypeToChar.[boundaryType]
+
+                let nextTransitions =
+                    [ From state.current, OnEpsilon, To boundaryMatcher
+                      From boundaryMatcher, OnAny, To boundaryMatcher
+                      From boundaryMatcher, OnChar boundaryChar, To next ]
+
+                { state with
+                    transitions = nextTransitions @ state.transitions
+                    current = next }
+
+            /// Takes a segment, applies a series of transformations to it, and finally adds a transformation to the given transition.
+            let addFeatureTransformations transition transformations features depth originalSegment =
+                let nextSegment =
+                    (originalSegment, features)
+                    ||> List.fold (fun segment (FeatureIdentifierNode (isPresent, name)) ->
+                        let additions, removals = featureTransformations.[name]
+                        let searchMap = if isPresent then additions else removals
+                        searchMap
+                        |> Map.tryFind segment
+                        |> Option.defaultValue segment)
+
+                if nextSegment <> originalSegment then
+                    (transition, ReplacesWith (depth, nextSegment)) :: transformations
+                else
+                    transformations
+
+            /// Creates a series of states and transitions that match each character of an utterance.
+            let matchUtterance (utterance: string) =
+                // If possible, adds a transformation for an utterance.
+                let rec matchUtterance' inputChars innerState =
+                    match inputChars with
+                    | [] ->
+                        let innerState, outputNode = giveOutput innerState
+                        let depth = max 0 (utterance.Length - 1)
+                        let t = List.head innerState.transitions
+
+                        let transformations =
+                            match outputNode with
+                            | Some (UtteranceNode s) ->
+                                if innerState.IsPlaceholderNext then
+                                    (t, InsertsAfter s) :: innerState.transformations
+                                elif state.currentSection = InputSection then
+                                    (t, ReplacesWith (depth, s)) :: innerState.transformations
+                                else
+                                    innerState.transformations
+
+                            | Some (CompoundSetIdentifierNode features) ->
+                                addFeatureTransformations t innerState.transformations features depth utterance
+
+                            | _ ->
+                                if state.currentSection = InputSection then
+                                    (t, Deletes (utterance.Length, utterance)) :: innerState.transformations
+                                else
+                                    innerState.transformations
+
+                        { innerState with transformations = transformations }
+
+                    | c::xs ->
+                        let nextNfaState, next = getNextState innerState
+
+                        matchUtterance' xs
+                            { nextNfaState with
+                                transitions = (From innerState.current, OnChar c, To next) :: innerState.transitions
+                                current = next }
+
+                matchUtterance' (List.ofSeq utterance) state
+
+            /// Computes the intersection of a list of feature and set identifiers, and creates a
+            /// tree of states and transitions that match each member of the resulting set.
+            /// If any categories specify transformations that match the output of the rule,
+            /// these will be added to the transformation list.
+            let matchSet setDesc =
+                let state, terminator = getNextState state
+
+                let rec matchSet' tree state =
+                    match tree with
+                    | PrefixTree.Leaf _ ->
+                        state
+
+                    | PrefixTree.Root children
+                    | PrefixTree.Node (_, _, children) ->
+                        // Create states for each child and transitions to them
+                        let nextState =
+                            (state, children)
+                            ||> List.fold
+                                (fun innerState n ->
+                                    match n with
+                                    | PrefixTree.Node (_, c, _) ->
+                                        // Create a node for this input symbol and a transition to it, and visit the children.
+                                        let states, nextState = takeState innerState.states
+                                        let transitions = (From state.current, OnChar c, To nextState) :: innerState.transitions
+                                        let nextInnerState =
+                                            { innerState with
+                                                states = states
+                                                transitions = transitions
+                                                current = nextState }
+                                            |> matchSet' n
+                                        { innerState with
+                                            states = nextInnerState.states
+                                            transitions = nextInnerState.transitions
+                                            transformations = nextInnerState.transformations }
+
+                                    | PrefixTree.Leaf (value, depth) ->
+                                        // We have reached a leaf node and now have a complete segment to transform.
+                                        // Add the transformation and a transition to the terminator state.
+                                        let t = From state.current, OnEpsilon, To terminator
+                                        let innerState, outputNode = giveOutput innerState
+
+                                        let nextTransformations =
+                                            match outputNode with
+                                            | Some (UtteranceNode utterance) ->
+                                                if innerState.IsPlaceholderNext then
+                                                    (t, InsertsAfter utterance) :: innerState.transformations
+                                                else
+                                                    (t, ReplacesWith (depth, utterance)) :: innerState.transformations
+
+                                            | Some (CompoundSetIdentifierNode features) ->
+                                                addFeatureTransformations t innerState.transformations features depth value
+
+                                            | _ ->
+                                                if state.currentSection = InputSection then
+                                                    (t, Deletes (value.Length, value)) :: innerState.transformations
+                                                else
+                                                    innerState.transformations
+
+                                        { innerState with
+                                            transitions = t :: innerState.transitions
+                                            transformations = nextTransformations }
+
+                                    | PrefixTree.Root _ ->
+                                        failwith "A Root should never be the descendant of another node")
+
+                        { nextState with current = terminator }
+
+                // Add transitions to match and transform the set
+
+                let phonemes, prefixTree = PrefixTree.fromSetIntersection features sets setDesc
+                let nextState = matchSet' prefixTree state
+
+                { nextState with
+                    outputNodes =
+                        if state.currentSection = InputSection && nextState.outputNodes.Length > 0 then
+                            List.tail nextState.outputNodes
+                        else
+                            nextState.outputNodes }
+
+            /// Match the input section.
+            let matchInput () =
+                let nextState =
+                    buildStateMachine'
+                        { state with
+                            currentNodes = input
+                            currentSection = InputSection
+                            inputPosition = InputNoninitial }
+
+                { nextState with currentSection = EnvironmentSection }
+
+            /// Optionally match a sequence of nodes. Continue even if no match is possible.
+            let matchOptional nodes =
+                let state, terminator = getNextState state
+                let nextState =
+                    buildStateMachine'
+                        { state with
+                            currentNodes = nodes
+                            inputPosition = InputNoninitial
+                            isOptional = true }
+                let transitions =
+                    [ From state.current, OnEpsilon, To terminator
+                      From nextState.current, OnEpsilon, To terminator ]
+                    @ nextState.transitions
+                { nextState with
+                    transitions = transitions
+                    current = terminator
+                    isOptional = false }
+
+            let matchAlternationBranch nodes (branchState::_ as acc) = 
+                let nextState =
+                    buildStateMachine'
+                        { state with
+                            current = state.current
+                            states = branchState.states
+                            currentNodes = nodes
+                            transitions = branchState.transitions
+                            transformations = branchState.transformations }
+                nextState :: acc
+
+            /// Match exactly one of many sequences of nodes.
+            let matchAlternation branches =
+                // Build a subtree for each branch and then continue with the state of the last subtree
+                let state, terminator = getNextState state
+                let out = List.foldBack matchAlternationBranch branches [ state ]
+                let state::_ = out
+
+                // Add epsilon transitions from the last state of each subtree to the terminator state.
+                // Reverse the list and take the tail first so we don't epsilon from current to terminator and match without consuming input.
+                let subtreeFinalToLastState =
+                    out
+                    |> Seq.rev
+                    |> Seq.tail
+                    |> Seq.map (fun state -> From state.current, OnEpsilon, To terminator)
+                    |> List.ofSeq
+
+                let insertions =
+                    if input = [] then
+                        let outputString = output |> Seq.map Node.getStringValue |> String.concat ""
+                        subtreeFinalToLastState
+                        |> List.map (fun (From subtreeFinal, _, _) -> (From state.current, OnEpsilon, To subtreeFinal), InsertsAfter outputString)
+                    else
+                        []
+
+                { state with
+                    current = terminator
+                    outputNodes = output
+                    transitions = subtreeFinalToLastState @ state.transitions
+                    transformations = state.transformations @ insertions }
+
+            let matchNegation node =
+                let state, terminator = getNextState state
+                // TODO: need to make sure if the match fails somewhere in here, it needs to go to the terminator instead of ERROR.
+                // it might be possible to use an OnAny transition with an InsertsAfter transformation to reinsert any partially
+                // matched input. how can we special case this to add these transitions at each step?
+                let nextState = buildStateMachine' { state with currentNodes = [ node ] }
+                    
+                { nextState with
+                    current = terminator
+                    transitions =
+                        [ From nextState.current, OnEpsilon, To ERROR
+                          From state.current, OnEpsilon, To terminator ]
+                        @ nextState.transitions }
+
+            let generatorState =
+                match state.currentNodes with
+                | [] ->
+                    Done
+                | WordBoundaryNode::_ ->
+                    HasNext (matchWordBoundary ())
+                | SyllableBoundaryNode SyllableStart::_ ->
+                    HasNext (matchSyllableBoundary ())
+                | SyllableBoundaryNode boundaryType :: _ ->
+                    HasNext (matchSyllableSegment boundaryType)
+                | (UtteranceNode utterance)::_ ->
+                    HasNext (matchUtterance utterance)
+                | (CompoundSetIdentifierNode setDesc)::_  ->
+                    HasNext (matchSet setDesc)
+                | (SetIdentifierNode _ as id)::_ ->
+                    HasNext (matchSet [ id ])
+                | PlaceholderNode::_ ->
+                    HasNext (matchInput ())
+                | (OptionalNode children)::_ ->
+                    HasNext (matchOptional children)
+                | (AlternationNode branches)::_ ->
+                    HasNext (matchAlternation branches)
+                | (NegationNode node)::_ ->
+                    HasNext (matchNegation node)
+                | x::_ ->
+                    failwithf "Unexpected %O" x
+
+            match generatorState with
+            | Done ->
+                state
+            | HasNext nextState ->
+                buildStateMachine'
+                    { nextState with
+                        isPlaceholderNextStack = List.tail nextState.isPlaceholderNextStack
+                        currentNodes = List.tail state.currentNodes
+                        inputPosition = InputNoninitial }
+
+        let initialState =
+            { current = start
+              states = Seq.initInfinite (fun i -> State.make $"{statePrefix}{i}")
+              currentNodes = environment
+              outputNodes = output
+              transitions = []
+              transformations = []
+              currentSection = EnvironmentSection
+              inputPosition = InputInitial
+              isPlaceholderNextStack = []
+              isOptional = false
+            }
+
+        // Add initial transformation
+        let initialState =
+            match input, environment with
+            | [], PlaceholderNode :: _ ->
+                let states, nextState = takeState initialState.states
+                let t = From START, OnEpsilon, To nextState
+                let result = output |> List.map Node.getStringValue |> String.concat ""
+
+                { initialState with
+                    states = states
+                    current = nextState
+                    outputNodes = []
+                    transitions = [ t ]
+                    transformations = [ t, InsertsBefore result ] }
+
+            | _ ->
+                initialState
+
+        let { current = lastState; states = states; transitions = transitions; transformations = transformations } = buildStateMachine' initialState
+        let _, finalState = takeState states
+        let finalState = State.makeFinal finalState
+        let transitions = (From lastState, OnEpsilon, To finalState) :: transitions
+
+        transitions, transformations
+
+    let toDfa showNfa start (transitions, transformations) =
+        let dfa = DeterministicFiniteAutomaton.fromNfa start ERROR (List.rev transitions) transformations showNfa
+
+        let dfaTransitionTable =
+            dfa
+            |> Seq.map (fun ((From origin, input, To dest), _) -> (origin, input), dest)
+            |> Map.ofSeq
+
+        let dfaTransformations =
+            dfa
+            |> Seq.choose (function
+                | _, OutputDefault -> None
+                | t, output -> Some (t, output))
+            |> Map.ofSeq
+
+        dfaTransitionTable, dfaTransformations
+
+    /// <summary>
+    /// Compiles a finite state transducer from a phonological rule.
+    /// The resulting state machine can be passed into <see cref="RuleMachine.transform" /> to apply the rule to a word.
+    /// </summary>
+    let compile showNfa features sets rule : SoundChangeRule =
+        match Node.untag rule with
+        | RuleNode (_, _, input, output, environment) ->
+            let input = Node.untagAll input
+            let output = Node.untagAll output
+            let environment = Node.untagAll environment
+            buildNfa "q" features sets START input output environment
+            |> toDfa showNfa START
+        | _ ->
+            invalidArg "rule" "Must be a RuleNode"

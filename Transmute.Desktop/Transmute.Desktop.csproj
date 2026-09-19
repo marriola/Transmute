@@ -75,7 +75,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TransmuteLib\TransmuteLib.fsproj" />
+    <ProjectReference Include="..\Transmute.Engine\Transmute.Engine.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

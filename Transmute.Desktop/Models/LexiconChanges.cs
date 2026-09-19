@@ -3,7 +3,7 @@
 // Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
-using TransmuteLib;
+using Transmute.Engine;
 
 namespace Transmute.Desktop.Models
 {

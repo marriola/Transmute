@@ -12,7 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Transmute.Desktop.Services;
-using TransmuteLib;
+using Transmute.Engine;
 
 namespace Transmute.Desktop.ViewModels
 {

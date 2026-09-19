@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.3.11520.95
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute", "Transmute\Transmute.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute.Console", "Transmute.Console\Transmute.Console.fsproj", "{E909825E-D739-4690-A5A1-E136FB506007}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib", "TransmuteLib\TransmuteLib.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute.Engine", "Transmute.Engine\Transmute.Engine.fsproj", "{9C287E6C-7305-47B2-89C3-52983FC49A7D}"
 EndProject
-Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "TransmuteLib.Test", "TransmuteLib.Test\TransmuteLib.Test.fsproj", "{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}"
+Project("{6EC3EE1D-3C4E-46DD-8F32-0CC8E7565705}") = "Transmute.Engine.Test", "Transmute.Engine.Test\Transmute.Engine.Test.fsproj", "{ECDBFE92-CB85-42D3-A8FB-C59D93054BD4}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{20BF81DB-D7B6-44C6-BD1F-F106ED66CE95}"
 	ProjectSection(SolutionItems) = preProject
@@ -15,6 +15,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 		LICENSE = LICENSE
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Transmute.Desktop", "Transmute.Desktop\Transmute.Desktop.csproj", "{2A06D4FE-41EF-4A4C-9F4D-64EF8A16F1EA}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,0 +1,550 @@
+﻿// Project:     Transmute.Engine
+// Module:      Node
+// Description: Syntax tree node type
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace Transmute.Engine
+
+open Transmute.Engine.ExceptionHelpers
+open Transmute.Engine.Position
+
+type Node =
+    /// Represents a comment.
+    | CommentNode of string
+
+    /// Represents an identifier.
+    | SetIdentifierNode of string
+
+    /// Defines the intersection of a list of sets and features.
+    | CompoundSetIdentifierNode of Node list
+
+    /// Represents the presence of a set in a set identifier.
+    | TermIdentifierNode of name:string
+
+    /// Represents the presence or absence of a feature in a set identifier.
+    | FeatureIdentifierNode of isPresent:bool * name:string
+
+    /// Represents the presence or absence of a list of phonemes in a set identifier.
+    | SegmentIdentifierNode of isPresent:bool * segments: string list
+
+    /// Represents an utterance.
+    | UtteranceNode of string
+
+    /// Represents the placeholder for the input section in the environment section.
+    | PlaceholderNode
+
+    /// Represents a word boundary in the environment section.
+    | WordBoundaryNode
+
+    | SyllableBoundaryNode of boundaryType: SyllableBoundaryType
+
+    /// Represents a phonological rule.
+    | RuleNode of lineNumber: int * text: string * input:Node list * output:Node list * environment:Node list
+
+    /// Defines a set of utterances.
+    | SetDefinitionNode of lineNumber: int * name:string * members:Node list
+
+    /// Defines a transformation from one phoneme to another.
+    | TransformationNode of input:Node * output:Node
+
+    /// Defines a set of phonemes possessing this feature and transformations on it.
+    | FeatureDefinitionNode of lineNumber: int * name:string * members:Node list
+
+    /// Defines a list of nodes that may be optionally matched.
+    | OptionalNode of Node list
+
+    /// Defines a set of lists of nodes, of which only one may be matched.
+    | AlternationNode of Node list list
+
+    /// Defines a negative match.
+    | NegationNode of Node
+
+    /// Defines the rule used by the syllable boundary detector.
+    | SyllableDefinitionNode of lineNumber: int * onset: Node list * nucleus: Node list * coda: Node list
+
+    | SyllableDefinitionListNode of lineNumber: int * definitions: Node list
+
+    /// Represents a node tagged with metadata.
+    | TaggedNode of pos: (Offset * Line * Column) * Node
+
+    with
+    override this.ToString() =
+        let stringifyList = List.map string >> String.concat ""
+        match this with
+        | TaggedNode (_, node) ->
+            node.ToString()
+        | PlaceholderNode -> "_"
+        | WordBoundaryNode -> "#"
+        | SyllableBoundaryNode SyllableStart -> "SyllableStart"
+        | SyllableBoundaryNode SyllableEnd -> "SyllableEnd"
+        | SyllableBoundaryNode OnsetStart -> "OnsetStart"
+        | SyllableBoundaryNode OnsetEnd -> "OnsetEnd"
+        | SyllableBoundaryNode NucleusStart -> "NucleusStart"
+        | SyllableBoundaryNode NucleusEnd -> "NucleusEnd"
+        | SyllableBoundaryNode CodaStart -> "CodaStart"
+        | SyllableBoundaryNode CodaEnd -> "CodaEnd"
+        | CommentNode text -> sprintf "; %s" text
+        | UtteranceNode value
+        | SetIdentifierNode value
+        | TermIdentifierNode value ->
+            value
+        | FeatureIdentifierNode (isPresent, name) ->
+            let sign = if isPresent then "+" else "-"
+            sign + name
+        | SegmentIdentifierNode (isPresent, segments) ->
+            let sign = if isPresent then "+" else "-"
+            sign + "/" + (String.concat " " segments) + "/"
+        | CompoundSetIdentifierNode terms ->
+            terms
+            |> List.map string
+            |> String.concat " "
+            |> sprintf "[%s]"
+        | SetDefinitionNode (lineNumber, name, members) ->
+            members
+            |> List.map string
+            |> String.concat " "
+            |> sprintf "%s { %s }" name
+        | TransformationNode (input, output) ->
+            sprintf "%s → %s" (string input) (string output)
+        | FeatureDefinitionNode (lineNumber, name, members) ->
+            members 
+            |> List.map string
+            |> String.concat "; "
+            |> sprintf "[%s] { %s }" name
+        | OptionalNode children ->
+            let contents =
+                children
+                |> List.map string
+                |> String.concat ""
+            if contents.Length > 1 then
+                sprintf "( %s )" contents
+            else
+                sprintf "(%s)" contents
+        | AlternationNode branches ->
+            branches
+            |> List.map stringifyList
+            |> String.concat " | "
+            |> sprintf "( %s )"
+        | NegationNode node ->
+            sprintf "!%O" node
+        | RuleNode (_, text, _, _, _) ->
+            text
+
+and SyllableBoundaryType =
+    | SyllableStart
+    | SyllableEnd
+    | OnsetStart
+    | OnsetEnd
+    | NucleusStart
+    | NucleusEnd
+    | CodaStart
+    | CodaEnd
+
+module SyllableBoundaryType =
+    let BoundaryTypeToChar = Map.ofList [
+        SyllableStart, Special.SYLLABLE_START_BOUNDARY
+        OnsetStart, Special.ONSET_START_BOUNDARY
+        OnsetEnd, Special.ONSET_END_BOUNDARY
+        NucleusStart, Special.NUCLEUS_START_BOUNDARY
+        NucleusEnd, Special.NUCLEUS_END_BOUNDARY
+        CodaStart, Special.CODA_START_BOUNDARY
+        CodaEnd, Special.CODA_END_BOUNDARY
+        SyllableEnd, Special.SYLLABLE_END_BOUNDARY
+    ]
+
+    // key[0]   syllable boundary identifier token value
+    // key[1]   false = token was found in the input section, true = token was found in the environment section
+
+    let NameToBoundaryType = Map.ofList [
+        ("syllablestart", true), SyllableStart
+        ("syllablestart", false), SyllableStart
+        ("syllableend", true), SyllableEnd
+        ("syllableend", false), SyllableEnd
+
+        ("onset", true), OnsetStart
+        ("onset", false), OnsetEnd
+        ("nucleus", true), NucleusStart
+        ("nucleus", false), NucleusEnd
+        ("coda", true), CodaStart
+        ("coda", false), CodaEnd
+
+        ("onsetstart", false), OnsetStart
+        ("onsetstart", true), OnsetStart
+        ("onsetend", false), OnsetEnd
+        ("onsetend", true), OnsetEnd
+        ("nucleusstart", false), NucleusStart
+        ("nucleusstart", true), NucleusStart
+        ("nucleusend", false), NucleusEnd
+        ("nucleusend", true), NucleusEnd
+        ("codastart", false), CodaStart
+        ("codastart", true), CodaStart
+        ("codaend", false), CodaEnd
+        ("codaend", true), CodaEnd
+    ]
+
+/// Provides functions on the Node type.
+module Node =
+    let tag node position =
+        TaggedNode (position, node)
+
+    /// Retrieves the inner node of a tagged node.
+    let rec untag taggedNode =
+        match taggedNode with
+        | TaggedNode (_, node) ->
+            node
+        | x ->
+            x
+        |> function
+            | RuleNode (lineNumber, tokens, input, output, environment) ->
+                RuleNode (lineNumber, tokens, untagAll input, untagAll output, untagAll environment)
+            | CompoundSetIdentifierNode xs ->
+                CompoundSetIdentifierNode (untagAll xs)
+            | SetDefinitionNode (lineNumber, name, members) ->
+                SetDefinitionNode (lineNumber, name, untagAll members)
+            | FeatureDefinitionNode (lineNumber, name, members) ->
+                FeatureDefinitionNode (lineNumber, name, untagAll members)
+            | TransformationNode (input, output) ->
+                TransformationNode (untag input, untag output)
+            | OptionalNode xs ->
+                OptionalNode (untagAll xs)
+            | AlternationNode xs ->
+                AlternationNode (List.map untagAll xs)
+            | NegationNode node ->
+                NegationNode (untag node)
+            | x ->
+                x
+
+    and untagAll nodes =
+        nodes
+        |> List.map untag
+
+    let (|Untag|_|) node =
+        match node with
+        | TaggedNode (position, inner) -> Some (inner, position)
+        | _ -> Some (node, (Offset 0, Line 0, Column 0))
+
+    let getLine node =
+        match node with
+        | SetDefinitionNode (line, _, _)
+        | FeatureDefinitionNode (line, _, _)
+        | SyllableDefinitionNode (line, _, _, _)
+        | SyllableDefinitionListNode (line, _)
+        | RuleNode (line, _, _, _, _) -> line
+        | _ ->
+            failwithf "Expected RuleNode or SyllableDefinitionListNode, got %O" node
+
+    /// Gets the left string value of a TransformationNode.
+    let getLeft node =
+        match untag node with
+        | TransformationNode (input, _) ->
+            input
+        | _ ->
+            invalidArg "this" "Must be a TranformationNode"
+
+    /// Gets the right string value of a TransformationNode.
+    let getRight node =
+        match untag node with
+        | TransformationNode (_, output)->
+            output
+        | _ ->
+            invalidArg "this" "Must be a TranformationNode"
+
+    /// Gets the string value of a node.
+    let getStringValue node =
+        match untag node with
+        | UtteranceNode value
+        | CommentNode value
+        | SetIdentifierNode value
+        | TermIdentifierNode value ->
+            value
+        | FeatureIdentifierNode (_, name) ->
+            name
+        | SetDefinitionNode (lineNumber, name, _) 
+        | FeatureDefinitionNode (lineNumber, name, _) ->
+            name
+        | _ ->
+            invalidArg "this" "Must be one of UtteranceNode, CommentNode, SetIdentifierNode, TermIdentifierNode"
+
+    /// <summary>
+    /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
+    /// </summary>
+    /// <param name="nodes"></param>
+    let getFeatures nodes =
+        nodes
+        |> List.choose
+            (fun x ->
+                match untag x with
+                | FeatureDefinitionNode (_, name, _) as node ->
+                    Some (name, node)
+                | _ -> None)
+        |> Map.ofSeq
+
+    let getMembers feature =
+        match feature with
+        | FeatureDefinitionNode (_, _, members) ->
+            members
+        | _ ->
+            invalidArg "feature" "Must be a FeatureDefinitionNode"
+
+    /// <summary>
+    /// Returns a dictionary of the elements of the Node list that are SetDefinitionNodes.
+    /// </summary>
+    /// <param name="nodes"></param>
+    let getSets nodes =
+        nodes
+        |> List.choose
+            (function
+                | SetDefinitionNode (_, name, _) as node -> Some (name, node)
+                | _ -> None)
+        |> Map.ofList
+
+    /// <summary>
+    /// Gets the members of the feature.
+    /// </summary>
+    /// <param name="feature">The feature.</param>
+    /// <param name="isPresent">If true, takes the right hand side from each transformation; otherwise, takes the left hand side.</param>
+    let getFeatureMembers isPresent feature =
+        let rec inner members out =
+            match members with
+            | [] ->
+                List.rev out
+            | x::xs ->
+                let nextOut = 
+                    match x with
+                    | Untag (UtteranceNode value, _) when isPresent ->
+                        value :: out
+                    | Untag (TransformationNode (input, output), _) ->
+                        let utterance = if isPresent then output else input
+                        match utterance with
+                        | Untag (UtteranceNode value, _) -> value :: out
+                    | _ ->
+                        out
+                inner xs nextOut
+        inner (getMembers feature) []
+
+    type private Transformation =
+        | Add of input: string * output: string
+        | Remove of input: string * output: string
+
+    /// Returns a map of phonemes that can be transformed to add the feature, and
+    /// a map of phonemes that can be transformed to remove the feature.
+    let getTransformations feature =
+        let transformations =
+            feature
+            |> getMembers
+            |> List.choose (fun m ->
+                match m with
+                | TransformationNode (input, output) ->
+                    let input = getStringValue input
+                    let output = getStringValue output
+                    Some [
+                        Add (input, output)
+                        Remove (output, input)
+                    ]
+                | _ -> None)
+            |> List.concat
+        let additions =
+            transformations
+            |> List.choose (function
+                | Add (input, output) -> Some (input, output)
+                | Remove _ -> None)
+            |> Map.ofSeq
+        let removals =
+            transformations
+            |> List.choose (function
+                | Remove (input, output) -> Some (input, output)
+                | Add _ -> None)
+            |> Map.ofSeq
+        additions, removals
+
+    /// <summary>
+    /// Gets the members of the set.
+    /// </summary>
+    /// <param name="theSet"></param>
+    let getSetMembers setNode =
+        match untag setNode with
+        | SetDefinitionNode (_, _, members) ->
+            members
+            |> List.choose (function
+                | UtteranceNode x -> Some x
+                | _ -> None)
+        | FeatureDefinitionNode (_, _, members) ->
+            members
+            |> List.choose (function
+                | UtteranceNode x -> Some x
+                | TransformationNode (_, UtteranceNode output) -> Some output
+                | _ -> None)
+        | _ ->
+            invalidArg "setNode" "Must be a set"
+
+    let getMemberNodes node =
+        match node with
+        | SetDefinitionNode (_, _, members)
+        | FeatureDefinitionNode (_, _, members) ->
+            members
+            |> List.choose (function
+                | SetIdentifierNode _ -> None
+                | n -> Some n)
+        | _ ->
+            invalidArg "node" "Must be a feature or a set"
+
+    let getAlphabet features sets =
+        let features =
+            features
+            |> Map.toList
+            |> List.map snd
+        
+        let sets =
+            sets
+            |> Map.toList
+            |> List.map snd
+
+        [ List.map (getFeatureMembers true) features
+          List.map (getFeatureMembers false) features
+          List.map getSetMembers sets ]
+        |> List.collect List.concat
+        |> set
+
+    /// <summary>
+    /// Computes the intersection of the sets and features named in the CompoundSetIdentifierNode.
+    /// </summary>
+    /// <param name="sets">The available sets.</param>
+    /// <param name="features">The available features.</param>
+    /// <param name="setIdentifier"></param>
+    let setIntersection (alphabet: Set<string>) (features: Map<string, Node>) (sets: Map<string, Node>) setDescriptor =
+        let rec inner (terms: Node list) first plus (result: Set<string>) =
+            let addToSet isPresent s =
+                if isPresent
+                    then Set.intersect result s
+                    else Set.difference result s
+
+            let addFeature isPresent name =
+                if features.ContainsKey name then
+                    if first then
+                        getFeatureMembers isPresent features.[name] |> set
+                    else
+                        getFeatureMembers true features.[name]
+                        |> set
+                        |> addToSet isPresent
+                elif sets.ContainsKey(name) then
+                    getSetMembers sets.[name]
+                    |> set
+                    |> addToSet isPresent
+                else
+                    failwithf "feature '%s' is not defined" name
+
+            match terms with
+            | [] ->
+                result
+            | x::xs ->
+                let plus =
+                    plus &&
+                    match x with
+                    | Untag (FeatureIdentifierNode (isPresent, _), _) when not isPresent -> false
+                    | _ -> true
+                let nextSet =
+                    match x with
+                    | Untag (SegmentIdentifierNode (isPresent, segments), _) ->
+                        if isPresent
+                            then segments |> Set.ofList |> Set.union result
+                            else segments |> Set.ofList |> Set.difference result
+                    | Untag (TermIdentifierNode name, pos)
+                    | Untag (SetIdentifierNode name, pos) ->
+                        match Map.tryFind name sets with
+                        | Some setNode ->
+                            getSetMembers setNode
+                            |> set
+                            |> addToSet true
+                        | None when features.ContainsKey name ->
+                            addFeature true name
+                        | _ ->
+                            invalidSyntax $"set '{name}' is not defined" pos
+                    | Untag (FeatureIdentifierNode (isPresent, name), _) ->
+                        addFeature isPresent name
+                    | Untag (node, position) ->
+                        invalidSyntax (sprintf "Unexpected token '%O'" node) position
+                inner xs false plus nextSet
+        
+        let segmentsOnly =
+            setDescriptor
+            |> List.exists (function TermIdentifierNode _ | SetIdentifierNode _ | FeatureIdentifierNode _ -> true | _ -> false)
+            |> not
+
+        if segmentsOnly then
+            setDescriptor
+            |> List.collect (function SegmentIdentifierNode (isPresent, segments) -> if isPresent then segments else [])
+            |> List.distinct
+        else
+            inner setDescriptor true true alphabet
+            |> List.ofSeq
+
+    /// <summary>
+    /// <para>Resolves references to other features/sets in a feature/set by adding their members to it.</para>
+    /// </summary>
+    /// <remarks>
+    /// <para>A reference may be a simple identifier, which will add the members of a set, or the outputs of
+    /// a feature's transformations, to the collection including it.</para>
+    /// <para>A reference may also be a compound set identifier in brackets, specifying a combination of sets
+    /// and features to add.</para>
+    /// </remarks>
+    /// <param name="features">foobaz</param>
+    let resolveReferences features sets node =
+        let alphabet = getAlphabet features sets
+        let rec resolveReferences' visited node =
+            let references, members =
+                match node with
+                | SetDefinitionNode (_, _, members)
+                | FeatureDefinitionNode (_, _, members) ->
+                    members
+                    |> List.partition (function
+                        | SetIdentifierNode _
+                        | CompoundSetIdentifierNode _ -> true
+                        | _ -> false)
+                | _ ->
+                    invalidArg "node" "Must be a set definition or a feature definition"
+            let identifiers =
+                references
+                |> List.choose (function
+                    | SetIdentifierNode id -> Some id
+                    | _ -> None)
+            let compoundIdentifiers =
+                references
+                |> List.choose (function
+                    | CompoundSetIdentifierNode setDesc -> Some setDesc
+                    | _ -> None)
+            let resolve (name, node) =
+                if Set.contains name visited
+                    then failwithf "Circular reference in '%s'" name
+                    else resolveReferences' (Set.add name visited) node |> getMemberNodes
+            let referenceMembers =
+                let setMembers =
+                    sets
+                    |> Map.toList
+                    |> List.filter (fun (name, _) -> List.contains name identifiers)
+                    |> List.collect resolve
+                let fixFeatureMemberNode =
+                    match node with
+                    | SetDefinitionNode _ -> (function
+                        | TransformationNode (_, output) -> output
+                        | n -> n)
+                    | FeatureDefinitionNode _ -> id
+                let featureMembers =
+                    features
+                    |> Map.toList
+                    |> List.filter (fun (name, _) -> List.contains name identifiers)
+                    |> List.collect resolve
+                    |> List.map fixFeatureMemberNode
+                let featureSets =
+                    compoundIdentifiers
+                    |> List.collect (setIntersection alphabet features sets)
+                    |> List.map UtteranceNode
+                (setMembers @ featureMembers @ featureSets)
+                |> Set.ofList
+                |> Set.toList
+            match node with
+            | SetDefinitionNode (lineNumber, name, _) ->
+                SetDefinitionNode (lineNumber, name, members @ referenceMembers)
+            | FeatureDefinitionNode (lineNumber, name, _) ->
+                FeatureDefinitionNode (lineNumber, name, members @ referenceMembers)
+        resolveReferences' Set.empty node

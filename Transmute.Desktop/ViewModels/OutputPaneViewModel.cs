@@ -10,7 +10,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using Transmute.Desktop.Models;
-using TransmuteLib;
+using Transmute.Engine;
 
 namespace Transmute.Desktop.ViewModels
 {

@@ -1,0 +1,761 @@
+﻿// Project:     Transmute.Engine
+// Module:      RuleParser
+// Description: Rule parser
+// Copyright:   (c) 2023 Matt Arriola
+// License:     MIT
+
+namespace Transmute.Engine
+
+open System.IO
+open Transmute.Engine.ExceptionHelpers
+open Transmute.Engine.Lexer
+open Transmute.Engine.Position
+open Transmute.Engine.Token
+
+type ParseResult = ParseResult of sets: Map<string, Node> * features: Map<string, Node> * syllableRules: Node list * soundChangeRules: Node list
+
+module internal RuleParser =
+    /// <summary>
+    /// Parses the next node in the list of tokens.
+    /// </summary>
+    /// <param name="tokens">The list of tokens.</param>
+    let private next (tokenBuffer: System.Collections.Generic.List<Token>) tokens =
+        let mutable _position = Offset 0, Line 1, Column 1
+
+        /// <summary>
+        /// Matches the next token to a specific type and consumes it.
+        /// <summary>
+        /// <exception cref="SyntaxException">Thrown when the token at the head of the list does not match the given type.</exception>
+        let rec matchToken tokens tokenType =
+            match tokens with
+            | [] ->
+                invalidArg "tokens" "Must not be empty"
+            | OfType Whitespace ws::xs ->
+                tokenBuffer.Add ws
+                matchToken xs tokenType
+            | { tokenType = t } as x::xs when tokenType = t ->
+                tokenBuffer.Add x
+                xs, x
+            | x::_ ->
+                unexpectedToken [tokenType] x
+
+        /// <summary>
+        /// Attempts to match the next token to a specific type, and consumes it if matched. Otherwise, returns the original tokens list unchanged.
+        /// </summary>
+        let rec tryMatchToken tokens tokenType =
+            let rec tryMatchToken' next consumed =
+                match next with
+                | OfType Whitespace ws::xs ->
+                    tryMatchToken' xs (ws :: consumed)
+                | { tokenType = t } as x::xs when tokenType = t ->
+                    consumed |> List.rev |> tokenBuffer.AddRange
+                    tokenBuffer.Add x
+                    xs, Some t
+                | _ ->
+                    tokenBuffer.Clear()
+                    tokens, None
+
+            tryMatchToken' tokens []
+
+        /// <summary>
+        /// Attempts to match the next token to a specific type, and consumes it if matched. Otherwise, returns the original tokens list unchanged.
+        /// If a newline is reached before matching the target token type, the match fails.
+        /// </summary>
+        let rec tryMatchTokenOnSameLine tokens tokenType =
+            match tokens with
+            | OfType Whitespace ws::xs ->
+                if ws.value.Contains "\n" then
+                    xs, None
+                else
+                    tokenBuffer.Add ws
+                    tryMatchToken xs tokenType
+            | { tokenType = t } as x::xs when tokenType = t ->
+                tokenBuffer.Add x
+                xs, Some t
+            | _ ->
+                tokens, None
+
+        /// <summary>
+        /// Matches a token to one of a list of token types, automatically skipping over any whitespace.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="tokenTypes">The list of valid token types.</param>
+        let rec matchOneOf tokens tokenTypes =
+            match tokens with
+            | [] ->
+                invalidArg "tokens" "Must not be empty"
+            | OfType Whitespace ws::xs ->
+                tokenBuffer.Add ws
+                matchOneOf xs tokenTypes
+            | { tokenType = t } as x::xs when List.contains t tokenTypes ->
+                tokenBuffer.Add x
+                xs, x
+            | x::_ ->
+                unexpectedToken tokenTypes x
+
+        let matchUtteranceIdentifierNode (tokens: Token list) isPresent =
+            let rec inner last tokens out =
+                match tokens with
+                | [] ->
+                    failwith $"Expected segment or '/', got end of file at {last.position}"
+
+                | { tokenType = Whitespace } as token :: rest ->
+                    if token.value.Contains "\n" then
+                        failwith $"Expected segment or '/', got end of line at {token.position}"
+                    else
+                        tokenBuffer.Add token
+                        inner token rest out
+
+                | { tokenType = Divider } as divider :: rest ->
+                    tokenBuffer.Add divider
+                    rest, SegmentIdentifierNode (isPresent, List.rev out)
+
+                | { tokenType = Utterance } as token :: rest ->
+                    tokenBuffer.Add token
+                    inner token rest (token.value :: out)
+
+                | token :: _ ->
+                    failwith $"Expected segment or '/', got {token} at {token.position}"
+
+            inner tokens[0] tokens[1..] []
+
+        /// <summary>
+        /// Matches a <see cref="FeatureIdentifierNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchFeatureIdentifierTerm tokens =
+            let tokens, presence = matchOneOf tokens [ Plus; Minus ]
+            let rest, term = matchOneOf tokens [ Id; Divider ]
+            tokenBuffer.RemoveAt (tokenBuffer.Count - 1) // I have to do this because I got hacky
+            let isPresent = presence.tokenType = Plus
+            let tokens, node =
+                match term with
+                | { tokenType = Id } as id ->
+                    tokenBuffer.Add id
+                    rest, FeatureIdentifierNode (isPresent, term.value)
+                | { tokenType = Divider } as divider ->
+                    tokenBuffer.Add divider
+                    matchUtteranceIdentifierNode tokens isPresent
+            tokens, Node.tag node presence.position
+
+        /// <summary>
+        /// Matches a <see cref="TermIdentifierNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchSetIdentifierTerm tokens =
+            let tokens, identifier = matchToken tokens Id
+            tokens, Node.tag (TermIdentifierNode identifier.value) identifier.position
+
+        /// <summary>
+        /// Matches either a <see cref="TermIdentifierNode" /> or a <see cref="FeatureIdentifierNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchSetOrFeatureIdentifierTerm tokens =
+            match tokens with
+            | [] ->
+                invalidSyntax "Expected '+', '-' or an identifier, got end of file" _position
+            | OfType Id _::_ ->
+                matchSetIdentifierTerm tokens
+            | OfType Plus _::_
+            | OfType Minus _::_ ->
+                matchFeatureIdentifierTerm tokens
+            | x::_ ->
+                unexpectedToken [ Id; Plus; Minus ] x
+
+        /// <summary>
+        /// Matches a <see cref="CompoundSetIdentifierNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchSetIdentifier tokens headPosition =
+            let rec matchSetIdentifierInternal tokens out =
+                match tokens with
+                | [] ->
+                    invalidSyntax "Expected '+', '-' or an identifier, got end of file" _position
+                | NewlineWhitespace _::_ ->
+                    invalidSyntax "Expected '+', '-' or an identifier; got end of line" _position
+                | NonNewlineWhitespace ws::xs ->
+                    tokenBuffer.Add ws
+                    matchSetIdentifierInternal xs out
+                | OfType RBrack rbrack::xs ->
+                    tokenBuffer.Add rbrack
+                    xs, Node.tag (CompoundSetIdentifierNode (List.rev out)) headPosition
+                | _ ->
+                    let tokens, term = matchSetOrFeatureIdentifierTerm tokens
+                    matchSetIdentifierInternal tokens (term :: out)
+            matchSetIdentifierInternal tokens []
+
+        /// <summary>
+        /// Matches a rule section, i.e. a list of <see cref="SetIdentifierNode" />, <see cref="UtteranceNode" />,
+        /// <see cref="PlaceholderNode" />, <see cref="BoundaryNode" />, <see cref="SyllableBoundaryNode" />,
+        /// <see cref="CompoundSetIdentifierNode" />, <see cref="OptionalNode" /> and <see cref="AlternationNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let rec matchRuleSection tokens =
+            /// <summary>
+            /// Matches an <see cref="AlternationNode" />.
+            /// </summary>
+            /// <param name="tokens">The list of tokens.</param>
+            /// <param name="out">The contents of the node.</param>
+            let rec matchAlternation tokens startToken out =
+                match tokens with
+                | OfType Empty empty::xs ->
+                    tokenBuffer.Add empty
+                    matchAlternation xs startToken out
+                | NewlineWhitespace _::_ ->
+                    invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
+                | OfType Whitespace ws::xs ->
+                    tokenBuffer.Add ws
+                    matchAlternation xs startToken out
+                | OfType RParen rparen::xs ->
+                    tokenBuffer.Add rparen
+                    xs, Node.tag (AlternationNode (List.rev out)) startToken.position
+                | OfType Pipe pipe::xs ->
+                    tokenBuffer.Add pipe
+                    matchAlternation xs startToken out
+                | _ ->
+                    let tokens, ruleSection = matchRuleSection tokens
+                    ruleSection :: out
+                    |> matchAlternation tokens startToken
+
+            /// <summary>
+            /// Matches either an <see cref="OptionalNode" /> or an <see cref="AlternationNode" />.
+            /// </summary>
+            /// <param name="tokens">The list of tokens.</param>
+            let matchOptional_Alternation tokens =
+                let tokens, lparen = matchToken tokens LParen
+                let rec matchOptional_AlternationInteral tokens out =
+                    match tokens with
+                    | NewlineWhitespace _::_ ->
+                        invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
+                    | OfType Whitespace ws::xs ->
+                        tokenBuffer.Add ws
+                        matchOptional_AlternationInteral xs out
+                    | OfType RParen rparen::xs ->
+                        tokenBuffer.Add rparen
+                        xs, Node.tag (OptionalNode (List.rev out)) lparen.position
+                    | OfType Pipe pipe::xs ->
+                        tokenBuffer.Add pipe
+                        matchAlternation xs lparen [out]
+                    | _ ->
+                        let tokens, ruleSection = matchRuleSection tokens
+                        matchOptional_AlternationInteral tokens (ruleSection @ out)
+                matchOptional_AlternationInteral tokens []
+
+            let rec inner tokens out =
+                let inline hasPlaceholder x = List.exists (function TaggedNode (_, PlaceholderNode) -> true | _ -> false) x
+                
+                let rec matchNext tokens =
+                    match tokens with
+                    | OfType Empty t :: xs
+                    | OfType Separator t :: xs ->
+                        tokenBuffer.Add t
+                        matchNext xs
+
+                    | NonNewlineWhitespace ws :: xs ->
+                        tokenBuffer.Add ws
+                        matchNext xs
+
+                    | OfType Id x :: xs ->
+                        tokenBuffer.Add x
+                        match Map.tryFind (x.value.ToLower(), hasPlaceholder out) SyllableBoundaryType.NameToBoundaryType with
+                        | None ->
+                            xs, Some (Node.tag (SetIdentifierNode x.value) x.position)
+                        | Some boundaryType ->
+                            xs, Some (Node.tag (SyllableBoundaryNode boundaryType) x.position)
+
+                    | OfType Utterance x :: xs ->
+                        tokenBuffer.Add x
+                        xs, Some (Node.tag (UtteranceNode x.value) x.position)
+
+                    | OfType Placeholder x :: xs ->
+                        tokenBuffer.Add x
+                        xs, Some (Node.tag PlaceholderNode x.position)
+
+                    | OfType WordBoundary x :: xs ->
+                        tokenBuffer.Add x
+                        xs, Some (Node.tag WordBoundaryNode x.position)
+
+                    | OfType SyllableBoundary x :: xs ->
+                        tokenBuffer.Add x
+                        let boundaryType = if hasPlaceholder out then SyllableEnd else SyllableStart
+
+                        xs, Some (Node.tag (SyllableBoundaryNode boundaryType) x.position)
+
+                    | OfType LBrack x :: xs ->
+                        tokenBuffer.Add x
+                        let tokens, setIdentifier = matchSetIdentifier xs x.position
+                        tokens, Some setIdentifier
+
+                    | OfType LParen _ :: _ ->
+                        let tokens, optional = matchOptional_Alternation tokens
+                        tokens, Some optional
+
+                    | OfType Not x :: xs ->
+                        tokenBuffer.Add x
+                        let negationPosition = _position
+                        match matchNext xs with
+                        | xs, Some next ->
+                            xs, Some (Node.tag (NegationNode next) negationPosition)
+
+                        | _ ->
+                            invalidSyntax ("Unexpected " + (xs |> List.head |> string)) _position
+
+                    | _ ->
+                        tokens, None
+
+                match matchNext tokens with
+                | xs, Some next ->
+                    inner xs (next :: out)
+
+                | xs, None ->
+                    xs, List.rev out
+
+            inner tokens []
+
+        /// <summary>
+        /// Either matches an arrow and an utterance and produces a <see cref="TransformationNode" />, or produces an <see cref="UtteranceNode" />
+        /// with the utterance already parsed.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="utterance">The utterance already matched.</param>
+        let rec matchUtterance_Transformation tokens utterance =
+            match tokens with
+            | OfType Whitespace ws::xs ->
+                tokenBuffer.Add ws
+                matchUtterance_Transformation xs utterance
+            | OfType Arrow arrow::xs ->
+                tokenBuffer.Add arrow
+                let tokens, token = matchToken xs Utterance
+                let inputNode = Node.tag (UtteranceNode utterance.value) utterance.position
+                let outputNode = Node.tag (UtteranceNode token.value) token.position
+                tokens, Node.tag (TransformationNode (inputNode, outputNode)) utterance.position
+            | _ ->
+                tokens, Node.tag (UtteranceNode utterance.value) utterance.position
+
+        /// <summary>
+        /// Matches a list of set/feature members. These may be of type <see cref="UtteranceNode" /> or
+        /// <see cref="TransformationNode" />.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchMemberList closeToken tokens =
+            let rec matchMemberListInternal tokens out =
+                match tokens with
+                | [] ->
+                    invalidSyntax "Expected member list, got end of file" _position
+                | OfType Whitespace x::xs
+                | OfType Comment x::xs ->
+                    tokenBuffer.Add x
+                    matchMemberListInternal xs out
+                | OfType Utterance x::xs ->
+                    tokenBuffer.Add x
+                    let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
+                    let tokens, _ = tryMatchToken tokens Comma
+                    matchMemberListInternal tokens (utteranceOrTransformation :: out)
+                | OfType Id x::xs ->
+                    tokenBuffer.Add x
+                    let id = Node.tag (SetIdentifierNode x.value) x.position
+                    let tokens, _ = tryMatchToken xs Comma
+                    matchMemberListInternal tokens (id :: out)
+                | x::xs when x.tokenType = closeToken ->
+                    tokenBuffer.Add x
+                    xs, List.rev out
+                | OfType LBrack x::xs ->
+                    tokenBuffer.Add x
+                    let tokens, id = matchSetIdentifier xs x.position
+                    let tokens, _ = tryMatchToken tokens Comma
+                    matchMemberListInternal tokens (id :: out)
+                | x::_ ->
+                    unexpectedToken [Utterance] x
+            matchMemberListInternal tokens []
+
+        /// <summary>
+        /// Matches a rule.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchRule tokens headPosition =
+            let _, Line startLine, _ = headPosition
+            let tokens, input = matchRuleSection tokens
+            let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
+            let tokens, output = matchRuleSection tokens
+            let tokens, divider = tryMatchTokenOnSameLine tokens Divider
+            let tokens, environment =
+                match divider with
+                | Some _ ->
+                    let tokens, environment = matchRuleSection tokens
+                    tokens, environment
+                | None ->
+                    tokens, [PlaceholderNode]
+            let text =
+                tokenBuffer
+                |> Seq.map (fun t -> t.value)
+                |> String.concat ""
+            tokens, Node.tag (RuleNode (startLine, text, input, output, environment)) headPosition
+
+
+        /// <summary>
+        /// Matches a rule when an identifier has already been matched.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <param name="identifier">The identifier already matched.</param>
+        let matchRuleStartingWithIdentifier tokens identifier =
+            let tokens, ruleNode = matchRule tokens identifier.position
+            match Node.untag ruleNode with
+            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
+                tokens, Node.tag
+                    (RuleNode (
+                        lineNumber,
+                        ruleTokens,
+                        Node.tag (SetIdentifierNode identifier.value) identifier.position :: input,
+                        output,
+                        environment))
+                    identifier.position
+            | _ ->
+                invalidSyntax "Expected a rule" _position
+
+        let matchAssignment tokens =
+            let tokens, identifier = matchToken tokens Id
+            let tokens, _ = matchToken tokens Equals
+            let tokens, nodes = matchRuleSection tokens
+            tokens, identifier.value, nodes
+
+        let matchSyllableDefinition tokens =
+            let startToken = List.head tokens
+
+            let rec inner tokens out =
+                match tokens with
+                | []
+                | OfType RParen _ :: _->
+                    tokens, List.rev out
+                | OfType Comment _ :: xs
+                | OfType Whitespace _ :: xs ->
+                    inner xs out
+                | OfType Id _ :: _ ->
+                    let xs, name, nodes = matchAssignment tokens
+                    inner xs ((name, nodes) :: out)
+                | token::_ ->
+                    invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda', got {token}" token.position
+
+            let tokens, _ = matchToken tokens LParen
+            let tokens, definitions = inner tokens []
+            let tokens, _ = matchToken tokens RParen
+
+            let definitions =
+                definitions
+                |> List.groupBy fst
+                |> Map.ofList
+                |> Map.map (fun _ parts ->
+                    match parts with
+                    | [] -> []
+                    | [_, nodes] -> nodes
+                    | _ -> 
+                        let alternationNode =
+                            parts
+                            |> List.map (fun (_, nodes) -> nodes)
+                            |> AlternationNode
+                        [ alternationNode ])
+
+            let onset = Map.tryFind "Onset" definitions |> Option.defaultValue []
+            let nucleus = Map.tryFind "Nucleus" definitions |> Option.defaultValue []
+            let coda = Map.tryFind "Coda" definitions |> Option.defaultValue []
+
+            if onset = [] && nucleus = [] && coda = [] then
+                invalidSyntax "All segments are missing or empty in syllable definition" startToken.position
+
+            let (_, Line lineNumber, _) = startToken.position
+
+            tokens, SyllableDefinitionNode (lineNumber, onset, nucleus, coda)
+
+        let matchSyllableDefinitions tokens =
+            let rec inner matchedOr out tokens =
+                match tokens with
+                | [] ->
+                    tokens, List.rev out
+
+                | OfType Whitespace ws :: _ when ws.value.Contains "\n" ->
+                    tokens, List.rev out
+
+                | OfType Whitespace _ :: xs ->
+                    inner matchedOr out xs
+
+                | OfType Utterance u :: xs when u.value.Trim().ToLower() = "or" ->
+                    inner true out xs
+
+                | OfType LParen _ :: _ ->
+                    let xs, syllableDefinition = matchSyllableDefinition tokens
+                    inner false (syllableDefinition :: out) xs
+
+            inner false [] tokens
+
+        /// <summary>
+        /// Matches either a set or a rule.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let rec matchSet_Rule tokens identifier =
+            match tokens with
+            | OfType Separator x::xs
+            | OfType Whitespace x::xs ->
+                tokenBuffer.Add x
+                matchSet_Rule xs identifier
+            | OfType Equals x::xs when identifier.value = "Syllable" ->
+                tokenBuffer.Add x
+                let _, Line lineNumber, _ = xs.[0].position
+                let xs, syllableDefinitions = matchSyllableDefinitions xs
+                xs, (SyllableDefinitionListNode (lineNumber, syllableDefinitions))
+            | OfType Equals _ :: xs ->
+                let xs, openToken = matchOneOf xs [ LParen; LBrace ]
+                let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
+                let tokens, members = matchMemberList closeToken xs
+                let (_, Line lineNumber, _) = identifier.position
+                tokens, Node.tag (SetDefinitionNode (lineNumber, identifier.value, members)) identifier.position
+            | OfType Arrow _::xs
+            | OfType Divider _::xs ->
+                let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
+                tokens, ruleNode
+            | OfType Utterance _::xs ->
+                let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
+                tokens, ruleNode
+            | [] ->
+                failwith "No more input"
+            | x::_ ->
+                unexpectedToken [ Equals; LBrace; Empty; Divider; Utterance ] x
+
+        /// <summary>
+        /// Matches a rule when a set identifier has already been matched.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchRuleStartingWithSetIdentifier tokens headPosition =
+            let tokens, setIdentifier = matchSetIdentifier tokens headPosition
+            let tokens, ruleNode = matchRule tokens headPosition
+            match ruleNode with
+            | TaggedNode (_, RuleNode (lineNumber, ruleTokens, input, output, environment)) ->
+                tokens, TaggedNode (headPosition, RuleNode (lineNumber, ruleTokens, setIdentifier :: input, output, environment))
+            | _ ->
+                invalidSyntax "Expected a rule" _position
+
+        /// <summary>
+        /// Prepends a node list to the input section of a RuleNode.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/>
+        /// is not a <see cref="RuleNode" />.</exception>
+        let prependToRule rule headPosition nodes =
+            match Node.untag rule with
+            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
+                Node.tag (RuleNode (lineNumber, ruleTokens, nodes @ input, output, environment)) headPosition
+            | _ ->
+                invalidArg "rule" "Must be a RuleNode"
+
+        /// <summary>
+        /// Prepends a node list to the initial CompoundSetIdentifierNode of the input section of a RuleNode.
+        /// </summary>
+        /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
+        /// or when the first element of the input section is not a <see cref="CompoundSetIdentifierNode" />.</exception>
+        let prependToRuleSetIdentifier rule headPosition nodes =
+            match Node.untag rule with
+            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
+                match Node.untag input.Head with
+                | CompoundSetIdentifierNode identifiers ->
+                    Node.tag
+                        (RuleNode
+                            (lineNumber,
+                            ruleTokens,
+                            Node.tag (CompoundSetIdentifierNode (nodes @ identifiers)) headPosition :: input.Tail,
+                            output,
+                            environment))
+                        headPosition
+                | _ ->
+                    invalidArg "rule" "First element of the input section must be a CompoundSetIdentifierNode"
+            | _ ->
+                invalidArg "rule" "Must be a RuleNode"
+                    
+        /// <summary>
+        /// Matches a feature definition.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        let matchFeature tokens headPosition identifier =
+            let tokens, _ = matchToken tokens Equals
+            let tokens, openToken = matchOneOf tokens [ LBrace; LParen ]
+            let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
+            let tokens, memberList = matchMemberList closeToken tokens
+            let (_, Line lineNumber, _) = headPosition
+            tokens, Node.tag (FeatureDefinitionNode (lineNumber, identifier.value, memberList)) headPosition
+
+
+        /// <summary>
+        /// Matches either a <see cref="FeatureDefinitionNode" />, a <see cref="CompoundSetIdentifierNode" />
+        /// or a <see cref="RuleNode" />.
+        /// </summary>
+        /// <remarks>
+        /// LBrack '[' is parsed just before entering this function.
+        /// </remarks>
+        /// <param name="tokens">The list of tokens.</param>
+        let rec matchFeature_SetIdentifier_Rule tokens headPosition identifier =
+            match tokens with
+            | [] ->
+                invalidSyntax "Expected feature identifier term, identifier or ']'; got end of file" _position
+            | NewlineWhitespace _::_ ->
+                invalidSyntax "Expected '+', '-', ']' or an identifier; got end of line" _position
+            | NonNewlineWhitespace _::xs ->
+                matchFeature_SetIdentifier_Rule xs headPosition identifier
+            | OfType Plus _::_
+            | OfType Minus _::_ ->
+                let tokens, theSet = matchRuleStartingWithSetIdentifier tokens headPosition
+                identifier
+                // '[' Id [ '+' | '-' ] -> RuleNode (id :: input, output, environment)
+                |> Option.map (fun i -> tokens, prependToRuleSetIdentifier theSet headPosition [ Node.tag (SetIdentifierNode i.value) i.position ])
+                // '[' [ '+' | '-' ] -> RuleNode (...)
+                |> Option.defaultWith (fun _ -> tokens, theSet)
+            | OfType RBrack x::xs ->
+                identifier
+                // '[' Id ']' -> FeatureDefinitionNode Id.name nodeList
+                |> Option.map (fun i -> matchFeature xs headPosition i)
+                // '[' ']' -> syntax error
+                |> Option.defaultWith (fun _ -> unexpectedToken [Id] x)
+            | OfType Id idToken::xs ->
+                identifier
+                // '[' Id Id -> RuleNode ((Id :: (Id :: setIdentifier)) :: input.Tail, output, environment)
+                |> Option.map (fun i ->
+                    let tokens, ruleNode = matchRule tokens idToken.position
+                    tokens, prependToRule ruleNode headPosition
+                        [ Node.tag (SetIdentifierNode i.value) i.position
+                          Node.tag (SetIdentifierNode idToken.value) idToken.position
+                        ])
+                // Store first identifier and see what we get next
+                |> Option.defaultWith (fun _ ->
+                    tokenBuffer.Add idToken
+                    matchFeature_SetIdentifier_Rule xs headPosition (Some idToken))
+            | x::_ ->
+                unexpectedToken [ Plus; Minus; Id ] x
+
+        let matchSyllableRule tokens =
+            let tokens, _ = matchToken tokens Equals
+            matchRuleSection tokens
+
+        /// <summary>
+        /// Determines which rule to match to the available tokens.
+        /// </summary>
+        /// <param name="tokens">The list of tokens.</param>
+        /// <exception cref="SyntaxException">No rule matches the available tokens.</exception>
+        let rec nextInternal tokens =
+            try
+                _position <-
+                    match tokens with
+                    | [] -> _position
+                    | x:: _ -> x.position
+
+                match tokens with
+                | [] ->
+                    Result.Error (syntaxErrorMessage "End of file" _position)
+                | OfType Whitespace _::xs ->
+                    nextInternal xs
+                | OfType Comment x::xs ->
+                    Ok (xs, Node.tag (CommentNode x.value) x.position)
+                | OfType Empty x::_
+                | OfType Divider x::_
+                | OfType Utterance x::_
+                | OfType LParen x::_
+                | OfType Not x::_ ->
+                    tokenBuffer.Clear()
+                    Ok (matchRule tokens x.position)
+                | OfType Id x::xs ->
+                    tokenBuffer.Clear()
+                    tokenBuffer.Add x
+                    Ok (matchSet_Rule xs x)
+                | OfType LBrack x::xs ->
+                    tokenBuffer.Clear()
+                    tokenBuffer.Add x
+                    Ok (matchFeature_SetIdentifier_Rule xs x.position None)
+                | x::_ ->
+                    Result.Error (syntaxErrorMessage (sprintf "Unexpected token '%s'" x.value)  _position)
+            with
+                Exceptions.SyntaxError (message, offset, row, col) ->
+                    Result.Error (syntaxErrorMessage message (offset, row, col))
+   
+        nextInternal tokens
+
+    /// <summary>
+    /// Parses a list of tokens to a list of nodes.
+    /// </summary>
+    /// <param name="tokens">The list of tokens to parse.</param>
+    let private parseInternal tokenBuffer tokens =
+        let rec inner tokens out =
+            match tokens with
+            | [] ->
+                Ok (List.rev out)
+            | _ ->
+                match next tokenBuffer tokens with
+                | Ok (nextTokens, node) ->
+                    inner nextTokens (node :: out)
+                | Result.Error message ->
+                    Result.Error message
+        inner tokens []
+
+    [<CompiledName("Parse")>]
+    let parse inputFormat content =
+        let tokens =
+            match lex inputFormat content with
+            | SyntaxError (msg, Offset offset, Line row, Column col) ->
+                Result.Error (sprintf "Syntax error at row %d column %d (offset %d): %s" row col offset msg)
+            | OK tokens ->
+                Result.Ok tokens
+
+        let nodes =
+            tokens
+            |> Result.bind (parseInternal (new System.Collections.Generic.List<Token>()))
+            |> Result.bind SyntaxAnalyzer.validate
+            |> Result.bind (Node.untagAll >> Ok)
+
+        let syllableDefinitions =
+            nodes
+            |> Result.map (List.collect (function
+                | SyllableDefinitionListNode (line, definitions) -> definitions
+                | _ -> []))
+
+        let features = Result.map Node.getFeatures nodes
+        let sets = Result.map Node.getSets nodes
+
+        let rules =
+            nodes
+            |> Result.bind (Ok << List.choose (function
+                | RuleNode _ as x -> Some x
+                | _ -> None))
+
+        match syllableDefinitions, features, sets, rules with
+        | _, _, _, (Result.Error msg)
+        | _, _, (Result.Error msg), _
+        | _, (Result.Error msg), _, _
+        | (Result.Error msg), _, _, _ ->
+            Result.Error msg
+        | Ok (syllableDefinition), (Ok features), (Ok sets), (Ok rules) ->
+            // Resolve references to other sets and features
+            let resolvedFeatures =
+                features
+                |> Map.toList
+                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+                |> Map.ofList
+
+            let resolvedSets =
+                sets
+                |> Map.toList
+                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+                |> Map.ofList
+
+            Ok (ParseResult (resolvedSets, resolvedFeatures, syllableDefinition, rules))
+
+#if !FABLE_COMPILER
+    let parseStreamReader inputFormat (reader: StreamReader) =
+        let content = reader.ReadToEnd()
+        parse inputFormat content
+
+    let parseTextReader inputFormat (reader: TextReader) =
+        let content = reader.ReadToEnd()
+        parse inputFormat content
+
+    let parseStream inputFormat (stream: Stream) =
+        use reader = new StreamReader(stream)
+        let content = reader.ReadToEnd()
+        parse inputFormat content
+
+    let parseFile inputFormat (path: string) =
+        use reader = new StreamReader(path, true)
+        parseStreamReader inputFormat reader
+#endif
