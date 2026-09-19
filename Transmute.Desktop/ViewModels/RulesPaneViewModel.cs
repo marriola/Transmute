@@ -100,6 +100,9 @@ namespace Transmute.Desktop.ViewModels
         [ObservableProperty]
         public partial bool CanGoForward { get; set; } = false;
 
+        [ObservableProperty]
+        public partial bool IpaFix { get; set; } = true;
+
         public bool IsLoading { get; set; }
 
         public (int line, int position) NavigateBack()

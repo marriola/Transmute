@@ -27,7 +27,10 @@ namespace Transmute.Desktop.Services
 
         public event ThemeChangeEventHandler ThemeChange;
 
-        public Configuration Configuration { get; private set; } = new Configuration();
+        public Configuration Configuration { get; private set; } = new Configuration
+        {
+            SilIpaFix = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+        };
 
         public bool IsNew { get; private set; } = true;
 

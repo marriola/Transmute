@@ -25,6 +25,11 @@ namespace Transmute.Desktop.Models
         public bool WordWrap { get; set; } = true;
 
         /// <summary>
+        /// Inserts a space when using the SIL IPA keyboard layout and the space key registers, but isn't added to the text.
+        /// </summary>
+        public bool SilIpaFix { get; set; }
+
+        /// <summary>
         /// Rules font
         /// </summary>
         public string RulesFontFamily { get; set; }

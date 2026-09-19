@@ -398,6 +398,18 @@ public partial class RulesPane : UserControl
 
     private void Rules_KeyDown(object? sender, KeyEventArgs e)
     {
+        if (ViewModel.IpaFix && e.PhysicalKey == PhysicalKey.Space && e.KeySymbol == null)
+        {
+            // Workaround for space key not registering when using the IPA (SIL) keyboard layout for Keyman
+
+            ViewModel.Rules.Text = ViewModel.Rules.Text.Insert(Rules.CaretOffset, " ");
+
+            if (Rules.CaretOffset < ViewModel.Rules.Text.Length)
+            {
+                Rules.CaretOffset += 1;
+            }
+        }
+
         ViewModel.UpdateRulesPosition(Rules.CaretOffset);
         UpdateSelectedRule();
     }

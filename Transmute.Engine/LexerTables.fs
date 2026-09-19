@@ -171,7 +171,6 @@ module private LexerTables =
               // Utterance
 
               makeTransitions (From START) beginUtteranceTransitions
-              makeTransitions (From Q_Not) beginUtteranceTransitions
               makeTransitions (From Q_Utterance) utteranceTransitions
               makeTransitions (From Q_Utterance) [ To Q_UtteranceFinal, OnEpsilon ]
 

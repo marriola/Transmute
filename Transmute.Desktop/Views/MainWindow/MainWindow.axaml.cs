@@ -43,9 +43,16 @@ namespace Transmute.Desktop.Views
 
         private Size _previousSize;
 
+        private TextBox? _focusedEditor = null;
+
         public MainWindow()
         {
             InitializeComponent();
+
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            {
+                IpaSilFix.IsVisible = false;
+            }
         }
 
         internal bool ShowNativeMenu => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -272,8 +279,10 @@ namespace Transmute.Desktop.Views
             _configurationService.ChangeTheme(themeVariant);
         }
 
-        private TextBox? _focusedEditor = null;
-
+        public async Task ToggleFix()
+        {
+            _configurationService.Configuration.SilIpaFix = ViewModel.RulesPaneViewModel.IpaFix = !ViewModel.RulesPaneViewModel.IpaFix;
+        }
         protected override void OnLoaded(RoutedEventArgs e)
         {
             base.OnLoaded(e);
@@ -282,6 +291,8 @@ namespace Transmute.Desktop.Views
             {
                 return;
             }
+
+            ViewModel.RulesPaneViewModel.IpaFix = _configurationService.Configuration.SilIpaFix;
 
             this.GetObservable(WindowStateProperty).Subscribe(ws =>
             {
