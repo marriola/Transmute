@@ -58,7 +58,21 @@ svg {
   height: auto;
   max-width: 100%;
 }
-h1, h2, h3, h4, h5, h6 {
+h1:first-of-type {
+	background: darkslategray;
+	box-shadow: -5px 5px 5px #181818;
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	padding: 5px;
+	margin: 0;
+}
+html[data-scheme="light"] h1:first-of-type {
+	box-shadow: -5px 5px 5px gray;
+	color: #d0c8c8;
+}
+h1:not(:first-of-type), h2, h3, h4, h5, h6 {
   margin-top: 1.4em;
 }
 h5, h6 {
