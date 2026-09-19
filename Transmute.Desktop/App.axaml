@@ -1,0 +1,53 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Transmute.Desktop.App"
+             xmlns:local="using:Transmute.Desktop"
+             xmlns:dialogHostAvalonia="clr-namespace:DialogHostAvalonia;assembly=DialogHost.Avalonia"
+             xmlns:ip="https://github.com/MahApps/IconPacks.Avalonia"
+             RequestedThemeVariant="Default">
+             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+
+    <Application.DataTemplates>
+        <local:ViewLocator/>
+    </Application.DataTemplates>
+
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked">Black</SolidColorBrush>
+                    <SolidColorBrush x:Key="HyperlinkColor">#0606e0</SolidColorBrush>
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked">White</SolidColorBrush>
+                    <SolidColorBrush x:Key="HyperlinkColor">#00cde0</SolidColorBrush>
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+
+    <Application.Styles>
+        <Style Selector="AdornerLayer">
+            <Setter Property="DefaultFocusAdorner">
+                <FocusAdornerTemplate>
+                    <!--<Border BorderThickness="1.5" BorderBrush="#CCCCCC" />-->
+                    <Rectangle Margin="0" 
+                               Stroke="#CCCCCC" 
+                               StrokeDashArray="1" 
+                               StrokeThickness="1" /> 
+                </FocusAdornerTemplate>
+            </Setter>
+        </Style>
+        <Style Selector="HyperlinkButton">
+            <Setter Property="Foreground" Value="{DynamicResource HighlightBrush}" />
+        </Style>
+        <Style Selector="GridSplitter">
+			    <Setter Property="Background" Value="SlateGray" />
+			    <Setter Property="MinWidth" Value="3" />
+			    <Setter Property="MaxWidth" Value="3" />
+        </Style>
+        <SimpleTheme />
+        <StyleInclude Source="avares://AvaloniaEdit/Themes/Simple/AvaloniaEdit.xaml" />
+        <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Simple.xaml" />
+    </Application.Styles>
+</Application>

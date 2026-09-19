@@ -7,12 +7,13 @@
 namespace TransmuteLib
 
 open TransmuteLib.StateMachine
-open TransmuteLib.Utils.Operators
 
 module internal Transducer =
     /// An input symbol tagged with the action taken to transform it, the result, and the information needed to undo it.
     type internal BufferString =
         | Unchanged of position: int * symbol: string
+        /// A tone diacritic was not explicitly matched, but is being included anyway
+        | Captured of position: int * diacriticSymbol: string
         | Replaced of position: int * symbol: string * original: string
         | Inserted of position: int * symbol: string
         | Deleted of position: int * count: int * symbol: string
@@ -25,6 +26,7 @@ module internal Transducer =
             /// Gets the symbol.
             static member getText = function
                 | Unchanged (_, s)
+                | Captured (_, s)
                 | Replaced (_, s, _)
                 | Inserted (_, s)
                 | Deleted (_, _, s) -> s
@@ -32,6 +34,7 @@ module internal Transducer =
             /// Gets the original untransformed symbol.
             static member getOriginal = function
                 | Unchanged (_, s)
+                | Captured (_, s)
                 | Inserted (_, s)
                 | Deleted (_, _, s) ->
                     s
@@ -40,7 +43,8 @@ module internal Transducer =
 
             /// Gets the difference in length between the result of the change and the original symbol
             static member getLengthDifference = function
-                | Unchanged _ -> 0
+                | Unchanged _
+                | Captured _ -> 0
                 | Inserted (_, s) -> s.Length
                 | Deleted (_, _, s) -> -(s.Length)
                 | Replaced (_, replacement, original) -> replacement.Length - original.Length
@@ -48,6 +52,7 @@ module internal Transducer =
             /// Replaces the original symbol.
             static member withText (text: string) = function
                 | Unchanged (p, _) -> Unchanged (p, text)
+                | Captured (p, _) -> Captured (p, text)
                 | Replaced (p, s, _) -> Replaced (p, s, text)
                 | Inserted (p, _) -> Inserted (p, text)
                 | Deleted (p, _, _) -> Deleted (p, text.Length, text)
@@ -55,6 +60,7 @@ module internal Transducer =
             /// Replaces the symbol position.
             static member withPosition p = function
                 | Unchanged (_, s) -> Unchanged (p, s)
+                | Captured (_, s) -> Captured (p, s)
                 | Replaced (_, s, r) -> Replaced (p, s, r)
                 | Inserted (_, s) -> Inserted (p, s)
                 | Deleted (_, c, s) -> Deleted (p, c, s)
@@ -62,6 +68,7 @@ module internal Transducer =
             /// Gets the symbol position.
             static member getPosition = function
                 | Unchanged (p, _)
+                | Captured (p, _)
                 | Replaced (p, _, _)
                 | Inserted (p, _)
                 | Deleted (p, _, _) ->
@@ -73,6 +80,18 @@ module internal Transducer =
                 | ReplacesWith (count, s) ->
                     // If this is a non-initial part of a multi-character match, drop the last replacement
                     // and combine the contents of both.
+                    let diacriticIndexes =
+                        value.buffer
+                        |> Seq.rev
+                        |> Seq.indexed
+                        |> Seq.choose (fun (i, sym) ->
+                            match sym with
+                            | Captured (_, d) -> Some (i, d)
+                            | _ -> None)
+                        |> Seq.toList
+                    let (count, s) =
+                        ((count, s), diacriticIndexes)
+                        ||> List.fold (fun (count, s) (i, d) -> count + 1, s.Insert(i, d))
                     let bufferLength = List.length value.buffer
                     let skip = min bufferLength count
                     let nextProduction = Replaced (position, s, string symbol) :: value.buffer
@@ -121,6 +140,7 @@ module internal Transducer =
                 xs
                 |> List.choose (function
                     | Unchanged (_, s)
+                    | Captured (_, s)
                     | Replaced (_, _, s)
                     | Deleted (_, _, s) ->
                         Some s
@@ -132,6 +152,7 @@ module internal Transducer =
                 xs
                 |> List.choose (function
                     | Unchanged (_, s)
+                    | Captured (_, s)
                     | Replaced (_, s, _)
                     | Inserted (_, s) ->
                         Some s
@@ -152,8 +173,8 @@ module internal Transducer =
                         |> BufferString.getPosition
                     let ysText =
                         ys
-                        |> List.map BufferString.getOriginal
-                        |> List.rev
+                        |> Seq.map BufferString.getOriginal
+                        |> Seq.rev
                         |> String.concat ""
                     // Add the updated head and skip the strings we just processed
                     let offset =
@@ -171,10 +192,10 @@ module internal Transducer =
                 // through the list.
                 let totalDifference, changes =
                     xs
-                    |> List.filter BufferString.isMutation
-                    |> List.map (fun bs -> BufferString.getPosition bs, BufferString.getLengthDifference bs)
-                    |> List.rev
-                    |> List.fold (fun (totalDifference, acc) (position, difference) ->
+                    |> Seq.filter BufferString.isMutation
+                    |> Seq.map (fun bs -> BufferString.getPosition bs, BufferString.getLengthDifference bs)
+                    |> Seq.rev
+                    |> Seq.fold (fun (totalDifference, acc) (position, difference) ->
                         let acc = (position + offset + totalDifference) :: acc
                         let totalDifference = totalDifference + difference
                         totalDifference, acc) (0, [])
@@ -208,7 +229,7 @@ module internal Transducer =
     /// <param name="verbose">If true, displays the state of the state machine at each step.</param>
     /// <param name="rule">The rule to apply.</param>
     /// <param name="word">The word to transform.</param>
-    let private transformInternal reportChangeLocations verbose (segmentLocations, segmentedWord) rule word =
+    let private transformInternal reportChangeLocations verbose segmentedWord rule word =
         // Debug output columns
         //  is valid transition
         //  position in word
@@ -225,6 +246,7 @@ module internal Transducer =
         |> withTransitions transitions
         |> withStartState RuleCompiler.START
         |> withErrorState RuleCompiler.ERROR
+        |> captureToneDiacritics
         |> withInitialValue
             { isPartialMatch = false
               wasLastFinal = false
@@ -245,7 +267,10 @@ module internal Transducer =
                         BufferString.apply value.buffer @ value.output
                     else
                         // The rule failed to match
-                        BufferString.undo value.buffer @ value.output
+                        let s = BufferString.undo value.buffer @ value.output
+                        match value.buffer with
+                        | Captured _ :: _ when not (Special.Symbols.Contains input) -> string input :: s
+                        | _ -> s
                 else
                     // The rule has not yet begun to match.
                     if Special.Symbols.Contains input then
@@ -305,6 +330,9 @@ module internal Transducer =
                     // Make sure X-SAMPA underscore inside a deletion also gets deleted
                     BufferString.addProduction position value symbol (Deletes (1, "_"))
 
+                | None when Special.ToneDiacritics.Contains symbol ->
+                    Captured (position, string symbol) :: production
+
                 | None when not (Special.Symbols.Contains symbol) ->
                     Unchanged (position, string symbol) :: production
 
@@ -333,7 +361,7 @@ module internal Transducer =
                     let out = BufferString.undo value.buffer @ value.output
                     out, value.locations
                     //value.output, value.locations
-            let output = outputBuffer |> List.rev |> String.concat ""
+            let output = outputBuffer |> Seq.rev |> String.concat ""
             output, locations)
         |> runDFA (string Special.WORD_START_BOUNDARY + segmentedWord + string Special.WORD_END_BOUNDARY)
 
@@ -345,37 +373,3 @@ module internal Transducer =
     /// Applies a rule to a word, returning locations where the rule applied along with the new word.
     let transformWithChangeLocations verbose syllableBoundaryLocations rule word =
         transformInternal true verbose syllableBoundaryLocations rule word
-
-    let getIpaChangeLine ruleNum (changes: int list) (result: string) =
-        let result = result |> List.ofSeq
-    
-        // Insert a combining long underline after each change, but if there's a deletion at the end, put a regular underscore there
-        let deletionAtEnd, changes =
-            changes
-            |> List.rev
-            |> List.partition ((<=) result.Length)
-        let outChars =
-            let chars =
-                (result, changes)
-                ||> List.fold (fun result location -> List.insertAt (location + 1) '\u0332' result)
-            if List.isEmpty deletionAtEnd then
-                chars
-            else
-                chars @ ['_']
-
-        let out = System.String.Join("", outChars)
-
-        [ $"%3d{ruleNum}: {out}" ]
-
-    let getXsampaChangeLine ruleNum (changes: int list) (result: string) = 
-        let maxIndex = List.max changes + 1
-
-        let changeLine =
-            Array.create maxIndex ' '
-            |> Array.mapi (fun i _ -> if List.contains i changes then "^" else " ")
-            |> String.concat ""
-
-        [
-            $"%3d{ruleNum}: {result}"
-            String.indent 5 changeLine
-        ]

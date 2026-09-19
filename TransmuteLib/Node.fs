@@ -6,7 +6,6 @@
 
 namespace TransmuteLib
 
-open System.Collections.Generic
 open TransmuteLib.ExceptionHelpers
 open TransmuteLib.Position
 
@@ -41,16 +40,16 @@ type Node =
     | SyllableBoundaryNode of boundaryType: SyllableBoundaryType
 
     /// Represents a phonological rule.
-    | RuleNode of lineNumber: int * input:Node list * output:Node list * environment:Node list
+    | RuleNode of lineNumber: int * text: string * input:Node list * output:Node list * environment:Node list
 
     /// Defines a set of utterances.
-    | SetDefinitionNode of name:string * members:Node list
+    | SetDefinitionNode of lineNumber: int * name:string * members:Node list
 
     /// Defines a transformation from one phoneme to another.
     | TransformationNode of input:Node * output:Node
 
     /// Defines a set of phonemes possessing this feature and transformations on it.
-    | FeatureDefinitionNode of name:string * members:Node list
+    | FeatureDefinitionNode of lineNumber: int * name:string * members:Node list
 
     /// Defines a list of nodes that may be optionally matched.
     | OptionalNode of Node list
@@ -62,7 +61,7 @@ type Node =
     | NegationNode of Node
 
     /// Defines the rule used by the syllable boundary detector.
-    | SyllableDefinitionNode of onset: Node list * nucleus: Node list * coda: Node list
+    | SyllableDefinitionNode of lineNumber: int * onset: Node list * nucleus: Node list * coda: Node list
 
     | SyllableDefinitionListNode of lineNumber: int * definitions: Node list
 
@@ -77,14 +76,14 @@ type Node =
             node.ToString()
         | PlaceholderNode -> "_"
         | WordBoundaryNode -> "#"
-        | SyllableBoundaryNode SyllableStart 
-        | SyllableBoundaryNode SyllableEnd -> "σ"
-        | SyllableBoundaryNode OnsetStart
-        | SyllableBoundaryNode OnsetEnd -> "Onset"
-        | SyllableBoundaryNode NucleusStart
-        | SyllableBoundaryNode NucleusEnd -> "Nucleus"
-        | SyllableBoundaryNode CodaStart
-        | SyllableBoundaryNode CodaEnd -> "Coda"
+        | SyllableBoundaryNode SyllableStart -> "SyllableStart"
+        | SyllableBoundaryNode SyllableEnd -> "SyllableEnd"
+        | SyllableBoundaryNode OnsetStart -> "OnsetStart"
+        | SyllableBoundaryNode OnsetEnd -> "OnsetEnd"
+        | SyllableBoundaryNode NucleusStart -> "NucleusStart"
+        | SyllableBoundaryNode NucleusEnd -> "NucleusEnd"
+        | SyllableBoundaryNode CodaStart -> "CodaStart"
+        | SyllableBoundaryNode CodaEnd -> "CodaEnd"
         | CommentNode text -> sprintf "; %s" text
         | UtteranceNode value
         | SetIdentifierNode value
@@ -101,14 +100,14 @@ type Node =
             |> List.map string
             |> String.concat " "
             |> sprintf "[%s]"
-        | SetDefinitionNode (name, members) ->
+        | SetDefinitionNode (lineNumber, name, members) ->
             members
             |> List.map string
             |> String.concat " "
             |> sprintf "%s { %s }" name
         | TransformationNode (input, output) ->
             sprintf "%s → %s" (string input) (string output)
-        | FeatureDefinitionNode (name, members) ->
+        | FeatureDefinitionNode (lineNumber, name, members) ->
             members 
             |> List.map string
             |> String.concat "; "
@@ -129,18 +128,8 @@ type Node =
             |> sprintf "( %s )"
         | NegationNode node ->
             sprintf "!%O" node
-        | RuleNode (_, input, output, environment) ->
-            let environmentSection =
-                match environment with
-                | [PlaceholderNode] -> ""
-                | _ -> sprintf " / %s" (stringifyList environment)
-
-            sprintf "%s → %s%s"
-                (if input = [] then "Ø" else stringifyList input)
-                // I know this technically isn't the empty set symbol, but the actual one doesn't display
-                // in the DOS console in any of the fonts I tried, and anyway it's not a proper IPA symbol.
-                (if output = [] then "Ø" else stringifyList output)
-                environmentSection
+        | RuleNode (_, text, _, _, _) ->
+            text
 
 and SyllableBoundaryType =
     | SyllableStart
@@ -168,12 +157,17 @@ module SyllableBoundaryType =
     // key[1]   false = token was found in the input section, true = token was found in the environment section
 
     let NameToBoundaryType = Map.ofList [
-        ("onset", false), OnsetEnd
+        ("syllablestart", true), SyllableStart
+        ("syllablestart", false), SyllableStart
+        ("syllableend", true), SyllableEnd
+        ("syllableend", false), SyllableEnd
+
         ("onset", true), OnsetStart
-        ("nucleus", false), NucleusEnd
+        ("onset", false), OnsetEnd
         ("nucleus", true), NucleusStart
-        ("coda", false), CodaEnd
+        ("nucleus", false), NucleusEnd
         ("coda", true), CodaStart
+        ("coda", false), CodaEnd
 
         ("onsetstart", false), OnsetStart
         ("onsetstart", true), OnsetStart
@@ -202,14 +196,14 @@ module Node =
         | x ->
             x
         |> function
-            | RuleNode (lineNumber, input, output, environment) ->
-                RuleNode (lineNumber, untagAll input, untagAll output, untagAll environment)
+            | RuleNode (lineNumber, tokens, input, output, environment) ->
+                RuleNode (lineNumber, tokens, untagAll input, untagAll output, untagAll environment)
             | CompoundSetIdentifierNode xs ->
                 CompoundSetIdentifierNode (untagAll xs)
-            | SetDefinitionNode (name, members) ->
-                SetDefinitionNode (name, untagAll members)
-            | FeatureDefinitionNode (name, members) ->
-                FeatureDefinitionNode (name, untagAll members)
+            | SetDefinitionNode (lineNumber, name, members) ->
+                SetDefinitionNode (lineNumber, name, untagAll members)
+            | FeatureDefinitionNode (lineNumber, name, members) ->
+                FeatureDefinitionNode (lineNumber, name, untagAll members)
             | TransformationNode (input, output) ->
                 TransformationNode (untag input, untag output)
             | OptionalNode xs ->
@@ -232,8 +226,11 @@ module Node =
 
     let getLine node =
         match node with
+        | SetDefinitionNode (line, _, _)
+        | FeatureDefinitionNode (line, _, _)
+        | SyllableDefinitionNode (line, _, _, _)
         | SyllableDefinitionListNode (line, _)
-        | RuleNode (line, _, _, _) -> line
+        | RuleNode (line, _, _, _, _) -> line
         | _ ->
             failwithf "Expected RuleNode or SyllableDefinitionListNode, got %O" node
 
@@ -263,8 +260,8 @@ module Node =
             value
         | FeatureIdentifierNode (_, name) ->
             name
-        | SetDefinitionNode (name, _) 
-        | FeatureDefinitionNode (name, _) ->
+        | SetDefinitionNode (lineNumber, name, _) 
+        | FeatureDefinitionNode (lineNumber, name, _) ->
             name
         | _ ->
             invalidArg "this" "Must be one of UtteranceNode, CommentNode, SetIdentifierNode, TermIdentifierNode"
@@ -278,14 +275,14 @@ module Node =
         |> List.choose
             (fun x ->
                 match untag x with
-                | FeatureDefinitionNode (name, _) as node ->
+                | FeatureDefinitionNode (_, name, _) as node ->
                     Some (name, node)
                 | _ -> None)
         |> Map.ofSeq
 
     let getMembers feature =
         match feature with
-        | FeatureDefinitionNode (_, members) ->
+        | FeatureDefinitionNode (_, _, members) ->
             members
         | _ ->
             invalidArg "feature" "Must be a FeatureDefinitionNode"
@@ -298,7 +295,7 @@ module Node =
         nodes
         |> List.choose
             (function
-                | SetDefinitionNode (name, _) as node -> Some (name, node)
+                | SetDefinitionNode (_, name, _) as node -> Some (name, node)
                 | _ -> None)
         |> Map.ofList
 
@@ -367,12 +364,12 @@ module Node =
     /// <param name="theSet"></param>
     let getSetMembers setNode =
         match untag setNode with
-        | SetDefinitionNode (_, members) ->
+        | SetDefinitionNode (_, _, members) ->
             members
             |> List.choose (function
                 | UtteranceNode x -> Some x
                 | _ -> None)
-        | FeatureDefinitionNode (_, members) ->
+        | FeatureDefinitionNode (_, _, members) ->
             members
             |> List.choose (function
                 | UtteranceNode x -> Some x
@@ -383,8 +380,8 @@ module Node =
 
     let getMemberNodes node =
         match node with
-        | SetDefinitionNode (_, members)
-        | FeatureDefinitionNode (_, members) ->
+        | SetDefinitionNode (_, _, members)
+        | FeatureDefinitionNode (_, _, members) ->
             members
             |> List.choose (function
                 | SetIdentifierNode _ -> None
@@ -497,8 +494,8 @@ module Node =
         let rec resolveReferences' visited node =
             let references, members =
                 match node with
-                | SetDefinitionNode (_, members)
-                | FeatureDefinitionNode (_, members) ->
+                | SetDefinitionNode (_, _, members)
+                | FeatureDefinitionNode (_, _, members) ->
                     members
                     |> List.partition (function
                         | SetIdentifierNode _
@@ -546,8 +543,8 @@ module Node =
                 |> Set.ofList
                 |> Set.toList
             match node with
-            | SetDefinitionNode (name, _) ->
-                SetDefinitionNode (name, members @ referenceMembers)
-            | FeatureDefinitionNode (name, _) ->
-                FeatureDefinitionNode (name, members @ referenceMembers)
+            | SetDefinitionNode (lineNumber, name, _) ->
+                SetDefinitionNode (lineNumber, name, members @ referenceMembers)
+            | FeatureDefinitionNode (lineNumber, name, _) ->
+                FeatureDefinitionNode (lineNumber, name, members @ referenceMembers)
         resolveReferences' Set.empty node

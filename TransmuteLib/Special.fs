@@ -54,7 +54,29 @@ module private Special =
         CODA_END_BOUNDARY
     ]
 
+    let SymbolNames =
+        [ WORD_START_BOUNDARY, "WordStart"
+          SYLLABLE_START_BOUNDARY, "SyllableStart"
+          ONSET_START_BOUNDARY, "OnsetStart"
+          ONSET_END_BOUNDARY, "OnsetEnd"
+          NUCLEUS_START_BOUNDARY, "NucleusStart"
+          NUCLEUS_END_BOUNDARY, "NucleusEnd"
+          CODA_START_BOUNDARY, "CodaStart"
+          CODA_END_BOUNDARY, "CodaEnd"
+          SYLLABLE_END_BOUNDARY, "SyllableEnd"
+          WORD_END_BOUNDARY, "WordEnd" ]
+        |> dict
+
+    let Diacritics = set <| seq { '\u0300'..'\u0341' }
+    let ToneDiacritics = set "\u0300\u0301\u0302\u0304\u030b\u030c\u030f"
+
     let Symbols = Set.unionMany [
         WordBoundarySymbols
         SyllableBoundarySymbols
     ]
+
+    /// Wraps a word with word start and word end boundary symbols.
+    let wrapWord word = string WORD_START_BOUNDARY + word + string WORD_END_BOUNDARY
+
+    /// Removes word start and end boundary symbols from a word.
+    let unwrapWord (word: string) = word.Replace(string WORD_START_BOUNDARY, "").Replace(string WORD_END_BOUNDARY, "")

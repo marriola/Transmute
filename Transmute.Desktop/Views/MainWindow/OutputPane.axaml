@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:uc="using:Transmute.Desktop.Views"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:m="using:Transmute.Desktop.Models"
+             xmlns:vm="using:Transmute.Desktop.ViewModels"
+             xmlns:te="using:TransmuteLib"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:DataType="vm:OutputPaneViewModel"
+             x:Name="OutputPanel"
+             x:Class="Transmute.Desktop.Views.OutputPane">
+    
+    <Design.DataContext>
+        <vm:OutputPaneViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+		<TabStrip DockPanel.Dock="Top">
+			<TabStripItem IsSelected="{Binding ShowOutputLexicon}"
+                          Content="Results"
+                          ToolTip.Tip="Shift+Alt+R" />
+			<TabStripItem IsSelected="{Binding ShowLexiconChanges}"
+                          Content="Changes"
+                          ToolTip.Tip="Alt+C" />
+        </TabStrip>
+
+        <Panel DockPanel.Dock="Bottom">
+    		<TextBox Name="OutputLexicon"
+                     Classes="multiline"
+                     IsVisible="{Binding ShowOutputLexicon}"
+                     AcceptsReturn="true"
+                     IsReadOnly="True"
+                     ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility}"
+                     ClearSelectionOnLostFocus="False"
+                     Text="{Binding OutputLexicon}" />
+                        
+            <DockPanel IsVisible="{Binding ShowLexiconChanges}"
+                       Margin="10">
+				<ComboBox Name="SelectedOutputWord"
+                          DockPanel.Dock="Top"
+                          Margin="0 0 0 10"
+                          IsTextSearchEnabled="True"
+                          ItemsSource="{Binding LexiconChangeList}"
+                          DisplayMemberBinding="{Binding Header}"
+                          SelectionChanged="ChangeList_SelectionChanged" />
+                <DataGrid DockPanel.Dock="Bottom"
+                          Name="LexiconChangesGrid"
+                          RowBackground="Transparent"
+                          Margin="10"
+                          IsReadOnly="True"
+                          CanUserReorderColumns="True"
+                          CanUserResizeColumns="True"
+                          GridLinesVisibility="All"
+                          BorderThickness="1" BorderBrush="Gray"
+                          ItemsSource="{Binding CurrentLexiconChange}">
+					<DataGrid.Columns>
+                        <DataGridTemplateColumn Header="Rule #">
+							<DataGridTemplateColumn.CellTemplate>
+								<DataTemplate DataType="te:LexiconChange">
+									<HyperlinkButton IsVisible="{Binding !isOriginal}"
+                                                     Content="{Binding ruleNumber}"
+                                                     Command="{Binding #OutputPanel.GoToDestination}"
+                                                     CommandParameter="{Binding ruleNumber}" />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTextColumn Header="Change" Binding="{Binding change}" IsReadOnly="True" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

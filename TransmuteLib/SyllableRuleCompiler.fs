@@ -6,6 +6,7 @@
 
 namespace TransmuteLib
 
+open TransmuteLib
 open TransmuteLib.RuleCombinators
 
 module internal SyllableRuleCompiler =
@@ -18,7 +19,7 @@ module internal SyllableRuleCompiler =
             features
             |> Map.map (fun _ feature ->
                 match feature with
-                | FeatureDefinitionNode (_, members) ->
+                | FeatureDefinitionNode (_, _, members) ->
                     members
                     |> List.map (fun item ->
                         match item with
@@ -32,7 +33,7 @@ module internal SyllableRuleCompiler =
             sets
             |> Map.map (fun _ set ->
                 match set with
-                | SetDefinitionNode (_, members) ->
+                | SetDefinitionNode (_, _, members) ->
                     members
                     |> List.map (fun (UtteranceNode utterance) -> utterance)
                     |> List.sortByDescending String.length)
@@ -86,6 +87,7 @@ module internal SyllableRuleCompiler =
                     rule
                     >> matchSymbols utterance
                     >> thenReplaceWithCopies label
+                    >> State.clearMatch
                     >> log i level $"/{utterance}/"
                     |> inner (i + 1) level rest
 
@@ -95,6 +97,7 @@ module internal SyllableRuleCompiler =
                     rule
                     >> matchOneOf setRules
                     >> thenReplaceWithCopies label
+                    >> State.clearMatch
                     >> log i level $"set {name}"
                     |> inner (i + 1) level rest
 
@@ -108,18 +111,19 @@ module internal SyllableRuleCompiler =
                     rule
                     >> matchOneOf phonemeRules
                     >> thenReplaceWithCopies label
+                    >> State.clearMatch
                     >> log i level (setDescriptor.ToString())
                     |> inner (i + 1) level rest
 
             inner 0 0 nodes rule
 
         match ruleNode with
-        | SyllableDefinitionNode (onset, nucleus, coda) ->
+        | SyllableDefinitionNode (_, onset, nucleus, coda) ->
             let rule =
-                (beginRule >> thenReplaceWith ".")
+                beginRule
                 |> build "O" (Node.untagAll onset)
                 |> build "N" (Node.untagAll nucleus)
                 |> build "C" (Node.untagAll coda)
                 >> endRule
 
-            State.wrap >> repeat rule >> State.unwrapRest
+            apply rule

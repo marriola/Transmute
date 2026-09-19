@@ -1,0 +1,345 @@
+$Syllable = (
+    $Onset = ((s | $Laryngeal)) ($C) ([C-Laryngeal])
+    $Nucleus = (") ([Overlong] | $V | [Syllabic] | $Laryngeal)
+    $Coda = ($C)($C) ([C-Glide])
+)
+
+; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ?, ?\ and ?\_w, respectively, on the basis that I think they're neat.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                        Rules                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+;;;;;;;;;;;;
+; Pre-PGmc ;
+;;;;;;;;;;;;
+
+; You can omit the environment section for unconditional rules.
+
+[+Palatalized] -> [-Palatalized]
+
+; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
+
+/ u / (#|[C-Laryngeal])(")_[+Syllabic](#|$C)
+[+Syllabic] -> [-Syllabic]
+
+[-Overlong] -> [+Overlong] / _#
+
+$Laryngeal // #_$C
+
+; e-coloring and dropping of laryngeals in onset
+
+e -> o / ?\_w(")_
+e -> a / ?\(")_
+$Laryngeal // _(")$V
+
+; Homorganic vowels in hiatus -> long vowel
+
+aa -> a::
+ee -> e::
+ii -> i::
+oo -> o::
+uu -> u::
+
+; e-coloring
+
+e -> o / _(w|j)?\_w
+e -> a / _(w|j)?\
+e?\_w -> o:
+e?\ -> A:
+
+; Compensatory lengthening with loss of laryngeals after sonorants
+
+[-Long]$Laryngeal -> [+Long] / _
+$Laryngeal // ($V|$Sonorant)_
+
+; Cowgill's law
+
+?\_w -> g / ($Sonorant)_w
+
+; Vocalization of remaining laryngeals
+
+$Laryngeal -> @
+
+
+;;;;;;;;;;;;;;
+; Early PGmc ;
+;;;;;;;;;;;;;;
+
+;[+Glide] -> [-Glide] / $V_$C
+
+; Sievers' law
+
+/ i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
+/ i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+
+(j|w) // _(e|a|o)#
+(e|a|o) // $C_#
+
+; Grimm's law: voiceless stops become fricatives, except after an obstruent
+
+[Stop-Voiced] -> [+Fricative] / (#|$V|$Sonorant)_
+;[Stop-Voiced] -> [+Fricative] / !($Obstruent)_
+
+; Undo Grimm's law after s-
+
+[+Fricative-Voiced] -> [-Fricative] / s _
+
+; Germanic spirant law
+
+[Stop+Labial] -> p\ / _(t|s) ;($C|$V)
+[Stop+Dental] -> ts / _(t|s) ;($C|$V)
+tst -> ss
+;tss -> ss
+ss -> s / _#
+[Stop+Velar] -> x / _(t|s)!#
+
+; Grimm's law: voiced unaspirated stops become voiceless stops
+
+[Stop +Voiced -Aspirated] -> [-Voiced] / _(#|(")$V|$C)
+
+; Grimm's law: aspirated stops become unaspirated
+
+[Stop+Aspirated] -> [-Aspirated]
+
+; Lenition of /g/ and intervocalic voiced stops
+
+g -> G / (#|$Liquid|$Fricative)_
+
+[Stop+Voiced] -> [+Fricative] / ($V|$Stressed|$Glide)_(#|$V|$Stressed|$Glide)
+
+; Verner's law
+
+[+Fricative-Voiced] → [+Voiced] / $NucleusStart [-Stressed] $CodaStart ![-Voiced] ($Sonorant) _ ![-Voiced]
+
+; Voiced fricatives resulting from Verner's law become stops after a nasal
+
+[+Fricative+Voiced] -> [-Fricative] / $Nasal_
+
+; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
+
+[+Stressed] -> [-Stressed]
+
+; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
+
+s -> z / $V(($Nasal|$Liquid))_#
+
+g_w -> b / #_
+
+nw -> nn
+ln -> ll
+zm -> mm
+
+e / i / $$_(#|$C)
+e / i / $$_(#|$C)
+(ei|ej) -> i:
+iji -> i:
+ij -> i: / _(C|#)
+i:i -> i:
+
+ji -> i / $V($C)($C)_(#|$C)
+
+(o|a) -> A
+
+;;;;;;;;;;;;;
+; Late PGmc ;
+;;;;;;;;;;;;;
+
+m -> n / _(#|$Dental)
+[-Nasalized]n -> [+Nasalized] / _#
+
+e~: -> A~:
+
+; Stressed schwa becomes /a/
+
+@ -> A / #(s)($C)($C)_
+
+; Unstressed schwa disappears between consonants
+
+@ // $C_$C
+@ -> A
+
+;t // $!"$V($C)_#
+t // $[V-Stressed]($C)_#
+gw -> g / n _
+G_w -> w
+
+A: -> O:
+A~: -> O~:
+
+e -> i / _n$C
+
+; Combined double transformation and deletion
+; 1. Nasalization and compensatory lengthening of a vowel
+; 2. Deletion of /n/
+
+[-Nasalized]n -> [+Nasalized +Long] / _x
+
+; Not really sure where this should go, so I'll just stick it at the end
+
+sr -> str
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                  Sets and features                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+$V = (
+    @
+    A   a   e   i   o       u
+    A:  a:  e:  i:  o:  O:  u:
+    A~  e~  i~  o~      u~
+    A~: e~: i~: o~: O~: u~:
+    Au eu
+)
+
+[Mid] = (e, o)
+[Round] = (o, u)
+[High] = (i, u)
+
+[Long] = (
+    A -> A:
+    a -> a:
+    e -> e:
+    i -> i:
+    o -> o:
+    u -> u:
+    O: 
+    A~ -> A~:
+    e~ -> e~:
+    i~ -> i~:
+    o~ -> o~:
+    u~ -> u~:
+    O~:
+)
+
+[Overlong] = (
+    a: -> a::
+    A: -> A::
+    A~: -> A~::
+    o: -> o::
+    O: -> O::
+    O~: -> O~::
+)
+
+[Nasalized] = (
+    A -> A~
+    e -> e~
+    i -> i~
+    o -> o~
+    u -> u~
+    A: -> A~:
+    e: -> e~:
+    i: -> i~:
+    o: -> o~:
+    u: -> u~:
+    A:: -> A~::
+    o:: -> o~::
+)
+
+; [Stressed] = "$V
+
+[Stressed] = (
+    a -> "a
+    a: -> "a:
+    A -> "A
+    A: -> "A:
+    Au -> "Au
+    e -> "e
+    e: -> "e:
+    eu -> "eu
+    i -> "i
+    i: -> "i:
+    o -> "o
+    o: -> "o:
+    O -> "O
+    O: -> "O:
+    u -> "u
+    u: -> "u:
+    @ -> "@
+    m -> "m=
+    n -> "n=
+    l -> "l=
+    r -> "r=
+)
+
+[Syllabic] = (
+    m -> m=
+    n -> n=
+    l -> l=
+    r -> r=
+)
+
+$Stop = (
+    k  k'  k_w  p  t
+    g  g'  g_w  b  d
+    g_h g'_h g_w_h b_h d_h
+)
+
+$Dental = (t, d, d_h, T, D, s, z)
+$Labial = (m, p, b, b_h, p\, B)
+$Labiovelar = (k_w, g_w, g_w_h, x_w, G_w)
+$Velar = (k, g, g_h, g'_h, x, G, $Labiovelar)
+$Liquid = (l, r)
+$Nasal = (m, n)
+[Glide] = (u -> w, i -> j)
+$Sonorant = ($Nasal, $Liquid, $Glide)
+$Laryngeal = (?, ?\, ?\_w)
+$Sibilant = (s z)
+
+$Obstruent = ($Stop, Fricative)
+$C = ($Dental, $Labial, $Velar, $Sonorant, $Liquid, $Glide, $Nasal, $Laryngeal, $Sibilant, Fricative, [-Fricative], Palatalized)
+
+[Voiced] = (
+    k -> g
+    g_h
+    x -> G
+    x_w -> G_w
+    k' -> g'
+    g'_h
+    k_w -> g_w
+    g_w_h
+    p -> b
+    b_h
+    p\ -> B
+    t -> d
+    s -> z
+    d_h
+    T -> D
+    $Sonorant
+)
+
+[Palatalized] = (
+    k -> k'
+    g -> g'
+    g_h -> g'_h
+)
+
+[Labialized] = (
+    k -> k_w
+    g -> g_w
+    g_h -> g_w_h
+)
+
+[Aspirated] = (
+    g -> g_h
+    g' -> g'_h
+    g_w -> g_w_h
+    b -> b_h
+    d -> d_h
+)
+
+[Fricative] = (
+    k -> x
+    k_w -> x_w
+    p -> p\
+    t -> T
+    g -> G
+    g_w -> G_w
+    b -> B
+    d -> D
+    s
+    z
+)

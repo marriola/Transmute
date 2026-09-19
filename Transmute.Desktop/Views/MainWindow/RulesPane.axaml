@@ -1,0 +1,110 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:models="using:Transmute.Desktop.Models"
+             xmlns:views="using:Transmute.Desktop.Views"
+             xmlns:vm="using:Transmute.Desktop.ViewModels"
+             xmlns:ae="using:AvaloniaEdit"
+             xmlns:i="https://github.com/projektanker/icons.avalonia"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:DataType="vm:RulesPaneViewModel"
+             x:Name="RulesPanel"
+             x:Class="Transmute.Desktop.Views.RulesPane">
+    
+    <Design.DataContext>
+        <vm:RulesPaneViewModel/>
+    </Design.DataContext>
+
+    <UserControl.Styles>
+		<Style Selector="DataGridRow:selected HyperlinkButton">
+			<Setter Property="Foreground" Value="White" />
+        </Style>
+		<Style Selector="DataGridRow:not(:selected) HyperlinkButton" >
+			<Setter Property="Foreground" Value="{DynamicResource HyperlinkColor}" />
+        </Style>
+        <Style Selector="CheckBox /template/ Path">
+			<!--<Setter Property="Foreground" Value="{DynamicResource CheckBoxCheckGlyphForegroundChecked}" />-->
+            <!--<Setter Property="Fill" Value="#ff0000" />-->
+        </Style>
+        <Style Selector="HyperlinkButton:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+          <Setter Property="Background" Value="{Binding $parent[Button].Background}" />
+        </Style>
+    </UserControl.Styles>
+
+    <DockPanel>
+        <TabStrip DockPanel.Dock="Top">
+			<TabStripItem Content="Rules"
+                          IsSelected="{Binding ShowRules}"
+                          Classes.dirty="{Binding IsRulesDirty}"
+                          ToolTip.Tip="Alt+R" />
+            <TabStripItem Name="LastTab"
+                          Content="Transition Tables"
+                          IsSelected="{Binding ShowTransitionTables}"
+                          ToolTip.Tip="Alt+T" />
+        </TabStrip>
+
+        <Panel DockPanel.Dock="Bottom">
+            <DockPanel IsVisible="{Binding ShowRules}">
+                <ComboBox Name="HighlightedRule"
+                            IsTextSearchEnabled="True"
+                            DockPanel.Dock="Top"
+                            HorizontalAlignment="Stretch"
+                            Margin="10 10 10 0"
+                            SelectionChanged="HighlightedRule_SelectionChanged"
+                            ItemsSource="{Binding NavigationList}"
+                            DisplayMemberBinding="{Binding Description}" />
+				
+                <ae:TextEditor Name="Rules"
+                               DockPanel.Dock="Bottom"
+                               Focusable="True"
+                               BorderThickness="1"
+                               WordWrap="True"
+                               ShowLineNumbers="True"
+                               PointerPressed="Rules_PointerPressed"
+                               TextChanged="Rules_TextChanged"
+                               Tapped="Rules_Tapped"
+                               Document="{Binding Rules}" />
+            </DockPanel>
+
+            <DockPanel IsVisible="{Binding ShowTransitionTables}">
+                <ComboBox Name="SelectedTransitionTable"
+                          IsTextSearchEnabled="True"
+                          DockPanel.Dock="Top"
+                          HorizontalAlignment="Stretch"
+                          Margin="10 10 10 0"
+                          SelectionChanged="TransitionTable_SelectionChanged"
+                          ItemsSource="{Binding TransitionTables}"
+                          DisplayMemberBinding="{Binding Description}" />
+
+                <DataGrid DockPanel.Dock="Bottom"
+                          Name="TransitionTableGrid"
+                          RowBackground="Transparent"
+                          Margin="10"
+                          IsReadOnly="True"
+                          CanUserReorderColumns="True"
+                          CanUserResizeColumns="True"
+                          GridLinesVisibility="All"
+                          BorderThickness="1" BorderBrush="Gray"
+                          ItemsSource="{Binding CurrentTransitionTable}">
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="#" Binding="{Binding Index}" IsReadOnly="true" />
+						<DataGridTextColumn Header="Origin" Binding="{Binding Origin}" IsReadOnly="true" />
+                        <DataGridTemplateColumn Header="Destination">
+							<DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate DataType="models:TransitionModel">
+									<HyperlinkButton Content="{Binding Destination}"
+                                                     Command="{Binding #RulesPanel.GoToDestination}"
+                                                     CommandParameter="{Binding Destination}"  />
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+						<DataGridTextColumn Header="Input" Binding="{Binding Input}" IsReadOnly="true" />
+						<DataGridTextColumn Header="Output" Binding="{Binding Output}" IsReadOnly="true" />
+						<DataGridCheckBoxColumn Header="Is Final" Binding="{Binding IsFinal, Mode=OneTime}" />
+                    </DataGrid.Columns>
+                </DataGrid>
+            </DockPanel>
+        </Panel>
+    </DockPanel>
+</UserControl>

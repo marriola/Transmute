@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Transmute.Desktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="250"
+             x:DataType="vm:ErrorPaneViewModel"
+             x:Class="Transmute.Desktop.Views.ErrorPane">
+    
+    <Design.DataContext>
+        <vm:ErrorPaneViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+	    <TabStrip DockPanel.Dock="Top">
+		    <TabStripItem Name="ErrorsTab" Tapped="ErrorsTab_Tapped" IsSelected="{Binding ShowErrors, Mode=OneWay}" Content="{Binding ErrorsTitle}" />
+		    <TabStripItem Name="WarningsTab" Tapped="WarningsTab_Tapped" IsSelected="{Binding ShowWarnings, Mode=OneWay}" Content="{Binding WarningsTitle}" />
+        </TabStrip>
+        <Panel DockPanel.Dock="Bottom" Classes="errorsPanel">
+            <TextBox Name="Errors"
+                     IsVisible="{Binding ShowErrors}"
+                     Classes="multiline"
+                     IsReadOnly="True" />
+            <TextBox Name="Warnings"
+                     IsVisible="{Binding ShowWarnings}"
+                     Classes="multiline"
+                     IsReadOnly="True" />
+        </Panel>
+    </DockPanel>
+</UserControl>

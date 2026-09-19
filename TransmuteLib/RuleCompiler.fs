@@ -6,16 +6,11 @@
 
 namespace TransmuteLib
 
-open ICSharpCode.SharpZipLib.GZip
-open MBrace.FsPickler
-open System
-open System.IO
-
-module private RuleCompiler =
+module internal RuleCompiler =
     let internal START = State.make "S"
     let internal ERROR = State.make "Error"
 
-    type CompiledRule = TransitionTable * Map<Transition, TransitionResult>
+    type SoundChangeRule = TransitionTable * Map<Transition, TransitionResult>
 
     type private InputPosition =
         | InputInitial
@@ -26,7 +21,7 @@ module private RuleCompiler =
         | EnvironmentSection
 
     type private NFAState = {
-        /// The current state from which transitions will be created.
+        /// The current origin state from which transitions will be created.
         current: State
 
         /// An infinite sequence of states.
@@ -62,7 +57,7 @@ module private RuleCompiler =
         | HasNext of NFAState
         | Done
 
-    let internal buildNfa showNfa isSyllableDefinitionRule statePrefix (features: Map<string, Node>) sets start input output environment =
+    let internal buildNfa statePrefix (features: Map<string, Node>) sets start input output environment =
         let takeState (states: State seq) =
             Seq.tail states, Seq.head states
 
@@ -77,13 +72,13 @@ module private RuleCompiler =
                 { state with
                     isPlaceholderNextStack =
                         match state.currentNodes with
-                        | [ PlaceholderNode _ ] ->
+                        | [ PlaceholderNode ] ->
                             false :: state.isPlaceholderNextStack
                         | _ ->
                             let b =
                                 state.currentNodes
                                 |> Seq.skip (min 1 state.currentNodes.Length)
-                                |> Seq.takeWhile (function PlaceholderNode _ -> false | _ -> true)
+                                |> Seq.takeWhile (function PlaceholderNode -> false | _ -> true)
                                 |> Seq.filter (function OptionalNode _ -> false | _ -> true)
                                 |> Seq.isEmpty
                             b :: state.isPlaceholderNextStack }
@@ -127,6 +122,7 @@ module private RuleCompiler =
                     | InputNoninitial -> Special.WORD_END_BOUNDARY
                 matchCharacter boundaryChar
 
+            // TODO: evaluate the possibility of having a syntax toggle on boundary symbols to make it act like a normal symbol
             let matchSyllableBoundary () =
                 let state, boundaryMatcher = getNextState state
                 let state, next = getNextState state
@@ -336,17 +332,9 @@ module private RuleCompiler =
 
             /// Match exactly one of many sequences of nodes.
             let matchAlternation branches =
-                // Create a common exit point for all subtrees
+                // Build a subtree for each branch and then continue with the state of the last subtree
                 let state, terminator = getNextState state
-
-                // Build a subtree for each branch
-                let out =
-                    List.foldBack
-                        matchAlternationBranch
-                        branches
-                        [ state ]
-
-                // Continue with the state of the last subtree built.
+                let out = List.foldBack matchAlternationBranch branches [ state ]
                 let state::_ = out
 
                 // Add epsilon transitions from the last state of each subtree to the terminator state.
@@ -374,7 +362,9 @@ module private RuleCompiler =
 
             let matchNegation node =
                 let state, terminator = getNextState state
-                // need to make sure if the match fails somewhere in here, it needs to go to the terminator instead of ERROR
+                // TODO: need to make sure if the match fails somewhere in here, it needs to go to the terminator instead of ERROR.
+                // it might be possible to use an OnAny transition with an InsertsAfter transformation to reinsert any partially
+                // matched input. how can we special case this to add these transitions at each step?
                 let nextState = buildStateMachine' { state with currentNodes = [ node ] }
                     
                 { nextState with
@@ -421,18 +411,18 @@ module private RuleCompiler =
                         currentNodes = List.tail state.currentNodes
                         inputPosition = InputNoninitial }
 
-        let initialState = {
-            current = start
-            states = Seq.initInfinite (string >> (+) statePrefix >> State.make)
-            currentNodes = environment
-            outputNodes = output
-            transitions = []
-            transformations = []
-            currentSection = EnvironmentSection
-            inputPosition = InputInitial
-            isPlaceholderNextStack = []
-            isOptional = false
-        }
+        let initialState =
+            { current = start
+              states = Seq.initInfinite (fun i -> State.make $"{statePrefix}{i}")
+              currentNodes = environment
+              outputNodes = output
+              transitions = []
+              transformations = []
+              currentSection = EnvironmentSection
+              inputPosition = InputInitial
+              isPlaceholderNextStack = []
+              isOptional = false
+            }
 
         // Add initial transformation
         let initialState =
@@ -480,65 +470,13 @@ module private RuleCompiler =
     /// Compiles a finite state transducer from a phonological rule.
     /// The resulting state machine can be passed into <see cref="RuleMachine.transform" /> to apply the rule to a word.
     /// </summary>
-    let compile showNfa features sets rule : CompiledRule =
+    let compile showNfa features sets rule : SoundChangeRule =
         match Node.untag rule with
-        | RuleNode (_, input, output, environment) ->
+        | RuleNode (_, _, input, output, environment) ->
             let input = Node.untagAll input
             let output = Node.untagAll output
             let environment = Node.untagAll environment
-            buildNfa showNfa false "q" features sets START input output environment
+            buildNfa "q" features sets START input output environment
             |> toDfa showNfa START
         | _ ->
             invalidArg "rule" "Must be a RuleNode"
-
-    let toList (transitions, transformations) =
-        let transitions =
-            transitions
-            |> Seq.map (fun (From origin, input, To dest) -> (origin, input), dest)
-            |> Map.ofSeq
-
-        transitions, transformations
-
-    let compileRules showNfa features sets rules =
-        rules
-        |> List.map (fun rule -> compile showNfa features sets rule)
-
-    let compileRulesParallel showNfa features sets rules =
-        rules
-        |> Array.ofList
-#if DEBUG
-        |> Array.mapi (fun i rule -> compile showNfa features sets rule)
-#else
-        |> Array.Parallel.mapi (fun i rule -> compile showNfa features sets rule)
-#endif
-        |> Array.toList
-
-#if !FABLE_COMPILER
-    let saveCompiledRules filename rules =
-        use f = File.Open(filename, FileMode.Create, FileAccess.Write)
-        use gzip = new GZipOutputStream(f)
-        gzip.SetLevel 9
-
-        let serializer = FsPickler.CreateBinarySerializer()
-        let pickle = serializer.Pickle(rules)
-
-        gzip.Write(BitConverter.GetBytes(pickle.Length), 0, 4)
-        gzip.Write(pickle, 0, pickle.Length)
-
-    let readCompiledRulesFromStream f =
-        use gzip = new GZipInputStream(f)
-
-        let lengthBuffer: byte[] = Array.zeroCreate 4
-        gzip.Read(lengthBuffer, 0, 4) |> ignore
-        let length = BitConverter.ToInt32(lengthBuffer, 0)
-
-        let buffer: byte[] = Array.zeroCreate length
-        gzip.Read(buffer, 0, length) |> ignore
-
-        let serializer = FsPickler.CreateBinarySerializer()
-        serializer.UnPickle(buffer)
-
-    let readCompiledRules filename =
-        use f = File.Open(filename, FileMode.Open, FileAccess.Read)
-        readCompiledRulesFromStream f
-#endif

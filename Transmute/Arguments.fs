@@ -26,7 +26,7 @@ let verbosityLevels = dict [
     "5", ShowNFA
 ]
 
-type Options =
+type CommandLineOptions =
     { format: InputFormat
       lexiconFiles: InputSource list
       rulesFile: InputSource
@@ -85,7 +85,7 @@ with
             failwith "Input source not specified"
 
         | StandardInput ->
-            System.Console.In.ReadToEnd().Replace("\r", "\n")
+            System.Console.In.ReadToEnd() //.Replace("\r", "\n")
 
         | File (RulesFileSource path)
         | File (LexiconFileSource path) ->
@@ -214,7 +214,7 @@ let parse (argv: string[]) =
 
     parse' (Array.toList argv) defaultOptions
 
-let validate (options: Options) =
+let validate (options: CommandLineOptions) =
     let mutable isValid = true
 
     if options.lexiconFiles.Length = 0 then

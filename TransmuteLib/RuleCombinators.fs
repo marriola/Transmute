@@ -6,7 +6,9 @@
 
 namespace TransmuteLib
 
-module private RuleCombinators =
+open TransmuteLib
+
+module public RuleCombinators =
 
     type State =
         { status: Status
@@ -20,24 +22,25 @@ module private RuleCombinators =
 
     module State =
         let undo state =
-            if state.undoBuffer.Length = 0 then
-                state
-            else
-                { state with
-                    status = Ok
-                    output = state.undoBuffer
-                    undoBuffer = "" }
+            { state with
+                //status = Ok
+                output = state.undoBuffer
+                undoBuffer = "" }
 
-        let id state = state
+        let inline id state = state
             
-        let ok state =
+        let inline ok state =
             { state with status = Ok }
             
-        let fail state =
+        let inline fail state =
             { state with status = Mismatched }
+
+        let inline addUndo count state =
+            { state with undoBuffer = state.undoBuffer + state.rest.Substring(0, count) }
         
-        let clearUndo state =
-            { state with undoBuffer = "" }
+        /// Resets the undo buffer to the contents of the output buffer.
+        let inline resetUndo state =
+            { state with undoBuffer = state.output }
             
         let inline isOk state =
             state.status = Ok
@@ -51,6 +54,7 @@ module private RuleCombinators =
         let inline orElse value state =
             if state.status = Mismatched then value else state
 
+        /// Creates an initial state from an input word.
         let wrap input =
             { status = Ok
               rest = input
@@ -59,36 +63,46 @@ module private RuleCombinators =
               matched = ""
               undoBuffer = "" }
         
-        let unwrap state =
-            state.output
-
+        /// Returns the remaining input.
         let unwrapRest state =
             state.rest
+
+        /// Returns the output and any remaining input.
+        let unwrapAll state =
+            state.output + state.rest
         
+        /// Feeds the output from the last run of the rule into the next.
         let fromOutput state =
             { state with
                 rest = state.output
                 output = "" }
             
-        let outputMatch state =
+        let inline outputMatch state =
             if state.matching then
                 { state with
                     output = state.output + state.matched
+                    // undoBuffer = state.undoBuffer + state.matched
                     matching = false
                     matched = "" }
-            elif state.rest.Length > 0 then
+            elif state.rest.Length > 0 && not (state.rest.StartsWith Special.WORD_END_BOUNDARY) then
                 { state with
                     output = state.output + string state.rest.[0]
+                    undoBuffer = state.undoBuffer + string state.rest.[0]
                     rest = state.rest.Substring 1 }
             else
                 state
-            
-        let clearMatch state =
+
+        let inline clearMatch state =
             if state.matching then
                 { state with
                     matching = false
                     matched = "" }
-            elif state.rest.Length > 0 then
+            else
+                state
+            
+        /// Consumes one input character if available and outputs it directly.
+        let inline advance state =
+            if state.rest.Length > 0 then
                 { state with
                     output = state.output + string state.rest.[0]
                     rest = state.rest.Substring 1 }
@@ -96,11 +110,21 @@ module private RuleCombinators =
                 state
 
     [<AutoOpen>]
-    module internal SoundChangeRule =
+    module public SoundChangeRule =
+        /// If the last match failed, undoes any changes and outputs the failing input character.
+        let advanceFromError state =
+            state
+            |> State.isError (State.undo >> fun state ->
+                if state.rest.Length > 0 then
+                    { state with
+                        status = Mismatched
+                        output = state.output + string state.rest.[0]
+                        rest = state.rest.Substring 1 }
+                else
+                    state)
+
         let inline beginRule state =
             { state with undoBuffer = state.output }
-
-        let uncapture = State.outputMatch
 
         let inline matchSymbols (symbols: string) state =
             state
@@ -108,11 +132,25 @@ module private RuleCombinators =
                 if state.rest.StartsWith symbols then
                     { state with
                         rest = state.rest.Substring symbols.Length
+                        undoBuffer = state.undoBuffer + state.rest.Substring(0, symbols.Length)
                         matching = true
-                        matched = symbols
-                        undoBuffer = state.undoBuffer + symbols }
+                        matched = state.matched + symbols }
                 else
                     State.fail state)
+
+        let inline matchString (s: string) state =
+            state
+            |> State.map (fun state ->
+                if state.rest.StartsWith s then
+                    { state with
+                        rest = state.rest.Substring s.Length
+                        undoBuffer = state.undoBuffer + state.rest.Substring(0, s.Length)
+                        matching = true
+                        matched = state.matched + s }
+                else
+                    state
+                    |> State.fail
+                    |> advanceFromError)
 
         let inline matchSymbol symbol state =
             state
@@ -121,9 +159,9 @@ module private RuleCombinators =
                     let current = string state.rest.[0]
                     { state with
                         rest = state.rest.Substring 1
+                        undoBuffer = state.undoBuffer + state.rest.Substring(0, 1)
                         matching = true
-                        matched = state.matched + current
-                        undoBuffer = state.undoBuffer + current }
+                        matched = state.matched + current }
                 else
                     State.fail state)
                 
@@ -134,13 +172,11 @@ module private RuleCombinators =
         let inline matchOneOf rules state =
             state
             |> State.map (fun state ->
-                (None, rules)
-                ||> List.fold (fun result rule ->
-                    result
-                    |> Option.orElseWith (fun () ->
-                        match rule state with
-                        | { status = Ok } as result -> Some result
-                        | { status = Mismatched } -> None))
+                rules
+                |> List.tryPick (fun rule ->
+                    match rule state with
+                    | { status = Ok } as result -> Some result
+                    | { status = Mismatched } -> None)
                 |> Option.defaultWith (fun () ->
                     State.fail state))
 
@@ -167,14 +203,11 @@ module private RuleCombinators =
             >> matchSymbol
             
         let inline thenEcho state = State.map State.outputMatch state
-                
+
         let inline thenReplaceWith symbol state =
             state
             |> State.map (fun state ->
-                { state with
-                    matched = ""
-                    matching = false
-                    output = state.output + symbol })
+                { state with output = state.output + symbol })
 
         /// <summary>
         /// Replaces the match with enough copies of <c>symbol</c> to match its length.
@@ -183,10 +216,8 @@ module private RuleCombinators =
             state
             |> State.map (fun state ->
                 let symbol = String.replicate state.matched.Length symbol
-                { state with
-                    matched = ""
-                    matching = false
-                    output = state.output + symbol })
+
+                { state with output = state.output + symbol })
 
         let inline thenDelete state = thenReplaceWith "" state
         
@@ -219,12 +250,21 @@ module private RuleCombinators =
             repeat' state
         
         let endRule = 
-            State.map State.clearUndo
-            >> State.isError (State.undo >> State.clearMatch)
+            State.map State.resetUndo
+            >> advanceFromError
             >> State.ok
 
+        let endRule2 state = 
+            //State.map State.clearUndo
+
+            //>> State.map (State.outputMatch >> State.fromOutput)
+
+            state
+            |> State.map (State.resetUndo >> State.outputMatch (*>> State.fromOutput*))
+            |> State.ok
+
         let inline log i indentLevel message state =
-    #if VERBOSE
+#if VERBOSE
             let indent = new System.String('\t', indentLevel)
             let stateStr =
                 state.ToString().Split '\n'
@@ -234,5 +274,7 @@ module private RuleCombinators =
             System.Diagnostics.Debug.WriteLine $"{indent}{i}. {message}"
             System.Diagnostics.Debug.WriteLine stateStr
             System.Diagnostics.Debug.WriteLine (new System.String('-', 40))
-    #endif
+#endif
             state
+
+        let inline apply rule = State.wrap >> repeat rule >> State.unwrapRest

@@ -1,0 +1,40 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d" d:DesignWidth="250" d:DesignHeight="100"
+        x:Class="Transmute.Desktop.GoToLineWindow"
+        x:Name="GoToLine"
+        CanResize="False"
+        Width="250" Height="100"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Opened="Window_Opened"
+        Title="Go to Rule Line">
+    <Window.KeyBindings>
+		<KeyBinding Gesture="Escape" Command="{Binding #GoToLine.Cancel}" />
+		<KeyBinding Gesture="Enter" Command="{Binding #GoToLine.Go}"/>
+    </Window.KeyBindings>
+    <StackPanel Margin="5">
+        <Grid RowSpacing="5" ColumnSpacing="5">
+            <Grid.RowDefinitions>
+			    <RowDefinition Height="auto" />
+			    <RowDefinition Height="auto" />
+			    <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+			    <ColumnDefinition Width="auto" />
+			    <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+		    <TextBlock Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" Text="Line number:" />
+            <NumericUpDown Name="LineNumber" Grid.Row="0" Grid.Column="1" ValueChanged="LineNumber_ValueChanged" />
+		    <TextBlock Grid.Row="1" Grid.Column="0" Text="Last line:" />
+            <TextBlock Name="LineCount" Grid.Row="1" Grid.Column="1" />
+        </Grid>
+		<StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="5">
+            <Button Name="GoButton" Grid.Row="2" Grid.Column="0" Click="GoButton_Click" IsEnabled="False">Go</Button>
+            <Button Name="CancelButton" Grid.Row="2" Grid.Column="1" Click="CancelButton_Click">Cancel</Button>
+        </StackPanel>
+    </StackPanel>
+</Window>

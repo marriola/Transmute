@@ -13,9 +13,15 @@ module Result =
         | Ok x ->
             x
         | Error msg ->
-            printfn "%s" msg
+            eprintfn "%s" msg
             exit 1
 #endif
+
+    let orThrow = function
+        | Ok x ->
+            x
+        | Error msg ->
+            failwithf "%s" msg
 
     ()
 

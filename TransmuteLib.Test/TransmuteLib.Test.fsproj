@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -10,7 +10,8 @@
 
   <ItemGroup>
     <Compile Include="Tests.fs" />
-    <Compile Include="SyllableDetectorTests.fs" />
+    <Compile Include="SoundChangeRuleTests.fs" />
+    <Compile Include="SyllableRuleTests.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 

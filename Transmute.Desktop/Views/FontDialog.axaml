@@ -1,0 +1,76 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:media="using:Avalonia.Media"
+        xmlns:td="using:Transmute.Desktop"
+        mc:Ignorable="d" d:DesignWidth="500" d:DesignHeight="135"
+        x:DataType="td:FontDialog"
+        x:Class="Transmute.Desktop.FontDialog"
+        ShowInTaskbar="False" CanResize="False"
+        Width="500" Height="135"
+        Title="Fonts">
+    <Window.Styles>
+		<Style Selector="TextBlock">
+			<Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Right" />
+        </Style>
+        <Style Selector="ComboBox">
+			<Setter Property="Width" Value="80" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style Selector="ComboBox.wide">
+            <Setter Property="Width" Value="250" />
+            <Setter Property="MaxDropDownHeight" Value="300" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+        </Style>
+    </Window.Styles>
+
+    <Grid ColumnDefinitions="2*,250,*,80" RowDefinitions="auto,auto,auto,auto"
+          Margin="10" RowSpacing="5" ColumnSpacing="5">
+	    <TextBlock Grid.Row="0" Grid.Column="0"
+                   Text="Rules Font:" />
+        <ComboBox Name="RulesFont" Classes="wide"
+                  Grid.Row="0" Grid.Column="1"
+                  ItemsSource="{Binding Fonts}"
+                  SelectedValue="{Binding SelectedRulesFont}"
+                  DisplayMemberBinding="{Binding Name}" />
+        <TextBlock Grid.Row="0" Grid.Column="2" Text="Size:" />
+        <ComboBox Name="RulesFontSize"
+                  Grid.Row="0" Grid.Column="3"
+                  ItemsSource="{Binding FontSizes}"
+                  SelectedValue="{Binding SelectedRulesFontSize}"/>
+
+	    <TextBlock Grid.Row="1" Grid.Column="0" Text="Lexicon Font:" />
+        <ComboBox Name="LexiconFont" Classes="wide"
+                  Grid.Row="1" Grid.Column="1"
+                  ItemsSource="{Binding Fonts}"
+                  SelectedValue="{Binding SelectedLexiconFont}"
+                  DisplayMemberBinding="{Binding Name}" />
+        <TextBlock Grid.Row="1" Grid.Column="2" Text="Size:" />
+        <ComboBox Name="LexiconFontSize"
+                  Grid.Row="1" Grid.Column="3"
+                  ItemsSource="{Binding FontSizes}"
+                  SelectedValue="{Binding SelectedLexiconFontSize}" />
+
+	    <TextBlock Grid.Row="2" Grid.Column="0" Text="Grid Font:" />
+        <ComboBox Name="GridFont" Classes="wide"
+                  Grid.Row="2" Grid.Column="1"
+                  ItemsSource="{Binding Fonts}"
+                  SelectedValue="{Binding SelectedGridFont}"
+                  DisplayMemberBinding="{Binding Name}" />
+        <TextBlock Grid.Row="2" Grid.Column="2" Text="Size:" />
+        <ComboBox Name="GridFontSize"
+                  Grid.Row="2" Grid.Column="3"
+                  ItemsSource="{Binding FontSizes}"
+                  SelectedValue="{Binding SelectedGridFontSize}" />
+
+        <StackPanel Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="4"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="5">
+		    <Button Name="OK" Click="OK_Click" Content="OK" />
+            <Button Name="Cancel" Click="Cancel_Click" Content="Cancel" />
+        </StackPanel>
+    </Grid>
+</Window>

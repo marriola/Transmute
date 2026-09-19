@@ -1,20 +1,16 @@
 ﻿// Project:     TransmuteLib
 // Module:      DeterministicFiniteAutomaton
 // Description: Converts a finite state transducer that is nondeterministic to an equivalent one that is deterministic.
-// Copyright:   (c) 2023 Matt Arriola
+// Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
 namespace TransmuteLib
 
+open System.Collections.Generic
+
 type Transformation = Transition * TransitionResult
 
 module private DeterministicFiniteAutomaton =
-    type private TransitionType =
-        /// A transition with a destination state that needs to be checked for deterministic transitions.
-        | MaybeDeterministic of (Transition * TransitionResult)
-        /// A transition with a destination state that either has deterministic transitions or just doesn't have any nondeterministic ones.
-        | Deterministic of (Transition * TransitionResult)
-
     /// Returns true if the states X and Y are equivalent, or if state Y is a merged state containing state X
     let inline private ( <% ) x y =
         match x, y with
@@ -42,7 +38,9 @@ module private DeterministicFiniteAutomaton =
                 match Map.tryFind t transformationsByTransition with
                 | None -> OutputDefault
                 | Some [tf] -> tf
+#if DEBUG
                 | Some tfs -> failwithf "Transition %O has %d transformations; it should have 0 or 1" t tfs.Length
+#endif
             t, transformation)
 
     let private transitionsFrom state transitions =
@@ -53,45 +51,6 @@ module private DeterministicFiniteAutomaton =
     let inline private getOrigin (transition, _) = StateMachine.getOrigin transition
     let inline private getDest (transition, _) = StateMachine.getDest transition
     let inline private getInput (transition, _) = StateMachine.getInput transition
-
-    /// <summary>
-    /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
-    /// </summary>
-    /// <returns>A set of input symbol and state tuples.</returns>
-    let private computePowerSet transitions (originalResult: TransitionResult) state =
-        let rec inner transitions states result =
-            match states with
-            | [] ->
-                List.rev result
-            | x::xs ->
-                // States to which we can ε transition from x
-                let followStates =
-                    transitions
-                    |> List.filter (function
-                        | (From origin, OnEpsilon, _), _ when origin = x -> true
-                        | _ -> false)
-                    |> List.map getDest
-                    |> set
-                // Non-ε transitions we can take from those states
-                let followTransitions =
-                    transitions
-                    |> List.filter
-                        (fun ((From origin, input, _), _) ->
-                            input <> OnEpsilon
-                            && (origin <% x
-                                || Set.contains origin followStates))
-                    |> List.map (fun ((From origin, input, To dest), result) ->
-                        input, dest, originalResult.Or result)
-                let nextStates =
-                    followStates
-                    |> Seq.filter (fun s ->
-                        transitions
-                        |> List.exists (function
-                            | (From origin, OnEpsilon, _), _ when origin = s -> true
-                            | _ -> false))
-                    |> List.ofSeq
-                inner transitions (nextStates @ xs) (followTransitions @ result)
-        inner transitions [state] []
 
     let printNfa table =
         printf "NFA:\n\n"
@@ -108,84 +67,92 @@ module private DeterministicFiniteAutomaton =
     let fromNfa startState errorState (table: Transition list) (transformations: Transformation list) showNfa =
         let table = augment table transformations
 
+        /// <summary>
+        /// Computes the list of transitions that can be taken from a state, skipping over epsilon transitions.
+        /// </summary>
+        /// <returns>A set of input symbol and state tuples.</returns>
+        let computePowerSet (originalResult: TransitionResult) state =
+            let rec inner states result =
+                match states with
+                | [] ->
+                    List.rev result
+                | x::xs ->
+                    // States to which we can ε transition from x
+                    let followStates =
+                        table
+                        |> List.filter (function
+                            | (From origin, OnEpsilon, _), _ when origin = x -> true
+                            | _ -> false)
+                        |> List.map getDest
+                        |> set
+                    // Non-ε transitions we can take from those states
+                    let followTransitions =
+                        table
+                        |> List.filter
+                            (fun ((From origin, input, _), _) ->
+                                input <> OnEpsilon
+                                && (origin <% x
+                                    || Set.contains origin followStates))
+                        |> List.map (fun ((_, input, To dest), result) ->
+                            input, dest, TransitionResult.coalesce originalResult result)
+                    let nextStates =
+                        followStates
+                        |> Seq.filter (fun s ->
+                            table
+                            |> List.exists (function
+                                | (From origin, OnEpsilon, _), _ when origin = s -> true
+                                | _ -> false))
+                        |> List.ofSeq
+                    inner (nextStates @ xs) (followTransitions @ result)
+            inner [state] []
+
         let initialInsertion =
             table
             |> List.tryFind (fun ((From origin, inputSymbol, _), _) -> origin = startState && inputSymbol = OnEpsilon)
             |> Option.map (fun (_, result) -> result)
             |> Option.defaultValue OutputDefault
 
-        let inline hasNonEpsilonTransition state =
-            table
-            |> List.exists (fun ((From origin, input, _), _) -> state = origin && input <> OnEpsilon)
+        let followDestinationAcc = new HashSet<Transition * TransitionResult>()
+        let mutable search = new HashSet<Transition * TransitionResult>()
+        let mutable nextSearch = new HashSet<Transition * TransitionResult>()
 
-        let inline allTransitionsDeterministic origin =
-            table
-            |> List.exists (function
-                | (From o, OnEpsilon, _), _ when o = origin -> true
-                | _ -> false)
-            |> not
-
-        // TODO: refactor this 8 level indented beast
-        /// <summary>
-        /// Recursively follows the destination of each transition to a state that has non-epsilon
-        /// transitions, eliminating any that have only epsilon transitions.
-        /// </summary>
-        /// <returns>A list of deterministic transitions.</returns>
         let followDestination current transitions =
-            let rec inner acc search =
-                match search with
-                | [] -> List.ofSeq acc
-                | _ ->
-                    // Search for states that might have deterministic transitions from their destinations.
-                    let successors =
-                        search
-                        |> List.collect (fun ((From o, input, To d), tResult as t) ->
-                            // For each transition T from O to D that is succeeded by a nondeterministic transition U,
-                            // move the destination of T forwards to skip it. If any of these lead to deterministic transitions,
-                            // they will be accumulated in the next iteration, along with final states.
-                            let followedTransitions =
-                                // HOT PATH: ~25% of time spent here
-                                table
-                                |> List.choose (function
-                                    | (From successor, OnEpsilon, To d2), uResult as u
-                                        when successor <% d ->
-                                        let result =
-                                            match tResult, uResult with
-                                            | OutputDefault, x
-                                            | x, OutputDefault ->
-                                                x
-                                            | x, y when x <> y ->
-                                                failwith "Both transitions have transformation!"
-                                            | _ ->
-                                                    tResult
-                                        Some (MaybeDeterministic ((From current, input, To d2), result))
-                                    | _ ->
-                                        None)
-                            // Keep the original transition T if D is final or has deterministic transitions
-                            let originalTransition =
-                                if (allTransitionsDeterministic d || hasNonEpsilonTransition d) then // && (State.isFinal d || input <> OnEpsilon) then
-                                    [ Deterministic ((From current, input, To d), tResult) ]
-                                else
-                                    []
-                            originalTransition @ followedTransitions)
-                    // Follow transitions to states we haven't already been to that have non-deterministic transitions
-                    let nextTransitions =
-                        successors
-                        |> Seq.choose (function
-                            | MaybeDeterministic u when not (List.contains u search) -> Some u
-                            | _ -> None)
-                        |> List.ofSeq
-                    // Accumulate transitions to states that are final or have deterministic transitions
-                    let nextAcc =
-                        successors
-                        |> Seq.choose (function
-                            | Deterministic t -> Some t
-                            | _ -> None)
-                        |> Set.ofSeq
-                        |> Set.union acc
-                    inner nextAcc nextTransitions
+            followDestinationAcc.Clear()
+            nextSearch.Clear()
+            search.Clear()
+            search.UnionWith transitions
+            
+            while search.Count > 0 do
+                for (_, input, To d), tResult in search do
+                    for (From successor, OnEpsilon, To d2), uResult in table do
+                        if successor <% d then
+                            let transitionToFollow = (From current, input, To d2), TransitionResult.coalesce uResult tResult
 
-            inner (Set.empty) transitions
+                            if not (search.Contains transitionToFollow) then
+                                nextSearch.Add transitionToFollow |> ignore
+
+                    let mutable partiallyDeterministic = false
+                    let mutable completelyDeterministic = true
+
+                    for entry in table do
+                        if (partiallyDeterministic = false || completelyDeterministic = true) then
+                            let (From origin, input, _), _ = entry
+
+                            if d = origin then
+                                if input = OnEpsilon then
+                                    completelyDeterministic <- false
+                                else
+                                    partiallyDeterministic <- true
+
+                    if completelyDeterministic || partiallyDeterministic then
+                        followDestinationAcc.Add ((From current, input, To d), tResult) |> ignore
+
+                let temp = search
+                search <- nextSearch
+                nextSearch <- temp
+                nextSearch.Clear()
+
+            List.ofSeq followDestinationAcc
 
         /// <summary>
         /// For each transition, get the states that can be reached from its destination by
@@ -195,7 +162,7 @@ module private DeterministicFiniteAutomaton =
         let followEpsilonTransitions origin originalResult transitions =
             let originIsStartState = State.name origin = "S"
             transitions
-            |> List.collect (getDest >> computePowerSet table originalResult)
+            |> List.collect (getDest >> computePowerSet originalResult)
             |> List.distinct
             |> List.map (fun (input, dest, result) ->
                 let dest =
@@ -252,8 +219,10 @@ module private DeterministicFiniteAutomaton =
                             match out, result with
                             | OutputDefault, (_ as result) ->
                                 result
+#if DEBUG
                             | ReplacesWith (_, a), ReplacesWith (_, b) when a <> b ->
                                 failwithf "Merged state %O has multiple productions! (%O, %O)" mergedDest out result
+#endif
                             | _ ->
                                 out)
                     (From current, on, To mergedDest), production)
@@ -270,7 +239,7 @@ module private DeterministicFiniteAutomaton =
                 // transitions from current state -> skip lambdas -> group by symbol
                 let transitionsFromCurrent =
                     table
-                    |> transitionsFrom current 
+                    |> transitionsFrom current
                     |> removeNondeterminism current initialInsertion
                     |> groupTransitions current
                 // Follow transitions that don't go to the current state or a state already in the stack

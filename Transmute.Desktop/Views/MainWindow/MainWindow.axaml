@@ -1,0 +1,249 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:v="using:Transmute.Desktop.Views"
+        xmlns:vm="using:Transmute.Desktop.ViewModels"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:uc="using:Transmute.Desktop.Views"
+        xmlns:AvaloniaEdit="using:AvaloniaEdit"
+        xmlns:i="https://github.com/projektanker/icons.avalonia"
+        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="600"
+        x:Class="Transmute.Desktop.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        x:Name="Window"
+        Icon="/Assets/transmute.ico"
+        Title="Transmute"
+        Width="800" Height="600" WindowState="Maximized"
+        Closing="Window_Closing"
+        SizeChanged="Window_SizeChanged">
+    
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <Window.Styles>
+        <Style Selector="StackPanel.toolbar Button">
+            <Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="3" />
+            <Setter Property="FontSize" Value="16" />
+        </Style>
+        <Style Selector="StackPanel.toolbar Button:pointerover">
+            <Setter Property="BorderThickness" Value="0" />
+			<Setter Property="Background" Value="{DynamicResource ThemeBorderLowColor}" />
+        </Style>
+        <Style Selector="Image.icon">
+            <Setter Property="Width" Value="16" />
+            <Setter Property="Height" Value="16" />
+        </Style>
+        <Style Selector="Line.separator">
+            <Setter Property="Stroke" Value="Gray" />
+            <Setter Property="StartPoint" Value="0,0" />
+            <Setter Property="EndPoint" Value="0,24" />
+            <Setter Property="Margin" Value="3 0 3 0" />
+        </Style>
+        <Style Selector="AvaloniaEdit|TextEditor">
+			<Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderMidColor}" />
+        </Style>
+        <Style Selector="AvaloniaEdit|TextEditor:pointerover, AvaloniaEdit|TextEditor:focus-within">
+			<Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderHighColor}" />
+        </Style>
+        <Style Selector="AvaloniaEdit|TextEditor, TextBox.multiline">
+            <Setter Property="Margin" Value="10" />
+        </Style>
+        <Style Selector="AvaloniaEdit|TextEditor.changes, TextBox.multiline.changes">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlForegroundChromeMediumBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+			<Setter Property="Margin" Value="5 0" />
+        </Style>
+        <Style Selector="TabStripItem">
+            <Setter Property="FontSize" Value="14" />
+	        <Setter Property="BorderThickness" Value="0 0 0 3" />
+        </Style>
+		<Style Selector="TabStripItem.dirty">
+            <Setter Property="BorderBrush" Value="Goldenrod" />
+        </Style>
+        <Style Selector=".errorsPanel TextBox">
+			<Setter Property="MaxHeight" Value="200" />
+        </Style>
+        <Style Selector="SplitView">
+            <Setter Property="PaneBackground" Value="{DynamicResource SystemControlPageBackgroundChromeLowBrush}" /> 			
+        </Style>
+    </Window.Styles>
+
+    <Window.KeyBindings>
+		<KeyBinding Command="{Binding #Window.NewRules}" Gesture="Ctrl+N" />
+        <KeyBinding Command="{Binding #Window.OpenRules}" Gesture="Ctrl+O" />
+        <KeyBinding Command="{Binding #Window.SaveRules}" Gesture="Ctrl+S" />
+		<KeyBinding Command="{Binding #Window.NewLexicon}" Gesture="Ctrl+Shift+N" />
+		<KeyBinding Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
+		<KeyBinding Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
+
+        <KeyBinding Command="{Binding #Window.GoBack}" Gesture="Alt+Left" />
+        <KeyBinding Command="{Binding #Window.GoForward}" Gesture="Alt+Right" />
+
+        <KeyBinding Command="{Binding #Window.PromptLine}" Gesture="Ctrl+G" />
+        <KeyBinding Command="{Binding #Window.GoToChanges}" Gesture="F12" />
+        <KeyBinding Command="{Binding #Window.ApplyRules}" Gesture="F5" />
+
+        <KeyBinding Command="{Binding #Window.SelectRuleTab}" CommandParameter="0" Gesture="Alt+R" />
+        <KeyBinding Command="{Binding #Window.SelectRuleTab}" CommandParameter="1" Gesture="Alt+T" />
+        <KeyBinding Command="{Binding #Window.SelectInputLexicon}" Gesture="Alt+L" />
+        <KeyBinding Command="{Binding #Window.SelectOutputTab}" CommandParameter="0" Gesture="Alt+Shift+R" />
+        <KeyBinding Command="{Binding #Window.SelectOutputTab}" CommandParameter="1" Gesture="Alt+C" />
+
+        <KeyBinding Command="{Binding #Window.OpenHelp}" Gesture="F1" />
+    </Window.KeyBindings>
+
+    <NativeMenu.Menu>
+		<NativeMenu>
+            <NativeMenuItem Header="File">
+				<NativeMenu>
+			        <NativeMenuItem Header="New Rules" Command="{Binding #Window.NewRules}" Gesture="Ctrl+N" />
+                    <NativeMenuItem Header="Open _Rules…" Command="{Binding #Window.OpenRules}" CommandParameter="{Binding #Window}" Gesture="Ctrl+O" />
+                    <NativeMenuItem Header="Save _Rules" Command="{Binding #Window.SaveRules}" Gesture="Ctrl+S" />
+                    <NativeMenuItem Header="Save _Rules As…" Command="{Binding #Window.SaveRulesAs}" />
+                    <NativeMenuItemSeparator Header="-" />
+			        <NativeMenuItem Header="New Lexicon" Command="{Binding #Window.NewLexicon}" Gesture="Ctrl+Shift+N" />
+			        <NativeMenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
+			        <NativeMenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
+			        <NativeMenuItem Header="Save _Lexicon As…" Command="{Binding #Window.SaveLexiconAs}" />
+                    <NativeMenuItemSeparator Header="-" />
+                    <NativeMenuItem Header="_Quit Transmute" Gesture="Meta+Q" Command="{Binding #Window.Exit}" />
+                </NativeMenu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="_Edit">
+                <NativeMenu>
+				    <NativeMenuItem Header="_Cut" Command="{Binding #Window.Cut}" Gesture="Ctrl+X" />
+				    <NativeMenuItem Header="_Copy" Command="{Binding #Window.Copy}" Gesture="Ctrl+C" />
+				    <NativeMenuItem Header="_Paste" Command="{Binding #Window.Paste}" Gesture="Ctrl+V" />
+                    <NativeMenuItemSeparator Header="-" />
+                    <NativeMenuItem Header="Apply _Rules" Command="{Binding #Window.ApplyRules}" Gesture="F5" />
+                    <NativeMenuItem Header="Go to Chan_ges" Command="{Binding #Window.GoToChanges}" Gesture="F12" />
+				    <NativeMenuItem Header="_Go to Rule Line…" Command="{Binding #Window.PromptLine}" Gesture="Ctrl+G" />
+                </NativeMenu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="_Options">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Fonts…" Command="{Binding #Window.OpenFonts}" />
+                    <NativeMenuItem Header="_Theme">
+						<NativeMenu>
+					        <NativeMenuItem Header="_System default" ToggleType="Radio" IsChecked="{Binding MenuViewModel.SystemDefaultThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Default" />
+					        <NativeMenuItem Header="_Light" ToggleType="Radio" IsChecked="{Binding MenuViewModel.LightThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Light" />
+					        <NativeMenuItem Header="_Dark" ToggleType="Radio" IsChecked="{Binding MenuViewModel.DarkThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Dark" />
+                        </NativeMenu>
+                    </NativeMenuItem>
+                    <NativeMenuItem Header="_Change Marker">
+                        <NativeMenu>
+				            <NativeMenuItem Header="_None" ToggleType="Radio" IsChecked="{Binding MenuViewModel.NoChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.NoChangeMarker}" />
+				            <NativeMenuItem Header="_Underline" ToggleType="Radio" IsChecked="{Binding MenuViewModel.UnderlineChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.UnderlineChangeMarker}" />
+				            <NativeMenuItem Header="_Double Underline" ToggleType="Radio" IsChecked="{Binding MenuViewModel.DoubleUnderlineChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.DoubleUnderlineChangeMarker}" />
+				            <NativeMenuItem Header="_Caret" ToggleType="Radio" IsChecked="{Binding MenuViewModel.CaretChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
+                        </NativeMenu>
+                    </NativeMenuItem>
+                    <NativeMenuItem Header="Show Horizontal _Scroll Bar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
+                    <NativeMenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
+                </NativeMenu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="_Help">
+                <NativeMenu>
+                    <NativeMenuItem Header="_Help" Gesture="F1" />
+                    <NativeMenuItemSeparator Header="-" />
+				    <NativeMenuItem Header="About _Transmute" Click="AboutTransmuteNative_Clicked" />
+				    <NativeMenuItem Header="About _Avalonia UI" Click="AboutAvaloniaNative_Clicked" />
+                </NativeMenu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
+    <DockPanel>
+        <Menu DockPanel.Dock="Top"
+              Name="TheMenu"
+              Margin="0 2 0 0"
+              Opened="TheMenu_Opened"
+              GettingFocus="TheMenu_GettingFocus"
+              IsVisible="{Binding !#Window.ShowNativeMenu}">
+            <MenuItem Header="_File">
+			    <MenuItem Header="New Rules" Command="{Binding #Window.NewRules}" InputGesture="Ctrl+N" />
+                <MenuItem Header="Open _Rules…" Command="{Binding #Window.OpenRules}" InputGesture="Ctrl+O" />
+                <MenuItem Header="Save _Rules" Command="{Binding #Window.SaveRules}" InputGesture="Ctrl+S" />
+                <MenuItem Header="Save _Rules As…" Command="{Binding #Window.SaveRulesAs}" />
+                <Separator />
+			    <MenuItem Header="New Lexicon" Command="{Binding #Window.NewLexicon}" InputGesture="Ctrl+Shift+N" />
+			    <MenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" InputGesture="Ctrl+Shift+O" />
+			    <MenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" InputGesture="Ctrl+Shift+S" />
+			    <MenuItem Header="Save _Lexicon As…" Command="{Binding #Window.SaveLexiconAs}" />
+                <Separator />
+                <MenuItem Header="E_xit" InputGesture="Alt+F4" Command="{Binding #Window.Exit}" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+				<MenuItem Header="_Cut" Command="{Binding #Window.Cut}" InputGesture="Ctrl+X" />
+				<MenuItem Header="_Copy" Command="{Binding #Window.Copy}" InputGesture="Ctrl+C" />
+				<MenuItem Header="_Paste" Command="{Binding #Window.Paste}" InputGesture="Ctrl+V" />
+                <Separator />
+                <MenuItem Header="Apply _Rules" Command="{Binding #Window.ApplyRules}" InputGesture="F5" />
+                <MenuItem Header="Go to Chan_ges" Command="{Binding #Window.GoToChanges}" InputGesture="F12" />
+				<MenuItem Header="_Go to Rule Line…" Command="{Binding #Window.PromptLine}" InputGesture="Ctrl+G" />
+            </MenuItem>
+            <MenuItem Header="_Options">
+                <MenuItem Header="_Fonts…" Command="{Binding #Window.OpenFonts}" />
+                <MenuItem Header="_Theme">
+					<MenuItem Name="rdoSystemDefaultTheme" GroupName="Theme" Header="_System default" ToggleType="Radio" IsChecked="{Binding MenuViewModel.SystemDefaultThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Default" />
+					<MenuItem Name="rdoLightTheme" GroupName="Theme" Header="_Light" ToggleType="Radio" IsChecked="{Binding MenuViewModel.LightThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Light" />
+					<MenuItem Name="rdoDarkTheme" GroupName="Theme" Header="_Dark" ToggleType="Radio" IsChecked="{Binding MenuViewModel.DarkThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Dark" />
+                </MenuItem>
+                <MenuItem Header="_Change Marker">
+					<MenuItem Header="_None" Name="rdoNoChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.NoChangeMarker}" />
+					<MenuItem Header="_Underline" Name="rdoUnderlineChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.UnderlineChangeMarker}" />
+					<MenuItem Header="_Double Underline" Name="rdoDoubleUnderlineChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.DoubleUnderlineChangeMarker}" />
+					<MenuItem Header="_Caret" Name="rdoCaretChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
+                </MenuItem>
+                <MenuItem Header="Show Horizontal _Scrollbar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
+                <MenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
+            </MenuItem>
+            <MenuItem Header="_Help">
+                <MenuItem Header="_Help" Click="Help_Clicked" InputGesture="F1" />
+                <Separator />
+				<MenuItem Header="About _Transmute" Click="AboutTransmute_Clicked" />
+				<MenuItem Header="About _Avalonia UI" Click="AboutAvalonia_Clicked" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Toolbar -->
+        <StackPanel Classes="toolbar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="5" Spacing="5">
+            <Button Command="{Binding #Window.GoBack}" i:Attached.Icon="fa-solid fa-arrow-left" ToolTip.Tip="Back (Alt+Left)" IsEnabled="{Binding RulesPaneViewModel.CanGoBack}" />
+            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-solid fa-arrow-right" ToolTip.Tip="Forward (Alt+Right)" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
+
+            <Line Classes="separator" />
+
+            <Button Command="{Binding #Window.NewRules}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="New Rules (Ctrl+N)" />
+            <Button Command="{Binding #Window.OpenRules}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Rules (Ctrl+O)" />
+            <Button Command="{Binding #Window.SaveRules}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Rules (Ctrl+S)" />
+            <ComboBox SelectedItem="{Binding RulesPaneViewModel.InputFormat}" ItemsSource="{Binding InputFormats}" ToolTip.Tip="Rules File Format" Width="90" />
+
+            <Line Classes="separator" />
+
+            <Button Command="{Binding #Window.NewLexicon}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="New Lexicon (Ctrl+Shift+N)" />
+            <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Lexicon (Ctrl+Shift+O)" />
+            <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Lexicon (Ctrl+Shift+S)" />
+            <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-file-import" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
+
+            <Line Classes="separator" />
+
+            <Button Command="{Binding #Window.OpenHelp}" i:Attached.Icon="fa-regular fa-circle-question" ToolTip.Tip="Help (F1)" />
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*" RowDefinitions="*,auto,auto">
+            <Grid ColumnDefinitions="4*,0,2*,0,2*" RowDefinitions="*" Grid.Row="0" Grid.Column="0">
+                <uc:RulesPane Grid.Column="0" Name="RulesPane" DataContext="{Binding RulesPaneViewModel}" />
+                <GridSplitter Grid.Column="1" />
+                <uc:InputPane Grid.Column="2" Name="InputPane" DataContext="{Binding InputPaneViewModel}" />
+                <GridSplitter Grid.Column="3" />
+                <uc:OutputPane Grid.Column="4" Name="OutputPane" DataContext="{Binding OutputPaneViewModel}" />
+            </Grid>
+
+            <uc:ErrorPane Grid.Column="0" Grid.Row="1" DataContext="{Binding RulesPaneViewModel.ErrorPaneViewModel}" />
+            <uc:StatusBar Grid.Column="0" Grid.Row="2" />
+        </Grid>
+    </DockPanel>
+</Window>

@@ -1,0 +1,38 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:viewmodel="using:Transmute.Desktop.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="775" d:DesignHeight="450"
+        x:Name="Window"
+        x:Class="Transmute.Desktop.HelpBrowser"
+        Closed="HelpBrowser_Closed"
+        Width="800" WindowState="Maximized"
+        Opened="HelpBrowser_Opened"
+        Title="Help">
+  <Grid ColumnDefinitions="400,2,*" RowDefinitions="*">
+      <TreeView Name="SelectedSection"
+                Grid.Row="0" Grid.Column="0"
+                ItemsSource="{Binding #Window.Sections}"
+                SelectionChanged="SelectedSection_SelectionChanged">
+          <TreeView.Styles>
+			  <Style Selector="TreeViewItem" x:DataType="viewmodel:HelpSectionViewModel">
+				  <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+              </Style>
+          </TreeView.Styles>
+          <TreeView.ItemTemplate>
+			  <TreeDataTemplate x:DataType="viewmodel:HelpSectionViewModel"
+                                ItemsSource="{Binding Children}">
+				  <TextBlock Text="{Binding Heading}" />
+              </TreeDataTemplate>
+          </TreeView.ItemTemplate>
+      </TreeView>
+      <GridSplitter Grid.Row="0" Grid.Column="1"
+                    MinWidth="3" MaxWidth="3"
+                    Background="SlateGray" />
+      <NativeWebView x:Name="HelpContent"
+                     Grid.Row="0" Grid.Column="2"
+                     WebMessageReceived="HelpContent_WebMessageReceived"
+                     NavigationCompleted="HelpContent_NavigationCompleted" />
+  </Grid>
+</Window>

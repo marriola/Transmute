@@ -1,0 +1,39 @@
+{
+	"source": "../README.md",
+	"destination": "../Transmute.Desktop",
+	"template": "source/template.html",
+	"titlePrefix": "Transmute help",
+	"author": "Matt Arriola",
+	"sections": [
+		{
+			"output": "1_About.md",
+			"title": "About",
+			"heading": "Transmute"
+		},
+		{
+			"output": "2_Rules.md",
+			"title": "Rule files",
+			"heading": "Rule files"
+		},
+		{
+			"output": "3_RuleTypes.md",
+			"title": "Rule types",
+			"heading": "Rule types"
+		},
+		{
+			"output": "4_Matching.md",
+			"title": "Matching",
+			"heading": "Matching"
+		},
+		{
+			"output": "5_DefiningSets.md",
+			"title": "Defining sets and features",
+			"heading": "Defining sets and features"
+		},
+		{
+			"output": "6_SyllableRules.md",
+			"title": "Syllable rules",
+			"heading": "Defining syllable rules"
+		}
+	]
+}

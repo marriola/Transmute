@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Transmute.Desktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="600"
+             x:DataType="vm:InputPaneViewModel"
+             x:Class="Transmute.Desktop.Views.InputPane">
+    
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel>
+		<TabStrip DockPanel.Dock="Top">
+			<TabStripItem IsSelected="True"
+                          Classes.dirty="{Binding IsLexiconDirty}"
+                          Content="Lexicon"
+                          ToolTip.Tip="Alt+L" />
+        </TabStrip>
+        <Panel DockPanel.Dock="Bottom">
+    		<TextBox Name="InputLexicon"
+                     Classes="multiline"
+                     AcceptsReturn="true"
+                     ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility}"
+                     ClearSelectionOnLostFocus="False"
+                     TextChanged="Lexicon_TextChanged"
+                     Text="{Binding InputLexicon}" />
+        </Panel>
+    </DockPanel>
+</UserControl>

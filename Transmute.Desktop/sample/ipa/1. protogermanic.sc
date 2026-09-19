@@ -1,0 +1,343 @@
+; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
+; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ʔ, ʕ and ʕʷ, respectively, on the basis that I think they're neat.
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                        Rules                        ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+Syllable = (
+    Onset = ((s|Laryngeal)) (C) ([C-Laryngeal])
+    Nucleus = (ˈ) ( [Overlong] | V | [Syllabic] | Laryngeal)
+    Coda = (C) (C) ([C-Glide])
+)
+
+;;;;;;;;;;;;
+; Pre-PGmc ;
+;;;;;;;;;;;;
+
+; You can omit the environment section for unconditional rules.
+
+[+Palatalized] → [-Palatalized]
+
+; Insertion rules transform nothing into something. You can omit the ∅ symbol if you want. If you do that, an arrow at the beginning by itself might look odd, so you can use a slash instead.
+
+∅ → u / _Syllabic
+[+Syllabic] → [-Syllabic]
+
+[-Overlong] → [+Overlong] / _#
+
+Laryngeal → ∅ / #_C
+
+; e-coloring and dropping of laryngeals in onset
+
+e → o / ʕʷ(ˈ)_
+e → a / ʕ(ˈ)_
+Laryngeal → ∅ / _(ˈ)V
+
+; Homorganic vowels in hiatus → long vowel
+
+aa → aːː
+ee → eːː
+ii → iːː
+oo → oːː
+uu → uːː
+
+; e-coloring
+
+e → o / _(w|j)ʕʷ
+e → a / _(w|j)ʕ
+eʕʷ → oː
+eʕ → ɑː
+
+; Compensatory lengthening with loss of laryngeals after sonorants
+
+[-Long]Laryngeal → [+Long] / _
+Laryngeal → ∅ / (V|Sonorant)_
+
+; Cowgill's law
+
+ʕʷ → g / (Sonorant)_w
+
+; Vocalization of remaining laryngeals
+
+Laryngeal → ə
+
+
+;;;;;;;;;;;;;;
+; Early PGmc ;
+;;;;;;;;;;;;;;
+
+;[+Glide] → [-Glide] / V_C
+
+; Sievers' law
+
+∅ → i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
+∅ → i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+
+(j|w) → ∅ / _(e|a|o)#
+(e|a|o) → ∅ / σσ_#
+
+; Grimm's law: voiceless stops become fricatives, except after an obstruent
+
+[Stop-Voiced] → [+Fricative] / (#|V|Sonorant)_	; ![C -Nasal -Liquid -Glide]_
+
+; Undo Grimm's law after s-
+
+[+Fricative-Voiced] → [-Fricative] / s_
+
+; Germanic spirant law
+
+[Stop+Labial] → ɸ / _(t|s) ;(C|V)
+[Stop+Dental] → ts / _(t|s) ;(C|V)
+tst → ss
+;tss → ss
+ss → s / _#
+[Stop+Velar] → x / _(t|s)!#
+
+; Grimm's law: voiced unaspirated stops become voiceless stops
+
+[Stop +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
+
+; Grimm's law: aspirated stops become unaspirated
+
+[Stop+Aspirated] → [-Aspirated]
+
+; Lenition of /g/ and intervocalic voiced stops
+
+g → ɣ / (#|Liquid|Fricative)_
+
+[Stop+Voiced] → [+Fricative] / (V|Stressed|Glide)_(#|V|Stressed|Glide)
+
+; Verner's law
+
+; Here we match an unstressed syllable by matching on the NucleusStart boundary, and then requiring the very next thing to be an unstressed vowel. If we encounter a stressed vowel instead, it will be forced to retry the rule starting from the next syllable. Additionally, with ![-Voiced] we block the rule when a voiceless consonant appears on either side.
+
+[+Fricative-Voiced] → [+Voiced] / NucleusStart [-Stressed] CodaStart ![-Voiced] (Sonorant) _ ![-Voiced]
+
+; Voiced fricatives resulting from Verner's law become stops after a nasal
+
+[+Fricative+Voiced] → [-Fricative] / Nasal_
+
+; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
+
+[+Stressed] → [-Stressed]
+
+; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
+
+s → z / V((Nasal|Liquid))_#
+
+gʷ → b / #_
+
+nw → nn
+ln → ll
+zm → mm
+
+e → i / σσ_(#|C)
+e → i / σσ_(#|C)
+(ei|ej) → iː
+iji → iː
+ij → iː / _(C|#)
+iːi → iː
+
+ji → i / V(C)(C)_(#|C)
+
+(o|a) → ɑ
+
+;;;;;;;;;;;;;
+; Late PGmc ;
+;;;;;;;;;;;;;
+
+m → n / _(#|Dental)
+[-Nasalized]n → [+Nasalized] / _#
+
+ẽː → ɑ̃ː
+
+; * Stressed schwa becomes /a/
+; * Unstressed schwa disappears between consonants
+; * Remaining schwas become /a/
+
+ə → ɑ / # NucleusStart _
+ə → ∅ / C_C
+ə → ɑ
+
+t → ∅ / σ[V-Stressed](C)_#
+gw → g / n_
+ɣʷ → w
+
+ɑː → ɔː
+ɑ̃ː → ɔ̃ː
+
+e → i / _ NucleusStart (i|j)
+e → i / _n SyllableEnd
+
+; Combined double transformation and deletion
+; 1. Nasalization and compensatory lengthening of a vowel
+; 2. Deletion of /n/
+
+[-Nasalized]n → [+Nasalized +Long] / _x
+
+; Not really sure where this should go, so I'll just stick it at the end
+
+sr → str
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;                  Sets and features                  ;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+
+V = (
+    ə
+    ɑ  a  e  i  o     u
+    ɑː aː eː iː oː ɔː uː
+    ɑ̃  ẽ  ĩ  õ     ũ
+    ɑ̃ː ẽː ĩː õː ɔ̃ː ũː
+    ɑu eu
+)
+
+[Mid] = (e, o)
+[Round] = (o, u)
+[High] = (i, u)
+
+[Long] = (
+    ɑ → ɑː
+    a → aː
+    e → eː
+    i → iː
+    o → oː
+    u → uː
+    ɔː 
+    ɑ̃ → ɑ̃ː
+    ẽ → ẽː
+    ĩ → ĩː
+    õ → õː
+    ũ → ũː
+    ɔ̃ː
+)
+
+[Overlong] = (
+    aː → aːː
+    ɑː → ɑːː
+    ɑ̃ː → ɑ̃ːː
+    oː → oːː
+    ɔː → ɔːː
+    ɔ̃ː → ɔ̃ːː
+)
+
+[Nasalized] = (
+    ɑ → ɑ̃
+    e → ẽ
+    i → ĩ
+    o → õ
+    u → ũ
+    ɑː → ɑ̃ː
+    eː → ẽː
+    iː → ĩː
+    oː → õː
+    uː → ũː
+    ɑːː → ɑ̃ːː
+    oːː → õːː
+)
+
+[Stressed] = (
+    a → ˈa
+    aː → ˈaː
+    ɑ → ˈɑ
+    ɑː → ˈɑː
+    ɑu → ˈɑu
+    e → ˈe
+    eː → ˈeː
+    eu → ˈeu
+    i → ˈi
+    iː → ˈiː
+    o → ˈo
+    oː → ˈoː
+    ɔ → ˈɔ
+    ɔː → ˈɔː
+    u → ˈu
+    uː → ˈuː
+    ə → ˈə
+    m̩ → ˈm̩
+    n̩ → ˈn̩
+    l̩ → ˈl̩
+    r̩ → ˈr̩
+)
+
+[Syllabic] = (
+    m → m̩
+    n → n̩
+    l → l̩
+    r → r̩
+)
+
+Stop = (
+    k  kʲ  kʷ  p  t
+    g  gʲ  gʷ  b  d
+    gʰ gʲʰ gʷʰ bʰ dʰ
+)
+
+Dental = (t, d, dʰ, θ, ð, s, z)
+Labial = (m, p, b, bʰ, ɸ, β)
+Labiovelar = (kʷ, gʷ, gʷʰ, xʷ, ɣʷ)
+Velar = (k, g, gʰ, gʲʰ, x, ɣ, Labiovelar)
+Liquid = (l, r)
+Nasal = (m, n)
+[Glide] = (u → w, i → j)
+Sonorant = (Nasal, Liquid, Glide)
+Laryngeal = (ʔ, ʕ, ʕʷ)
+Sibilant = (s z)
+
+Obstruent = (Stop, Fricative)
+C = (Dental, Labial, Velar, Sonorant, Liquid, Glide, Nasal, Laryngeal, Sibilant, Fricative, [-Fricative], Palatalized)
+
+[Voiced] = (
+    k → g
+    gʰ
+    x → ɣ
+    xʷ → ɣʷ
+    kʲ → gʲ
+    gʲʰ
+    kʷ → gʷ
+    gʷʰ
+    p → b
+    bʰ
+    ɸ → β
+    t → d
+    s → z
+    dʰ
+    θ → ð
+    Sonorant
+)
+
+[Palatalized] = (
+    k → kʲ
+    g → gʲ
+    gʰ → gʲʰ
+)
+
+[Labialized] = (
+    k → kʷ
+    g → gʷ
+    gʰ → gʷʰ
+)
+
+[Aspirated] = (
+    g → gʰ
+    gʲ → gʲʰ
+    gʷ → gʷʰ
+    b → bʰ
+    d → dʰ
+)
+
+[Fricative] = (
+    k → x
+    kʷ → xʷ
+    p → ɸ
+    t → θ
+    g → ɣ
+    gʷ → ɣʷ
+    b → β
+    d → ð
+    s
+    z
+)

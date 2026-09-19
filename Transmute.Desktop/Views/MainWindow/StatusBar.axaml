@@ -1,0 +1,37 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Transmute.Desktop.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:DataType="vm:MainWindowViewModel"
+             x:Class="Transmute.Desktop.Views.StatusBar">
+
+    <Design.DataContext>
+        <vm:MainWindowViewModel/>
+    </Design.DataContext>
+
+    <DockPanel Background="{DynamicResource SystemControlBackgroundBaseHighBrush}">
+        <TextBlock DockPanel.Dock="Left"
+                   Margin="5" FontSize="12"
+                   IsVisible="{Binding !RulesPaneViewModel.IsCompiling}"
+                   Text="{Binding RulesPaneViewModel.RulesPosition}" />
+
+        <StackPanel DockPanel.Dock="Right"
+                    IsVisible="{Binding !RulesPaneViewModel.IsCompiling}"
+                    Orientation="Horizontal">
+		    <TextBlock HorizontalAlignment="Right"
+                       Margin="5" FontSize="12"
+                       Text="{Binding InputPaneViewModel.Status}" />
+
+		    <TextBlock HorizontalAlignment="Right"
+                       Margin="5" FontSize="12"
+                       Text="{Binding RulesPaneViewModel.Status}" />
+        </StackPanel>
+
+        <ProgressBar DockPanel.Dock="Right"
+                     Height="20" Margin="0 0 5 0"
+                     IsVisible="{Binding RulesPaneViewModel.IsCompiling}"
+                     IsIndeterminate="{Binding RulesPaneViewModel.IsCompiling}" />
+    </DockPanel>
+</UserControl>

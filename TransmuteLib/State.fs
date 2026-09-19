@@ -1,7 +1,7 @@
 ﻿// Project:     TransmuteLib
 // Module:      State
 // Description: FSA state type
-// Copyright:   (c) 2023 Matt Arriola
+// Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
 namespace TransmuteLib
@@ -24,15 +24,17 @@ type TransitionResult =
     /// Drops the last N symbols.
     | Deletes of count: int * text: string
 with
-    member this.Or other =
-        match this, other with
-        | OutputDefault, x
-        | x, OutputDefault ->
-            x
-        | x, y when x <> y ->
-            failwithf "Tried to OR two transition results: %O, %O" x y
-        | _ ->
-            this
+    override this.ToString() =
+        match this with
+        | OutputDefault -> "OutputDefault"
+        | ReplacesWith (count, output) -> $"ReplacesWith ({count}, {output})"
+        | InsertsBefore output -> $"InsertsBefore {output}"
+        | InsertsAfter output -> $"InsertsAfter {output}"
+        | Deletes (count, text) -> $"Deletes ({count}, {text})"
+
+module TransitionResult =
+    let inline coalesce result1 result2 =
+        if result1 = OutputDefault then result2 else result1
 
 type State =
     | State of name: string * ordinal: int * stateType: StateType
@@ -63,7 +65,7 @@ type State =
             let mutable ordinal = -1
             System.Int32.TryParse(name.Substring(1), ref ordinal) |> ignore
             State (name, ordinal, NonFinal)
-    
+
         /// Marks a state as being final.
         static member makeFinal = function
             | State (name, ordinal, _) ->

@@ -13,9 +13,18 @@ type InputSymbol =
     | OnEpsilon
     | OnAny
 with
-    member this.Char =
+    override this.ToString() =
         match this with
-        | OnChar c -> c
+        | OnChar c when Special.Diacritics.Contains c ->
+            "◌" + string c
+        | OnChar c when Special.Symbols.Contains c ->
+            Special.SymbolNames[c]
+        | OnChar c ->
+            string c
+        | OnEpsilon ->
+            "∅"
+        | OnAny ->
+            "*"
 
 type Destination = To of State
 
@@ -108,6 +117,7 @@ module private StateMachine =
           startState: unit -> State
           errorState: unit -> State
           initialValue: unit -> 'TValue
+          captureToneDiacritics: unit -> bool
           fError: unit -> OnError<'TValue, 'TResult>
           fTransition: unit -> OnTransition<'TValue>
           fFinish: unit -> OnFinish<'TValue, 'TResult>
@@ -121,6 +131,7 @@ module private StateMachine =
           startState = require "start state"
           errorState = require "error state"
           initialValue = require "initial value"
+          captureToneDiacritics = provide false
           fError = require "error function"
           fTransition = require "transition function"
           fFinish = require "finish function" }
@@ -137,6 +148,9 @@ module private StateMachine =
     let withInitialValue value config =
         { config with initialValue = provide value }
 
+    let captureToneDiacritics config =
+        { config with captureToneDiacritics = provide true }
+
     let onError fError config =
         { config with fError = provide fError }
 
@@ -151,6 +165,7 @@ module private StateMachine =
           config.startState(),
           config.errorState(),
           config.initialValue(),
+          config.captureToneDiacritics(),
           config.fError(),
           config.fTransition(),
           config.fFinish() )
@@ -168,6 +183,7 @@ module private StateMachine =
               startState,
               errorState,
               initialValue,
+              captureToneDiacritics,
               fError,
               fTransition,
               fFinish
@@ -210,20 +226,24 @@ module private StateMachine =
                       currentValue = currentValue }
 
                 if transition = None then
-                    match fError nextSymbol machineState with
-                    | Restart value when currentState <> startState ->
-                        // Reprocess the same input unless we're on the start state
-                        inner value startState position input
-                    | Restart value when rest <> [] ->
-                        // Process the next input if there is one
-                        inner value startState nextPosition nextInput
-                    | Restart value ->
-                        // Nothing left, just finish
-                        fFinish value
-                    | Continue value ->
-                        inner value currentState nextPosition nextInput
-                    | Stop result ->
-                        result
+                    if captureToneDiacritics && Special.ToneDiacritics.Contains nextSymbol then
+                        let t = (From currentState, OnChar nextSymbol, To currentState)
+                        inner (fTransition nextSymbol t machineState) currentState position rest
+                    else
+                        match fError nextSymbol machineState with
+                        | Restart value when currentState <> startState ->
+                            // Reprocess the same input unless we're on the start state
+                            inner value startState position input
+                        | Restart value when rest <> [] ->
+                            // Process the next input if there is one
+                            inner value startState nextPosition nextInput
+                        | Restart value ->
+                            // Nothing left, just finish
+                            fFinish value
+                        | Continue value ->
+                            inner value currentState nextPosition nextInput
+                        | Stop result ->
+                            result
                 else
                     let transition = Option.get transition
                     inner (fTransition nextSymbol transition machineState) nextState nextPosition nextInput

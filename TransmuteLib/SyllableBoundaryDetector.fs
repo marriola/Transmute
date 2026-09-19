@@ -7,11 +7,6 @@
 namespace TransmuteLib
 
 module private SyllableBoundaryDetector =
-    type private DetectorState =
-        { segments: char list
-          syllableBoundaries: int list
-          lastOutputPosition: int }
-
     let private startSegments = dict [
         'O', OnsetStart
         'N', NucleusStart
@@ -85,7 +80,7 @@ module private SyllableBoundaryDetector =
 
     /// Classifies each segment in a word as belonging to either the onset, nucleus or coda.
     let private classifySegments (rule: string -> string) word =
-        (rule word).Replace(".", "")
+        rule word
         |> Seq.toList
 
     let private isValidSyllableSegment = function
@@ -100,6 +95,7 @@ module private SyllableBoundaryDetector =
 
         if List.exists isValidSyllableSegment segments then
             // if the syllabizer returned any leftover segments, the syllable rule wasn't able to match the whole word
+            // TODO report the location instead so we can put an underscore or a caret pointing at the offending characters
             let segments =
                 segments
                 |> List.map string
@@ -113,4 +109,4 @@ module private SyllableBoundaryDetector =
                 |> findSegmentBoundaryLocations
                 |> insertSyllableBoundaries allBoundaryTypes word
 
-            Result.Ok (segmentLocations, segmentedWord)
+            Result.Ok segmentedWord

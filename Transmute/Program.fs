@@ -9,6 +9,27 @@ open System
 open System.IO
 open TransmuteLib
 open Utils
+open TransmuteLib.Utils.Operators
+
+let dumpRules (rules: CompileRuleResult list) =
+    for rule in rules do
+        let transitions, transformations = rule.compiledRule
+        printfn $"\nRule {rule.lineNumber}: {rule.node}"
+
+        transitions
+        |> Map.toList
+        |> List.iteri (fun j ((fromState, m), toState) ->
+            let t = $"({fromState}, {m})"
+            printfn $"{j+1}.\t%-35s{t}-> {toState}")
+
+        printfn "\ntransformations:"
+
+        transformations
+        |> Map.toList
+        |> List.iteri (fun j ((From origin, input, To dest), result) ->
+            printfn $"{j+1}. ({origin}, {input}) -> {dest} => {result}")
+
+        printfn "\n********************************************************************************"
 
 [<EntryPoint>]
 let main argv =
@@ -24,14 +45,30 @@ let main argv =
     if not (Arguments.validate options) then
         Environment.Exit 0
 
+    let rulesFileOptions =
+        let baseOptions =
+            RulesFileOptions.Default
+            |> RulesFileOptions.withSource (options.rulesFile.GetStream())
+            |> RulesFileOptions.withInputFormat options.format
+            |> RulesFileOptions.withTestRules options.testRules
+            |> RulesFileOptions.withSilence (options.verbosityLevel = Silent)
+            |> RulesFileOptions.withParallelism options.parallelism
+
+        if options.verbosityLevel > Silent then
+            baseOptions
+            |> RulesFileOptions.withProgressHook (fun completedCount ruleCount ->
+                Console.Error.Write $"[{completedCount}/{ruleCount}] Compiling...\r")
+        else
+            baseOptions
+
     let rulesFile =
-        RulesFile.Options.Default
-        |> RulesFile.Options.withSource (options.rulesFile.GetStream())
-        |> RulesFile.Options.withInputFormat options.format
-        |> RulesFile.Options.withTestRules options.testRules
-        |> RulesFile.Options.withSilent (options.verbosityLevel = Silent)
-        |> RulesFile.Options.withParallelism options.parallelism
+        rulesFileOptions
         |> RulesFile.load
+        |> Async.RunSynchronously
+        |> Result.orAbort
+
+    if options.verbosityLevel > Silent then
+        Console.Error.WriteLine "\n"
 
     // List selected rules
 
@@ -51,7 +88,7 @@ let main argv =
     // Dump rule DFAs
 
     if options.verbosityLevel >= ShowDFA then
-        RulesFile.dumpRules rulesFile.rules
+        dumpRules rulesFile.rules
 
         printfn ""
 
@@ -75,7 +112,7 @@ let main argv =
 
     // Transform lexicon and report
 
-    let transformedLexicon, totalMilliseconds = RulesFile.transformLexicon rulesFile (Array.ofList lexicon)
+    let transformedLexicon, totalMilliseconds = RulesFile.transformLexicon rulesFile (Some Ascii) (Array.ofList lexicon)
     let outputStream =
         match options.outputFile with
         | None -> Console.Out
@@ -105,7 +142,11 @@ let main argv =
                 for line in result.changes do
                     if options.verbosityLevel >= ShowTimes then
                         fprintf outputStream "       "
-                    fprintfn outputStream "%s" line
+
+                    if line.ruleNumber <> -1 then
+                        Console.WriteLine $"%3d{line.ruleNumber}: {line.change}"
+                    else
+                        Console.WriteLine $"     {line.change}"
 
             fprintfn outputStream ""
 
@@ -126,7 +167,7 @@ let main argv =
         let numRules = float rulesFile.rules.Length
         let numWords = float lexicon.Length
 
-        if not rulesFile.recompiled then
+        if rulesFile.cached then
             printfn $"Loaded {rulesFile.rules.Length} rules in {formatTime rulesFile.totalCompileTime}"
         else
             printfn $"Compiled {rulesFile.rules.Length} rules in {formatTime rulesFile.totalCompileTime} (average {formatTime (rulesFile.totalCompileTime / numRules)})"

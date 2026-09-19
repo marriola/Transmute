@@ -1,0 +1,176 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+    <ApplicationIcon>Assets\transmute.ico</ApplicationIcon>
+    <Configurations>Debug;Release</Configurations>
+    <AssemblyVersion>0.2</AssemblyVersion>
+    <FileVersion>0.2</FileVersion>
+    <Configurations>Debug;Debug Verbose;Release</Configurations>
+    <Copyright>© 2026 Matt Arriola</Copyright>
+    <PublishTrimmed>False</PublishTrimmed>
+    <PublishAot>False</PublishAot>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <AssemblyName>Transmute</AssemblyName>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <PublishAot>True</PublishAot>
+    <PublishTrimmed>True</PublishTrimmed>
+  </PropertyGroup>
+
+  <PropertyGroup Label="Avalonia">
+    <AvaloniaXamlIlDebuggerLaunch>False</AvaloniaXamlIlDebuggerLaunch>
+    <AvaloniaXamlCreateSourceInfo>False</AvaloniaXamlCreateSourceInfo>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaXaml Remove="help\**" />
+    <Compile Remove="help\**" />
+    <EmbeddedResource Remove="help\**" />
+    <None Remove="help\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AvaloniaXaml Remove="Assets\DataTable.axaml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\transmute.ico" />
+    <Content Include="LICENSE">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.2" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.2" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.20">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.2" />
+    <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.11" />
+    <PackageReference Include="Optris.Icons.Avalonia.FontAwesome" Version="12.0.7" />
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TransmuteLib\TransmuteLib.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Update="Help.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Help.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Properties\Resources.Designer.cs">
+      <DesignTime>True</DesignTime>
+      <AutoGen>True</AutoGen>
+      <DependentUpon>Resources.resx</DependentUpon>
+    </Compile>
+    <Compile Update="Views\GoToLineDialog.axaml.cs">
+      <DependentUpon>GoToLineDialog.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\HelpBrowser.axaml.cs">
+      <DependentUpon>HelpBrowser.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\MainWindow\ErrorPane.axaml.cs">
+      <DependentUpon>ErrorPane.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\MainWindow\InputPane.axaml.cs">
+      <DependentUpon>InputPane.axaml</DependentUpon>
+    </Compile>
+    <Compile Update="Views\MainWindow\OutputPane.axaml.cs">
+      <DependentUpon>OutputPane.axaml</DependentUpon>
+    </Compile>
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Update="Help.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Help.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Properties\Resources.resx">
+      <Generator>ResXFileCodeGenerator</Generator>
+      <LastGenOutput>Resources.Designer.cs</LastGenOutput>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="sample\ipa\3. oldenglish.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\1. pie.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\1. protogermanic.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\2. protogermanic.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\sindarin.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\sindarin.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\2. westgermanic.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\3. westgermanic.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\tonogenesis.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\ipa\tonogenesis.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\3. oldenglish.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\1. pie.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\1. protogermanic.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\2. protogermanic.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\sindarin.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\sindarin.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\2. westgermanic.sc">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="sample\x-sampa\3. westgermanic.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>
