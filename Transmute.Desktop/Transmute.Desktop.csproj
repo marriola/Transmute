@@ -30,28 +30,17 @@
   <!-- Recompile help.tar.gz when README.md changes -->
 
   <ItemGroup>
-    <ins Include="../README.md" />
-    <outs Include="help.tar.gz" />
+    <HelpInput Include="../README.md" />
+    <HelpOutput Include="help.tar.gz" />
   </ItemGroup>
 
-  <Target Name="CompileHelp" BeforeTargets="BeforeBuild" Inputs="@(ins)" Outputs="@(outs)">
-    <Exec Command="../Transmute.Help/compile" WorkingDirectory="../Transmute.Help" />
+  <Target Name="CompileHelp" BeforeTargets="BeforeBuild" Inputs="@(HelpInput)" Outputs="@(HelpOutput)">
+    <Exec Command="compile" WorkingDirectory="../Transmute.Help" />
     <Touch Files="Help.resx" />
   </Target>
 
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <AvaloniaXaml Remove="help\**" />
-    <Compile Remove="help\**" />
-    <EmbeddedResource Remove="help\**" />
-    <None Remove="help\**" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <AvaloniaXaml Remove="Assets\DataTable.axaml" />
   </ItemGroup>
 
   <ItemGroup>

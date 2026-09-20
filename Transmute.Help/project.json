@@ -1,6 +1,6 @@
 {
 	"source": "../README.md",
-	"destination": "../Transmute.Desktop",
+	"destination": "../Transmute.Desktop/help.tar.gz",
 	"template": "source/template.html",
 	"titlePrefix": "Transmute help",
 	"author": "Matt Arriola",
