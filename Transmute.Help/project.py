@@ -3,29 +3,10 @@ import os.path
 import re
 import subprocess
 
-class InputFile:
-	def __init__(self, filename):
-		self.filename = filename
-		self.lines = []
-
-class Section:
-	def __init__(self, filename, title):
-		self.filename = filename
-		self.title = title
-		self.headings = []
-
-class Heading:
-	def __init__(self, level, title, url):
-		self.level = level
-		self.title = title
-		self.url = url
-		self.children = []
-
-class Split:
-	def __init__(self, filename, title, heading):
-		self.filename = filename
-		self.title = title
-		self.heading = heading
+from heading import Heading
+from input_file import InputFile
+from section import Section
+from split_point import SplitPoint
 
 class Project:
 	current_headings = None
@@ -45,19 +26,13 @@ class Project:
 		self.author = project['author']
 
 		for section in project['sections']:
-			self.splits.append(Split(section['output'], section['title'], section['heading']))
+			self.splits.append(SplitPoint(section['output'], section['title'], section['heading']))
 
-		split_point = self.splits[0]
-
-		self.index.append(Section(split_point.filename, split_point.title))
+		self.index.append(Section(self.splits[0].filename, self.splits[0].title))
 		self.current_headings = self.index[0].headings
 
-		self.files.append(InputFile(split_point.filename))
+		self.files.append(InputFile(self.splits[0].filename))
 		self.current_lines = self.files[0].lines
-
-	def header_level(self, line):
-		'''Returns the level of a heading'''
-		return len(line.split(' ')[0])
 
 	def to_dict(self, heading, filename):
 		return {
@@ -65,23 +40,6 @@ class Project:
 			'Path': filename + heading.url.replace('.md', '.html'),
 			'Children': [self.to_dict(c, filename) for c in heading.children]
 		}
-
-	def normalize_headers(self, file, index):
-		'''Adjusts a file's headings down to bring the lowest level to level 1'''
-
-		min_header_level = min(self.header_level(line) for line in file.lines if line.startswith('#'))
-
-		for h in index.headings:
-			h.level -= min_header_level - 1
-
-		for i in range(0, len(file.lines)):
-			line = file.lines[i]
-
-			if line.startswith('#'):
-				split_index = line.index(' ')
-				header, rest = line[:split_index], line[split_index+1:]
-				header_length = len(header) - min_header_level + 1
-				file.lines[i] = '#' * header_length + ' ' + rest
 
 	def handle_header(self, line):
 		'''Record the heading for the section, and end the section if at a defined split point.'''
@@ -112,28 +70,7 @@ class Project:
 
 		self.current_headings.append(next_heading)
 		self.last_heading = next_heading
-		# print([h.title for h in current_headings])
-
-	def handle_links(self, line, current_headings):
-		'''Iterates over each link in the text and adds the filename to each when the section it points to is located in another file.'''
-
-		link_matches = list(re.finditer('\\[(?P<text>.*?)\\]\\((?P<url>.*?)\\)', line))
-
-		if len(link_matches) == 0:
-			return line
-
-		for m in reversed(link_matches):
-			url = m.group('url')
-
-			if url.startswith('#') and not any(h for h in current_headings if h.url == url):
-				section = [s for s in self.index if any(h for h in s.headings if h.url == url)]
-
-				if section:
-					url = section[0].filename.replace('.md', '.html') + url
-					url_start, url_end = m.span('url')
-					line = line[:url_start] + url + line[url_end:]
-
-		return line
+		# print([h.title for h in self.current_headings])
 
 	def process_source(self):
 		'''Processes the source file'''
@@ -168,10 +105,8 @@ class Project:
 		'''Writes the individual markdown files'''
 
 		for file, section in zip(self.files, self.index):
-			self.normalize_headers(file, section)
-
-			for i in range(0, len(file.lines)):
-				file.lines[i] = self.handle_links(file.lines[i], section.headings)
+			file.normalize_headers(section)
+			file.resolve_links(section.headings, self.index)
 
 			out_path = os.path.join('out', file.filename)
 
