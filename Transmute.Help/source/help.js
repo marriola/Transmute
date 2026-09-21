@@ -1,4 +1,9 @@
+const headerHeight = 55;
 let isHighlightDisabled = true;
+
+function scrollPastHeader() {
+	window.scrollTo(0, window.scrollY - headerHeight);
+}
 
 function disableHighlight() {
 	isHighlightDisabled = true;
@@ -19,6 +24,7 @@ function selectDemo(lexiconFile, rulesFile) {
 }
 
 window.addEventListener('hashchange', () => {
+	scrollPastHeader();
 	disableHighlight();
 	
 	invokeCSharpAction({
@@ -62,6 +68,10 @@ const headingsObserver = new IntersectionObserver(
 	});
 
 window.addEventListener('load', () => {
+	if (document.location.hash) {
+		scrollPastHeader();
+	}
+	
 	for (const h of document.querySelectorAll('h1, h2, h3, h4, h5, h6')) {
 		headingsObserver.observe(h);
 	}
