@@ -140,8 +140,20 @@ public partial class RulesPane : UserControl
 
             Rules.ScrollToLine(lineNumber + 1);
             await Rules.HighlightLine(lineNumber, false);
-            ViewModel.NavigateTo(RulesPaneViewModel.GetOffset(Rules.Text, lineNumber));
+            var newLocation = ViewModel.NavigationList.FirstOrDefault(n => n.lineNumber == lineNumber);
+            ViewModel.NavigateTo(RulesPaneViewModel.GetOffset(Rules.Text, lineNumber), newLocation?.Description);
             UpdateHighlightedRuleSelection(lineNumber);
+        });
+    }
+
+    public void GoToHistory(NavigationHistory entry)
+    {
+        Dispatcher.UIThread.Post(async () =>
+        {
+            Rules.ScrollToLine(entry.Line + 1);
+            await Rules.HighlightLine(entry.Line, false);
+            ViewModel.SelectHistory(entry);
+            UpdateHighlightedRuleSelection(entry.Line);
         });
     }
 
@@ -171,7 +183,7 @@ public partial class RulesPane : UserControl
             return;
         }
 
-        var (line, position) = ViewModel.NavigateBack();
+        var (line, position, _) = ViewModel.NavigateBack();
         Rules.CaretOffset = position;
         Rules.ScrollToLine(line);
         UpdateHighlightedRuleSelection(line);
@@ -184,7 +196,7 @@ public partial class RulesPane : UserControl
             return;
         }
 
-        var (line, position) = ViewModel.NavigateForward();
+        var (line, position, _) = ViewModel.NavigateForward();
         Rules.CaretOffset = position;
         Rules.ScrollToLine(line);
         UpdateHighlightedRuleSelection(line);
@@ -192,8 +204,7 @@ public partial class RulesPane : UserControl
 
     public async Task NewRules()
     {
-        ViewModel.OriginalRules = string.Empty;
-        Rules.Text = string.Empty;
+        ViewModel.Reset();
     }
 
     public async Task OpenRules()
@@ -371,8 +382,11 @@ public partial class RulesPane : UserControl
     private void Rules_Tapped(object? sender, TappedEventArgs e)
     {
         ViewModel.UpdateRulesPosition(Rules.CaretOffset);
-        ViewModel.NavigateTo(Rules.CaretOffset);
-        UpdateSelectedRule();
+
+        if (UpdateSelectedRule() is NavigationEntry entry)
+        {
+            ViewModel.NavigateTo(Rules.CaretOffset, entry.Description);
+        }
     }
 
     private void Rules_TextChanged(object? sender, EventArgs e)
@@ -477,14 +491,19 @@ public partial class RulesPane : UserControl
         }
     }
 
-    private void UpdateSelectedRule()
+    private NavigationEntry? UpdateSelectedRule()
     {
-        if (ViewModel.NavigationList.OrderBy(n => n.lineNumber).LastOrDefault(n => n.lineNumber <= Rules.LineNumber) is NavigationEntry entry
-            && entry != HighlightedRule.SelectedItem)
+        var entry = ViewModel.NavigationList
+            .OrderBy(n => n.lineNumber)
+            .LastOrDefault(n => n.lineNumber <= Rules.LineNumber);
+
+        if (entry != null && entry != HighlightedRule.SelectedItem)
         {
             _dontUpdateNavigationStack = true;
             HighlightedRule.SelectedItem = entry;
         }
+
+        return entry;
     }
 
     private int LineToOffset(int lineNumber)

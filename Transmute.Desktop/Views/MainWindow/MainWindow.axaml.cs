@@ -62,7 +62,7 @@ namespace Transmute.Desktop.Views
         public async Task ApplyRules()
         {
             RulesPane.StopNavigationListUpdate();
-            
+
             if (await ViewModel.ApplyRules())
             {
                 return;
@@ -308,7 +308,7 @@ namespace Transmute.Desktop.Views
             InputPane.InputLexicon.GetObservable(IsFocusedProperty).Subscribe(f => _focusedEditor = InputPane.InputLexicon);
 
             OutputPane.OutputLexicon.GetObservable(IsFocusedProperty).Subscribe(f => _focusedEditor = OutputPane.OutputLexicon);
-            
+
             if (!_configurationService.IsNew)
             {
                 _configurationService.ChangeTheme(_configurationService.Configuration.ThemeVariant);
@@ -355,6 +355,23 @@ namespace Transmute.Desktop.Views
             };
 
             RulesPane.Rules.Focus();
+        }
+
+        private void History_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (NavigationHistory.SelectedIndex < 0 || NavigationHistory.SelectedIndex >= ViewModel.RulesPaneViewModel.NavigationHistory.Count)
+            {
+                return;
+            }
+
+            var newLocation = ViewModel.RulesPaneViewModel.NavigationHistory[NavigationHistory.SelectedIndex];
+
+            if (newLocation != ViewModel.RulesPaneViewModel.CurrentPosition)
+            {
+                ViewModel.RulesPaneViewModel.CurrentPosition = newLocation;
+                RulesPane.GoToHistory(newLocation);
+                BackButton?.Flyout?.Hide();
+            }
         }
 
         private void TheMenu_Opened(object? sender, RoutedEventArgs e)

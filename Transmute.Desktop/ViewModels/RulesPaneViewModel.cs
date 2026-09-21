@@ -8,7 +8,6 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.FSharp.Collections;
 using Microsoft.FSharp.Core;
 using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
@@ -66,6 +65,9 @@ namespace Transmute.Desktop.ViewModels
         public partial TextDocument Rules { get; set; } = new();
 
         [ObservableProperty]
+        public partial int CurrentLine { get; set; }
+
+        [ObservableProperty]
         public partial ObservableCollection<NavigationEntry> TransitionTables { get; set; } = new();
 
         [ObservableProperty]
@@ -90,9 +92,16 @@ namespace Transmute.Desktop.ViewModels
 
         public RulesFile? CompiledRules { get; set; }
 
-        public Stack<(int, int)> backStack = new([(1, 0)]);
+        [ObservableProperty]
+        public partial ObservableCollection<NavigationHistory> NavigationHistory { get; set; } = new();
 
-        public Stack<(int, int)> forwardStack = new();
+        [ObservableProperty]
+        public partial NavigationHistory CurrentPosition { get; set; }
+
+        public int NavStackPosition { get; set; } = 0;
+
+        [ObservableProperty]
+        public partial bool HasHistory { get; set; }
 
         [ObservableProperty]
         public partial bool CanGoBack { get; set; } = false;
@@ -105,43 +114,56 @@ namespace Transmute.Desktop.ViewModels
 
         public bool IsLoading { get; set; }
 
-        public (int line, int position) NavigateBack()
+        public NavigationHistory NavigateBack()
         {
-            var position = backStack.Peek();
-
-            if (backStack.Count > 0)
+            if (NavStackPosition == NavigationHistory.Count - 1)
             {
-                backStack.Pop();
-                forwardStack.Push(position);
-                CanGoBack = backStack.Count > 1;
-                CanGoForward = forwardStack.Count > 1;
+                return NavigationHistory.Last();
             }
 
-            return position;
+            CurrentPosition = NavigationHistory[++NavStackPosition];
+            CanGoBack = NavStackPosition < NavigationHistory.Count - 1;
+            CanGoForward = true;
+
+            return CurrentPosition;
         }
 
-        public (int line, int position) NavigateForward()
+        public NavigationHistory NavigateForward()
         {
-            var position = forwardStack.Peek();
-
-            if (forwardStack.Count > 0)
+            if (NavStackPosition == 0)
             {
-                forwardStack.Pop();
-                backStack.Push(position);
-                CanGoBack = backStack.Count > 1;
-                CanGoForward = forwardStack.Count > 0;
+                return NavigationHistory.First();
             }
 
-            return position;
+            CurrentPosition = NavigationHistory[--NavStackPosition];
+            CanGoBack = true;
+            CanGoForward = NavStackPosition > 0;
+
+            return CurrentPosition;
         }
 
-        public void NavigateTo(int position)
+        public void SelectHistory(NavigationHistory entry)
+        {
+            NavStackPosition = NavigationHistory.Index().FirstOrDefault(x => x.Item == entry).Index;
+            CanGoBack = NavStackPosition < NavigationHistory.Count - 1;
+            CanGoForward = NavStackPosition > 0;
+        }
+
+        public void NavigateTo(int position, string? desc)
         {
             var (line, _) = GetLineAndColumn(Rules.Text, position);
-            backStack.Push((line, position));
-            forwardStack.Clear();
-            CanGoBack = true;
+
+            for (var i = 0; i < NavStackPosition; i++)
+            {
+                NavigationHistory.RemoveAt(0);
+            }
+
+            CurrentPosition = new NavigationHistory(line, position, desc ?? line.ToString());
+            NavigationHistory.Insert(0, CurrentPosition);
+            NavStackPosition = 0;
+            CanGoBack = NavigationHistory.Count > 1;
             CanGoForward = false;
+            HasHistory = true;
         }
 
         public static int GetOffset(string text, int line)
@@ -190,20 +212,33 @@ namespace Transmute.Desktop.ViewModels
 
             var (row, col) = GetLineAndColumn(Rules.Text, currentOffset);
             RulesPosition = $"Line {row}, column {col}";
+            CurrentLine = row;
+        }
+
+        public void Reset()
+        {
+            IsRulesDirty = false;
+            IsRuleSetCompiled = false;
+            RulesTab = 0;
+            NavigationHistory.Clear();
+            NavStackPosition = 0;
+            CanGoForward = false;
+            CanGoBack = false;
+            HasHistory = false;
+            Rules.Text = string.Empty;
+            OriginalRules = string.Empty;
         }
 
         public async Task LoadRules(string path, Stream stream)
         {
             IsLoading = true;
-            OriginalRules = Rules.Text = await new StreamReader(stream).ReadToEndAsync();
+            var text = await new StreamReader(stream).ReadToEndAsync();
+
+            Reset();
             RulesPath = path;
-            IsRulesDirty = false;
-            IsRuleSetCompiled = false;
-            RulesTab = 0;
-            backStack.Clear();
-            backStack.Push((1, 0));
-            forwardStack.Clear();
             InputFormat = RE_X_SAMPA.IsMatch(Rules.Text) ? InputFormat.X_SAMPA : InputFormat.IPA;
+            OriginalRules = text;
+            Rules.Text = text;
 
             TransitionTables.Clear();
             CurrentTransitionTable.Clear();

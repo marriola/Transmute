@@ -213,8 +213,23 @@
 
         <!-- Toolbar -->
         <StackPanel Classes="toolbar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="5" Spacing="5">
-            <Button Command="{Binding #Window.GoBack}" i:Attached.Icon="fa-solid fa-arrow-left" ToolTip.Tip="Back (Alt+Left)" IsEnabled="{Binding RulesPaneViewModel.CanGoBack}" />
-            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-solid fa-arrow-right" ToolTip.Tip="Forward (Alt+Right)" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
+            <SplitButton Name="BackButton"
+                         Command="{Binding #Window.GoBack}"
+                         i:Attached.Icon="fa-regular fa-circle-left"
+                         ToolTip.Tip="Navigate Back (Alt+Left)"
+                         IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
+				<SplitButton.Flyout>
+					<Flyout Placement="Bottom">
+						<ListBox Name="NavigationHistory"
+                                 BorderThickness="0" Padding="0" Margin="0"
+                                 ItemsSource="{Binding RulesPaneViewModel.NavigationHistory}"
+                                 SelectedItem="{Binding RulesPaneViewModel.CurrentPosition, Mode=OneWay}"
+                                 DisplayMemberBinding="{Binding Description}"
+                                 SelectionChanged="History_SelectionChanged" />
+                    </Flyout>
+                </SplitButton.Flyout>
+            </SplitButton>
+            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="Navigate Forward (Alt+Right)" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
 
             <Line Classes="separator" />
 
@@ -228,7 +243,7 @@
             <Button Command="{Binding #Window.NewLexicon}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="New Lexicon (Ctrl+Shift+N)" />
             <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Lexicon (Ctrl+Shift+O)" />
             <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Lexicon (Ctrl+Shift+S)" />
-            <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-file-import" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
+            <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-diagram-next" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
 
             <Line Classes="separator" />
 
