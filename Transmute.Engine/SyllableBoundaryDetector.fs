@@ -83,7 +83,7 @@ module private SyllableBoundaryDetector =
         rule word
         |> Seq.toList
 
-    let private isValidSyllableSegment = function
+    let private isNotValidSyllableSegment = function
         | 'N' -> false
         | 'C' -> false
         | 'O' -> false
@@ -93,20 +93,16 @@ module private SyllableBoundaryDetector =
     let findBoundaries (rule: string -> string) (word: string) =
         let segments = classifySegments rule word
 
-        if List.exists isValidSyllableSegment segments then
-            // if the syllabizer returned any leftover segments, the syllable rule wasn't able to match the whole word
+        if List.exists isNotValidSyllableSegment segments then
+            // if the syllable rule returned any leftover segments, it wasn't able to match the whole word.
             // TODO report the location instead so we can put an underscore or a caret pointing at the offending characters
-            let segments =
-                segments
-                |> List.map string
-                |> String.concat ""
-            Result.Error (sprintf "warning: failed to syllabize '%s' (syllabizer returned '%s')" word segments)
+            segments
+            |> List.map string
+            |> String.concat ""
+            |> sprintf "warning: failed to syllabize '%s' (syllabizer returned '%s')" word
+            |> Result.Error
         else
-            let segmentLocations = findSegmentLocations segments
-        
-            let segmentedWord =
-                segments
-                |> findSegmentBoundaryLocations
-                |> insertSyllableBoundaries allBoundaryTypes word
-
-            Result.Ok segmentedWord
+            segments
+            |> findSegmentBoundaryLocations
+            |> insertSyllableBoundaries allBoundaryTypes word
+            |> Result.Ok
