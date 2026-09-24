@@ -33,34 +33,34 @@ module private SyntaxAnalyzer =
 
         inner nodes
 
-    let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) result =
+    let rec private onlyEnvironmentMayContainPlaceholderNode kind (nodes: Node List) () =
         match nodes with
         | [] -> Ok()
         | Node.Untag (PlaceholderNode, position)::_ ->
             Result.Error (syntaxErrorMessage (sprintf "%s section cannot contain placeholder" kind) position)
         | _::xs ->
-            onlyEnvironmentMayContainPlaceholderNode kind xs result
+            onlyEnvironmentMayContainPlaceholderNode kind xs ()
 
-    let rec private onlyEnvironmentMayContainBoundaryNode kind (nodes: Node List) result =
+    let rec private onlyEnvironmentMayContainBoundaryNode kind (nodes: Node List) () =
         match nodes with
         | [] -> Ok()
         | Node.Untag (WordBoundaryNode, position)::_ ->
             Result.Error (syntaxErrorMessage (sprintf "%s section cannot contain boundary" kind) position)
         | _::xs ->
-            onlyEnvironmentMayContainBoundaryNode kind xs result
+            onlyEnvironmentMayContainBoundaryNode kind xs ()
 
-    let rec private mayOnlyInsertUtterances inputNodes outputNodes result =
+    let rec private mayOnlyInsertUtterances inputNodes outputNodes () =
         if inputNodes <> [] then
             Ok()
         else
             match outputNodes with
             | [] -> Ok()
             | Node.Untag (UtteranceNode _, _)::xs ->
-                mayOnlyInsertUtterances inputNodes xs result
+                mayOnlyInsertUtterances inputNodes xs ()
             | Node.Untag (_, position)::_ ->
                 Result.Error (syntaxErrorMessage "The output section can only contain utterances" position)
 
-    let rec private boundaryMayOnlyAppearAtEnds nodes result =
+    let rec private boundaryMayOnlyAppearAtEnds nodes () =
         match nodes with
         | [] ->
             Ok()
@@ -74,7 +74,7 @@ module private SyntaxAnalyzer =
                 // Everything else is OK.
                 | _ ->
                     xs
-            boundaryMayOnlyAppearAtEnds rest result
+            boundaryMayOnlyAppearAtEnds rest ()
         | Item (TaggedNode (position, WordBoundaryNode))::xsHead::_ ->
             match xsHead with
             // BoundaryNode at end is OK.
@@ -84,11 +84,11 @@ module private SyntaxAnalyzer =
             | _ ->
                 Result.Error (syntaxErrorMessage "Boundary may only appear at beginning or end of the environment section" position)
         | _::xs ->
-            boundaryMayOnlyAppearAtEnds xs result
+            boundaryMayOnlyAppearAtEnds xs ()
 
     let private isPlaceholder = function PlaceholderNode | TaggedNode (_, PlaceholderNode) -> true | _ -> false
 
-    let private onlyOnePlaceholderNodeIsAllowed nodes result =
+    let private onlyOnePlaceholderNodeIsAllowed nodes () =
         let rec validateInternal nodes found =
             match found, nodes with
             | _, [] -> Ok()
@@ -100,7 +100,7 @@ module private SyntaxAnalyzer =
                 validateInternal xs found
         validateInternal nodes None
 
-    let private environmentNodeMustHavePlaceholderIfNotEmpty nodes result =
+    let private environmentNodeMustHavePlaceholderIfNotEmpty nodes () =
         let rec inner nodes =
             if List.isEmpty nodes then
                 Ok()
@@ -118,7 +118,7 @@ module private SyntaxAnalyzer =
                     Result.Error (syntaxErrorMessage "Environment must contain a placeholder if not empty" position)
         inner nodes
 
-    let private optionalNodeMayNotBeEmpty nodes result =
+    let private optionalNodeMayNotBeEmpty nodes () =
         let rec validateInternal (nodes: Node list) =
             match nodes with
             | [] -> Ok()
@@ -130,7 +130,7 @@ module private SyntaxAnalyzer =
                 validateInternal rest
         validateInternal nodes
 
-    let private syllableSegmentsMustBeDefinedBeforeUse allNodes nodes result =
+    let private syllableSegmentsMustBeDefinedBeforeUse allNodes nodes () =
         let (hasOnset, hasNucleus, hasCoda) =
             allNodes
             |> List.collect (fun node ->
@@ -167,7 +167,7 @@ module private SyntaxAnalyzer =
             | _ ->
                 Ok())
 
-    let private validateTransformationTargets nodes result =
+    let private validateTransformationTargets nodes () =
         nodes
         |> walkTree (fun node position ->
             match node with
@@ -180,7 +180,28 @@ module private SyntaxAnalyzer =
             | _ ->
                 Ok())
 
-    let private validateRuleNode input output environment nodes =
+    let private validateIdentifiers features sets nodes () =
+        nodes
+        |> walkTree (fun node position ->
+            match node with
+            | SetIdentifierNode identifier ->
+                if not (Set.contains identifier features) && not (Set.contains identifier sets) then
+                    Error (syntaxErrorMessage $"Feature or set '{identifier}' is not defined" position)
+                else
+                    Ok()
+            | CompoundSetIdentifierNode setDesc ->
+                setDesc
+                |> walkTree (fun node position ->
+                    match node with
+                    | TermIdentifierNode identifier
+                    | FeatureIdentifierNode (_, identifier) when not (Set.contains identifier features) && not (Set.contains identifier sets) ->
+                        Error (syntaxErrorMessage $"Feature or set '{identifier}' is not defined" position)
+                    | _ ->
+                        Ok())
+            | _ ->
+                Ok())
+
+    let private validateRuleNode features sets input output environment nodes =
         Ok()
         |> Result.bind (onlyEnvironmentMayContainBoundaryNode "Input" input)
         |> Result.bind (onlyEnvironmentMayContainBoundaryNode "Output" output)
@@ -193,9 +214,22 @@ module private SyntaxAnalyzer =
         |> Result.bind (optionalNodeMayNotBeEmpty environment)
         |> Result.bind (syllableSegmentsMustBeDefinedBeforeUse nodes environment)
         |> Result.bind (validateTransformationTargets output)
+        |> Result.bind (validateIdentifiers features sets input)
+        |> Result.bind (validateIdentifiers features sets output)
+        |> Result.bind (validateIdentifiers features sets environment)
         |> Result.map (fun _ -> nodes)
 
     let validate nodes =
+        let features =
+            nodes
+            |> Seq.choose (function TaggedNode (_, FeatureDefinitionNode (_, name, _)) as feature -> Some name | _ -> None)
+            |> Set.ofSeq
+
+        let sets =
+            nodes
+            |> Seq.choose (function TaggedNode (_, SetDefinitionNode (_, name, _)) as set -> Some name | _ -> None)
+            |> Set.ofSeq
+
         let rec validateInternal rest out =
             out
             |> Result.bind (fun _ ->
@@ -203,7 +237,7 @@ module private SyntaxAnalyzer =
                 | [] -> out
                 | TaggedNode (_, RuleNode (_, _, input, output, environment))::xs ->
                     out
-                    |> Result.bind (validateRuleNode input output environment)
+                    |> Result.bind (validateRuleNode features sets input output environment)
                     |> validateInternal xs
                 | _::xs ->
                     validateInternal xs out)
