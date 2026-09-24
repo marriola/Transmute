@@ -236,7 +236,7 @@ namespace Transmute.Desktop.ViewModels
 
             Reset();
             RulesPath = path;
-            InputFormat = RE_X_SAMPA.IsMatch(Rules.Text) ? InputFormat.X_SAMPA : InputFormat.IPA;
+            InputFormat = RE_X_SAMPA.IsMatch(text) ? InputFormat.X_SAMPA : InputFormat.IPA;
             OriginalRules = text;
             Rules.Text = text;
 
