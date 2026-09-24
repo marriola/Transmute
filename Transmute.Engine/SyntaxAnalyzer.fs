@@ -1,6 +1,6 @@
 ﻿// Project:     Transmute.Engine
 // Module:      SyntaxAnalyzer
-// Copyright:   (c) 2023 Matt Arriola
+// Copyright:   (c) 2026 Matt Arriola
 // License:     MIT
 
 namespace Transmute.Engine
@@ -184,11 +184,8 @@ module private SyntaxAnalyzer =
         nodes
         |> walkTree (fun node position ->
             match node with
-            | SetIdentifierNode identifier ->
-                if not (Set.contains identifier features) && not (Set.contains identifier sets) then
-                    Error (syntaxErrorMessage $"Feature or set '{identifier}' is not defined" position)
-                else
-                    Ok()
+            | SetIdentifierNode identifier when not (Set.contains identifier features) && not (Set.contains identifier sets) ->
+                Error (syntaxErrorMessage $"Feature or set '{identifier}' is not defined" position)
             | CompoundSetIdentifierNode setDesc ->
                 setDesc
                 |> walkTree (fun node position ->
