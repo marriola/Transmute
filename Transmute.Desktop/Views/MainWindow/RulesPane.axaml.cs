@@ -100,14 +100,16 @@ public partial class RulesPane : UserControl
         TransitionTableGrid.SelectedItems.Clear();
         var destinations = ViewModel.CurrentTransitionTable.Where(t => t.Origin == destination);
 
-        if (destinations.Any())
+        if (!destinations.Any())
         {
-            TransitionTableGrid.ScrollIntoView(destinations.Last(), null);
+            return;
+        }
 
-            foreach (var row in destinations)
-            {
-                TransitionTableGrid.SelectedItems.Add(row);
-            }
+        TransitionTableGrid.ScrollIntoView(destinations.Last(), null);
+
+        foreach (var row in destinations)
+        {
+            TransitionTableGrid.SelectedItems.Add(row);
         }
     }
 
@@ -229,7 +231,11 @@ public partial class RulesPane : UserControl
 
         try
         {
-            await ViewModel.LoadRules(file[0].Path.LocalPath, await file[0].OpenReadAsync());
+            if (!await ViewModel.LoadRules(file[0].Path.LocalPath, await file[0].OpenReadAsync()))
+            {
+                GoToError();
+                return;
+            }
 
             Dispatcher.UIThread.Post(async () =>
             {
@@ -373,6 +379,7 @@ public partial class RulesPane : UserControl
     internal async Task OpenRules(string path)
     {
         using Stream s = File.OpenRead(path);
+
         await ViewModel.LoadRules(path, s);
         Rules.Focus();
         UpdateHighlightedRuleSelection(1);
@@ -453,7 +460,7 @@ public partial class RulesPane : UserControl
     private void UpdateNavigationList(object? sender, EventArgs e)
     {
         _navigationListUpdateTimer.Stop();
-        if (!ViewModel.PopulateNavigationList(showErrors: false))
+        if (!ViewModel.PopulateNavigationList())
         {
             return;
         }

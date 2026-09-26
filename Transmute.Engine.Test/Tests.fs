@@ -16,7 +16,6 @@ let testRules format rulesText lexicon expected =
         |> RulesFileOptions.withInputFormat format
         |> RulesFile.load
         |> Async.RunSynchronously
-        |> Result.orThrow
 
     let actual =
         lexicon

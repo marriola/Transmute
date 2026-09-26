@@ -65,7 +65,6 @@ let main argv =
         rulesFileOptions
         |> RulesFile.load
         |> Async.RunSynchronously
-        |> Result.orAbort
 
     if options.verbosityLevel > Silent then
         Console.Error.WriteLine "\n"

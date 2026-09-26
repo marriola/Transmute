@@ -6,7 +6,6 @@
 using AvaloniaEdit.Document;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.FSharp.Collections;
-using Microsoft.FSharp.Core;
 using System;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -229,7 +228,7 @@ namespace Transmute.Desktop.ViewModels
             OriginalRules = string.Empty;
         }
 
-        public async Task LoadRules(string path, Stream stream)
+        public async Task<bool> LoadRules(string path, Stream stream)
         {
             IsLoading = true;
             var text = await new StreamReader(stream).ReadToEndAsync();
@@ -242,7 +241,8 @@ namespace Transmute.Desktop.ViewModels
 
             TransitionTables.Clear();
             CurrentTransitionTable.Clear();
-            PopulateNavigationList();
+            
+            return PopulateNavigationList();
         }
 
         public async Task<bool> CompileRules()
@@ -266,7 +266,7 @@ namespace Transmute.Desktop.ViewModels
 
                 var stopwatch = new Stopwatch();
 
-                FSharpResult<RulesFile, string> result;
+                RulesFile result;
                 try
                 {
                     stopwatch.Start();
@@ -277,26 +277,27 @@ namespace Transmute.Desktop.ViewModels
                 catch (Exception e)
                 {
                     stopwatch.Stop();
-                    return (stopwatch.ElapsedMilliseconds, FSharpResult<RulesFile, string>.NewError(e.ToString()));
+                    var errorResult = new RulesFile(InputFormat, null, null, null, 0, false, false, FSharpList.Create([ e.ToString() ]));
+                    return (stopwatch.ElapsedMilliseconds, errorResult);
                 }
             });
 
             IsCompiling = false;
             _errorService.ClearErrors();
 
-            if (result.IsError)
+            if (!result.errors.IsEmpty)
             {
-                _errorService.AddError(result.ErrorValue);
+                _errorService.AddErrors(result.errors);
                 ErrorPaneViewModel.ErrorsTab = 0;
                 return false;
             }
 
-            CompiledRules = result.ResultValue;
+            CompiledRules = result;
             PopulateTransitionTable();
             ErrorPaneViewModel.ErrorsTab = null;
             IsRuleSetCompiled = true;
 
-            Status = $"Compiled {result.ResultValue.rules.Length} rules in {elapsedMs} ms";
+            Status = $"Compiled {result.rules.Length} rules in {elapsedMs} ms";
 
             return true;
         }
@@ -312,25 +313,22 @@ namespace Transmute.Desktop.ViewModels
             }
         }
 
-        public bool PopulateNavigationList(bool showErrors = true)
+        public bool PopulateNavigationList()
         {
             NavigationList.Clear();
             _errorService.ClearErrors();
 
             var result = RuleParser.Parse(InputFormat, Rules.Text);
 
-            if (result.IsError)
+            if (!result.errors.IsEmpty)
             {
-                _errorService.AddError(result.ErrorValue);
-                if (showErrors)
-                {
-                    ErrorPaneViewModel.ErrorsTab = 0;
-                }
+                _errorService.AddErrors(result.errors);
+                ErrorPaneViewModel.ErrorsTab = 0;
                 return false;
             }
 
-            var combinedRules = result.ResultValue.soundChangeRules
-                .Concat(result.ResultValue.syllableRules)
+            var combinedRules = result.soundChangeRules
+                .Concat(result.syllableRules)
                 .OrderBy(NodeModule.getLine);
 
             foreach (var node in combinedRules)
@@ -345,8 +343,8 @@ namespace Transmute.Desktop.ViewModels
                 NavigationList.Add(entry);
             }
 
-            var setsAndFeatures = result.ResultValue.sets
-                .Concat(result.ResultValue.features)
+            var setsAndFeatures = result.sets
+                .Concat(result.features)
                 .OrderBy(x => x.Key);
 
             foreach (var set in setsAndFeatures)

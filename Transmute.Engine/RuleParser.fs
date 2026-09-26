@@ -12,7 +12,12 @@ open Transmute.Engine.Lexer
 open Transmute.Engine.Position
 open Transmute.Engine.Token
 
-type ParseResult = ParseResult of sets: Map<string, Node> * features: Map<string, Node> * syllableRules: Node list * soundChangeRules: Node list
+type ParseResult = 
+    { sets: Map<string, Node>
+      features: Map<string, Node>
+      syllableRules: Node list
+      soundChangeRules: Node list
+      errors: string list }
 
 module internal RuleParser =
     /// <summary>
@@ -21,6 +26,8 @@ module internal RuleParser =
     /// <param name="tokens">The list of tokens.</param>
     let private next (tokenBuffer: System.Collections.Generic.List<Token>) tokens =
         let mutable _position = Offset 0, Line 1, Column 1
+
+        // TODO add proper handling for missing closing paren
 
         /// <summary>
         /// Matches the next token to a specific type and consumes it.
@@ -198,11 +205,15 @@ module internal RuleParser =
             /// <param name="out">The contents of the node.</param>
             let rec matchAlternation tokens startToken out =
                 match tokens with
+                | [] ->
+                    invalidSyntax "Expected ')', got end of file" _position
                 | OfType Empty empty::xs ->
                     tokenBuffer.Add empty
                     matchAlternation xs startToken out
-                | NewlineWhitespace _::_ ->
-                    invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
+                | NewlineWhitespace newline::_ ->
+                    invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" newline.position
+                | OfType Comment comment::_ ->
+                    invalidSyntax "Expected '|', ')', an utterance, or an identifier; got a comment" comment.position
                 | OfType Whitespace ws::xs ->
                     tokenBuffer.Add ws
                     matchAlternation xs startToken out
@@ -225,8 +236,12 @@ module internal RuleParser =
                 let tokens, lparen = matchToken tokens LParen
                 let rec matchOptional_AlternationInteral tokens out =
                     match tokens with
-                    | NewlineWhitespace _::_ ->
-                        invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" _position
+                    | [] ->
+                        invalidSyntax "Expected ')', got end of file" _position
+                    | NewlineWhitespace newline::_ ->
+                        invalidSyntax "Expected '|', ')', an utterance, or an identifier; got end of line" newline.position
+                    | OfType Comment comment::_ ->
+                        invalidSyntax "Expected '|', ')', an utterance, or an identifier; got a comment" comment.position
                     | OfType Whitespace ws::xs ->
                         tokenBuffer.Add ws
                         matchOptional_AlternationInteral xs out
@@ -399,8 +414,8 @@ module internal RuleParser =
         /// <param name="identifier">The identifier already matched.</param>
         let matchRuleStartingWithIdentifier tokens identifier =
             let tokens, ruleNode = matchRule tokens identifier.position
-            match Node.untag ruleNode with
-            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
+            match ruleNode with
+            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
                 tokens, Node.tag
                     (RuleNode (
                         lineNumber,
@@ -538,8 +553,8 @@ module internal RuleParser =
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/>
         /// is not a <see cref="RuleNode" />.</exception>
         let prependToRule rule headPosition nodes =
-            match Node.untag rule with
-            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
+            match rule with
+            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
                 Node.tag (RuleNode (lineNumber, ruleTokens, nodes @ input, output, environment)) headPosition
             | _ ->
                 invalidArg "rule" "Must be a RuleNode"
@@ -550,10 +565,10 @@ module internal RuleParser =
         /// <exception cref="System.ArgumentException">Thrown when the argument to <c>rule<c/> is not a <see cref="RuleNode" />,
         /// or when the first element of the input section is not a <see cref="CompoundSetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule headPosition nodes =
-            match Node.untag rule with
-            | RuleNode (lineNumber, ruleTokens, input, output, environment) ->
-                match Node.untag input.Head with
-                | CompoundSetIdentifierNode identifiers ->
+            match rule with
+            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
+                match input.Head with
+                | Node.Untag (CompoundSetIdentifierNode identifiers, _) ->
                     Node.tag
                         (RuleNode
                             (lineNumber,
@@ -676,7 +691,7 @@ module internal RuleParser =
     /// Parses a list of tokens to a list of nodes.
     /// </summary>
     /// <param name="tokens">The list of tokens to parse.</param>
-    let private parseInternal tokenBuffer tokens =
+    let internal parseInternal tokenBuffer tokens =
         let rec inner tokens out =
             match tokens with
             | [] ->
@@ -693,53 +708,48 @@ module internal RuleParser =
     let parse inputFormat content =
         let tokens =
             match lex inputFormat content with
-            | SyntaxError (msg, Offset offset, Line row, Column col) ->
+            | Error (msg, Offset offset, Line row, Column col) ->
                 Result.Error (sprintf "Syntax error at row %d column %d (offset %d): %s" row col offset msg)
-            | OK tokens ->
+            | Ok tokens ->
                 Result.Ok tokens
 
-        let nodes =
+        let nodes, errors =
             tokens
             |> Result.bind (parseInternal (new System.Collections.Generic.List<Token>()))
-            |> Result.bind SyntaxAnalyzer.validate
-            |> Result.bind (Node.untagAll >> Ok)
+            |> SyntaxAnalyzer.validate
 
-        let syllableDefinitions =
-            nodes
-            |> Result.map (List.collect (function
-                | SyllableDefinitionListNode (line, definitions) -> definitions
-                | _ -> []))
+        let syllableRules, soundChangeRules =
+            (([], []), Node.untagAll nodes)
+            ||> List.fold (fun (syllableRules, soundChangeRules) n ->
+                match n with
+                | Node.Untag (SyllableDefinitionListNode (_, defs), _) as node ->
+                    (defs @ syllableRules), soundChangeRules
+                | Node.Untag (RuleNode _, _) as node ->
+                    syllableRules, (node :: soundChangeRules)
+                | _ ->
+                    syllableRules, soundChangeRules)
 
-        let features = Result.map Node.getFeatures nodes
-        let sets = Result.map Node.getSets nodes
+        let features = nodes |> Node.untagAll |> Node.getFeatureMap
+        let sets = nodes |> Node.untagAll |> Node.getSetMap
 
-        let rules =
-            nodes
-            |> Result.bind (Ok << List.choose (function
-                | RuleNode _ as x -> Some x
-                | _ -> None))
+        // Resolve references to other sets and features
+        let resolvedFeatures =
+            features
+            |> Map.toList
+            |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+            |> Map.ofList
 
-        match syllableDefinitions, features, sets, rules with
-        | _, _, _, (Result.Error msg)
-        | _, _, (Result.Error msg), _
-        | _, (Result.Error msg), _, _
-        | (Result.Error msg), _, _, _ ->
-            Result.Error msg
-        | Ok (syllableDefinition), (Ok features), (Ok sets), (Ok rules) ->
-            // Resolve references to other sets and features
-            let resolvedFeatures =
-                features
-                |> Map.toList
-                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
-                |> Map.ofList
+        let resolvedSets =
+            sets
+            |> Map.toList
+            |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
+            |> Map.ofList
 
-            let resolvedSets =
-                sets
-                |> Map.toList
-                |> List.map (fun (name, node) -> name, Node.resolveReferences features sets node)
-                |> Map.ofList
-
-            Ok (ParseResult (resolvedSets, resolvedFeatures, syllableDefinition, rules))
+        { sets = resolvedSets
+          features = resolvedFeatures
+          syllableRules = syllableRules
+          soundChangeRules = soundChangeRules
+          errors = errors }
 
 #if !FABLE_COMPILER
     let parseStreamReader inputFormat (reader: StreamReader) =

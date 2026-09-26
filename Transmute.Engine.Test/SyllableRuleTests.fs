@@ -24,12 +24,8 @@ let ``Categorizing segments works`` () =
             Coda = (C)(C)(C)
         )
         """
-    let (ParseResult (sets, features, syllableRules, _)) =
-        rule
-        |> RuleParser.parse InputFormat.IPA
-        |> Result.toOption
-        |> Option.get
-    let syllableRule = SyllableRuleCompiler.compile features sets syllableRules[0]
+    let result = RuleParser.parse InputFormat.IPA rule
+    let syllableRule = SyllableRuleCompiler.compile result.features result.sets result.syllableRules[0]
     let actual = syllableRule input
     Assert.Equal<string>(expected, actual)
 

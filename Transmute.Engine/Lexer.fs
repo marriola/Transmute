@@ -8,11 +8,7 @@ namespace Transmute.Engine
 open Transmute.Engine.Position
 open Transmute.Engine.StateMachine
 
-module private Lexer =
-    type Result =
-        | OK of Token list
-        | SyntaxError of string * Offset * Line * Column
-
+module internal Lexer =
     type MismatchAction = Restart | Stop
 
     type LexerValue =
@@ -52,7 +48,7 @@ module private Lexer =
                 ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
             | MismatchAction.Stop ->
                 (sprintf "Unrecognized token '%s%c'" (accumulate value.builder) inputSymbol, offset, row, col)
-                |> SyntaxError
+                |> Error
                 |> ErrorAction.Stop)
         |> onTransition (fun inputSymbol t machineState ->
             let (_, input, To nextState) = t
@@ -93,5 +89,5 @@ module private Lexer =
                     builder = if isNextFinal then [] else builder
                     acc = nextAcc })
         |> onFinish (fun ({ acc = acc }) ->
-            acc |> List.rev |> OK)
+            acc |> List.rev |> Ok)
         |> runDFA (content + "\n")

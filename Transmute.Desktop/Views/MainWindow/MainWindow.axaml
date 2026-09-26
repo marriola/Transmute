@@ -141,9 +141,9 @@
 				            <NativeMenuItem Header="_Caret" ToggleType="Radio" IsChecked="{Binding MenuViewModel.CaretChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
                         </NativeMenu>
                     </NativeMenuItem>
+                    <NativeMenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" />
                     <NativeMenuItem Header="Show Horizontal _Scroll Bar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
                     <NativeMenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
-                    <NativeMenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" />
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Help">
@@ -199,9 +199,9 @@
 					<MenuItem Header="_Double Underline" Name="rdoDoubleUnderlineChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.DoubleUnderlineChangeMarker}" />
 					<MenuItem Header="_Caret" Name="rdoCaretChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
                 </MenuItem>
+                <MenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" Name="IpaSilFix" />
                 <MenuItem Header="Show Horizontal _Scrollbar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
                 <MenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
-                <MenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" Name="IpaSilFix" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Help" Click="Help_Clicked" InputGesture="F1" />

@@ -18,7 +18,8 @@ type RulesFile =
       defaultChangeMarker: ChangeMarker
       totalCompileTime: float
       cached: bool
-      debug: bool }
+      debug: bool
+      errors: string list }
 
 and CompileRuleResult =
     { lineNumber: int
@@ -228,28 +229,30 @@ module private RulesFile =
         syllableRules, rules, rulesTime
 
     let loadInternal options =
-        (new StreamReader(options.source)).ReadToEnd()
-        |> RuleParser.parse options.format
-        |> Result.bind (fun (ParseResult (sets, features, syllableDefinitions, rules)) ->
-            let selectedRules =
-                match options.testRules with
-                | None -> rules
-                | Some testRules ->
-                    rules
-                    |> List.filter (function RuleNode (lineNumber, _, _, _, _) -> List.contains lineNumber testRules)
+        let parseResult =
+            (new StreamReader(options.source)).ReadToEnd()
+            |> RuleParser.parse options.format
 
-            let syllableRules, rules, compileTime = compileRules options features sets syllableDefinitions selectedRules
+        let selectedRules =
+            match options.testRules with
+            | None -> parseResult.soundChangeRules
+            | Some testRules ->
+                parseResult.soundChangeRules
+                |> List.filter (function RuleNode (lineNumber, _, _, _, _) -> List.contains lineNumber testRules)
 
-            Ok { format = options.format
-                 cached = false
-                 debug = options.debug
-                 defaultChangeMarker =
-                    match options.format with
-                    | IPA -> Underline
-                    | X_SAMPA -> Ascii
-                 totalCompileTime = compileTime
-                 syllableRules = syllableRules
-                 rules = rules })
+        let syllableRules, rules, compileTime = compileRules options parseResult.features parseResult.sets parseResult.syllableRules selectedRules
+
+        { format = options.format
+          cached = false
+          debug = options.debug
+          defaultChangeMarker =
+              match options.format with
+              | IPA -> Underline
+              | X_SAMPA -> Ascii
+          totalCompileTime = compileTime
+          syllableRules = syllableRules
+          rules = if parseResult.errors.IsEmpty then rules else []
+          errors = parseResult.errors }
 
     /// <summary>
     /// Selects the syllable rule that applies to the given line in the rule set, and detects syllable boundaries and segment locations in the given word.

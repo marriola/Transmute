@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="SyntaxAnalyzerTests.fs" />
     <Compile Include="Tests.fs" />
     <Compile Include="SoundChangeRuleTests.fs" />
     <Compile Include="SyllableRuleTests.fs" />

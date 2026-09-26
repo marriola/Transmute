@@ -118,7 +118,7 @@ let ``Addition and replacement after an optional node`` () =
         NASAL = { m n }
         LARYNGEAL = { ʔ χ χʷ }
         SIBILANT = { s }
-        C = { STOP DENTAL LABIAL VELAR SONORANT LIQUID GLIDE NASAL LARYNGEAL SIBILANT }
+        C = { DENTAL LABIAL VELAR SONORANT LIQUID GLIDE NASAL LARYNGEAL SIBILANT }
         LARYNGEAL = { ʔ χ χʷ }
 
         ∅ → u / (#|[C-LARYNGEAL])(ˈ) _ (m|n|l|r)(#|C)

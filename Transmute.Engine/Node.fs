@@ -250,6 +250,15 @@ module Node =
         | _ ->
             invalidArg "this" "Must be a TranformationNode"
 
+    /// Gets the name of a feature or set definition.
+    let getName node =
+        match untag node with
+        | SetDefinitionNode (lineNumber, name, _) 
+        | FeatureDefinitionNode (lineNumber, name, _) ->
+            name
+        | _ ->
+            invalidArg "this" "Must be one of FeatureDefinitionNode, SetDefinitionNode"
+
     /// Gets the string value of a node.
     let getStringValue node =
         match untag node with
@@ -260,22 +269,19 @@ module Node =
             value
         | FeatureIdentifierNode (_, name) ->
             name
-        | SetDefinitionNode (lineNumber, name, _) 
-        | FeatureDefinitionNode (lineNumber, name, _) ->
-            name
         | _ ->
-            invalidArg "this" "Must be one of UtteranceNode, CommentNode, SetIdentifierNode, TermIdentifierNode"
+            invalidArg "this" "Must be one of UtteranceNode, CommentNode, SetIdentifierNode, TermIdentifierNode, FeatureIdentifierNode"
 
     /// <summary>
     /// Returns a dictionary of the elements of the Node list that are FeatureDefinitionNodes.
     /// </summary>
     /// <param name="nodes"></param>
-    let getFeatures nodes =
+    let getFeatureMap nodes =
         nodes
         |> List.choose
             (fun x ->
-                match untag x with
-                | FeatureDefinitionNode (_, name, _) as node ->
+                match x with
+                | Untag (FeatureDefinitionNode (_, name, _), _) as node ->
                     Some (name, node)
                 | _ -> None)
         |> Map.ofSeq
@@ -291,11 +297,12 @@ module Node =
     /// Returns a dictionary of the elements of the Node list that are SetDefinitionNodes.
     /// </summary>
     /// <param name="nodes"></param>
-    let getSets nodes =
+    let getSetMap nodes =
         nodes
         |> List.choose
-            (function
-                | SetDefinitionNode (_, name, _) as node -> Some (name, node)
+            (fun x ->
+                match x with
+                | Untag (SetDefinitionNode (_, name, _), _) as node -> Some (name, node)
                 | _ -> None)
         |> Map.ofList
 
@@ -376,7 +383,7 @@ module Node =
                 | TransformationNode (_, UtteranceNode output) -> Some output
                 | _ -> None)
         | _ ->
-            invalidArg "setNode" "Must be a set"
+            invalidArg "setNode" "Must be a feature or set"
 
     let getMemberNodes node =
         match node with
@@ -491,7 +498,8 @@ module Node =
     /// <param name="features">foobaz</param>
     let resolveReferences features sets node =
         let alphabet = getAlphabet features sets
-        let rec resolveReferences' visited node =
+
+        let rec resolveReferences' node =
             let references, members =
                 match node with
                 | SetDefinitionNode (_, _, members)
@@ -513,16 +521,13 @@ module Node =
                 |> List.choose (function
                     | CompoundSetIdentifierNode setDesc -> Some setDesc
                     | _ -> None)
-            let resolve (name, node) =
-                if Set.contains name visited
-                    then failwithf "Circular reference in '%s'" name
-                    else resolveReferences' (Set.add name visited) node |> getMemberNodes
+            let resolve = resolveReferences' >> getMemberNodes
             let referenceMembers =
                 let setMembers =
                     sets
                     |> Map.toList
                     |> List.filter (fun (name, _) -> List.contains name identifiers)
-                    |> List.collect resolve
+                    |> List.collect (snd >> resolve)
                 let fixFeatureMemberNode =
                     match node with
                     | SetDefinitionNode _ -> (function
@@ -533,7 +538,7 @@ module Node =
                     features
                     |> Map.toList
                     |> List.filter (fun (name, _) -> List.contains name identifiers)
-                    |> List.collect resolve
+                    |> List.collect (snd >> resolve)
                     |> List.map fixFeatureMemberNode
                 let featureSets =
                     compoundIdentifiers
@@ -547,4 +552,4 @@ module Node =
                 SetDefinitionNode (lineNumber, name, members @ referenceMembers)
             | FeatureDefinitionNode (lineNumber, name, _) ->
                 FeatureDefinitionNode (lineNumber, name, members @ referenceMembers)
-        resolveReferences' Set.empty node
+        resolveReferences' node

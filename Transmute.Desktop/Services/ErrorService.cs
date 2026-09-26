@@ -29,9 +29,9 @@ namespace Transmute.Desktop.Services
             Cleared?.Invoke();
         }
 
-        public void AddError(string error)
+        public void AddErrors(IEnumerable<string> error)
         {
-            errors.Add(error);
+            errors.AddRange(error);
             ErrorsSet?.Invoke(errors);
         }
 
