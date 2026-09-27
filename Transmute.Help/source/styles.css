@@ -70,7 +70,7 @@ h1:first-of-type {
 }
 html[data-scheme="light"] h1:first-of-type {
 	box-shadow: -5px 5px 5px gray;
-	color: #d0c8c8;
+	color: #f8e8e8;
 }
 h1:not(:first-of-type), h2, h3, h4, h5, h6 {
   margin-top: 1.4em;
@@ -110,6 +110,7 @@ pre code {
   padding: 0;
   overflow: visible;
   overflow-wrap: normal;
+  font-size: 100%;
 }
 .sourceCode {
  background-color: transparent;
