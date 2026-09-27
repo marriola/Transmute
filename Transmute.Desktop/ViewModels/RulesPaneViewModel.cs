@@ -185,17 +185,21 @@ namespace Transmute.Desktop.ViewModels
         {
             var line = 1;
             var column = 1;
-
-            for (var i = 0; i < offset; i++)
+            
+            for (var i = 0; i < offset; )
             {
-                if (text[i] == '\n')
+                var newlineIndex = text.IndexOf('\n', i);
+
+                if (newlineIndex == -1 || newlineIndex > offset)
                 {
-                    line++;
-                    column = 1;
+                    column += offset - i;
+                    break;
                 }
                 else
                 {
-                    column++;
+                    i = newlineIndex + 1;
+                    line++;
+                    column = 1;
                 }
             }
 

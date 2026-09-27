@@ -19,11 +19,18 @@ namespace Transmute.Desktop.Extensions
                 {
                     var currentLine = 1;
 
-                    for (var i = 0; i < textEditor.CaretOffset; i++)
+                    for (var i = 0; i < textEditor.CaretOffset; )
                     {
-                        if (textEditor.Text[i] == '\n')
+                        var newlineIndex = textEditor.Text.IndexOf('\n', i);
+
+                        if (newlineIndex == -1 || newlineIndex > textEditor.CaretOffset)
+                        {
+                            break;
+                        }
+                        else
                         {
                             currentLine++;
+                            i = newlineIndex + 1;
                         }
                     }
 
@@ -40,11 +47,18 @@ namespace Transmute.Desktop.Extensions
                 {
                     var currentLine = 1;
 
-                    for (var i = 0; i < textEditor.CaretIndex; i++)
+                    for (var i = 0; i < textEditor.CaretIndex; )
                     {
-                        if (textEditor.Text[i] == '\n')
+                        var newlineIndex = textEditor.Text.IndexOf('\n', i);
+
+                        if (newlineIndex == -1 || newlineIndex > textEditor.CaretIndex)
+                        {
+                            break;
+                        }
+                        else
                         {
                             currentLine++;
+                            i = newlineIndex + 1;
                         }
                     }
 
