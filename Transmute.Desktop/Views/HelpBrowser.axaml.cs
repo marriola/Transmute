@@ -33,6 +33,8 @@ public partial class HelpBrowser : Window
 
     private readonly JsonSerializerOptions _jsonSerializerOptions = new() { TypeInfoResolver = AppJsonContext.Default };
 
+    private bool _isSelectionScrollInitiated = false;
+
     public HelpBrowser()
     {
         InitializeComponent();
@@ -77,13 +79,21 @@ public partial class HelpBrowser : Window
                 var parts = section.Path.Split('#');
                 var url = GetSectionFullPath(parts[0], parts[1]);
 
-                await HelpContent.InvokeScript("disableHighlight()");
-                HelpContent.Navigate(new Uri(url));
+                if (!_isSelectionScrollInitiated)
+                {
+                    await HelpContent.InvokeScript("disableHighlight()");
+                    HelpContent.Navigate(new Uri(url));
+                }
             }
             else
             {
                 HelpContent.Source = new Uri(GetSectionFullPath(section.Path));
             }
+        }
+
+        if (_isSelectionScrollInitiated)
+        {
+            _isSelectionScrollInitiated = false;
         }
     }
 
@@ -176,6 +186,7 @@ public partial class HelpBrowser : Window
         {
             if (hash.EndsWith(section.Path))
             {
+                _isSelectionScrollInitiated = true;
                 SelectedSection.SelectedItem = section;
                 return true;
             }
