@@ -218,6 +218,11 @@ namespace Transmute.Desktop.Views
             await InputPane.SaveLexiconAs();
         }
 
+        public async Task SaveOutputLexicon()
+        {
+            await OutputPane.SaveOutputLexicon();
+        }
+
         public async Task OpenFonts()
         {
             var win = new FontDialog();

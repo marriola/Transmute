@@ -5,7 +5,12 @@
 
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
+using System.Collections.Generic;
+using System.IO;
+using System.Threading.Tasks;
 using Transmute.Desktop.Models;
 using Transmute.Desktop.Services;
 using Transmute.Desktop.ViewModels;
@@ -14,7 +19,14 @@ namespace Transmute.Desktop.Views;
 
 public partial class OutputPane : UserControl
 {
+    private readonly List<FilePickerFileType> _lexiconFileTypes = [
+        new FilePickerFileType("Text files") { Patterns = [ "*.txt" ] },
+        new FilePickerFileType("Any") { Patterns = [ "*.*" ] }
+    ];
+    
     private readonly ConfigurationService _configurationService = App.Current.Services?.GetService<ConfigurationService>()!;
+
+    private MainWindow MainWindow => this.FindAncestorOfType<MainWindow>()!;
 
     public OutputPane()
     {
@@ -41,7 +53,34 @@ public partial class OutputPane : UserControl
     public void NewLexicon()
     {
         ViewModel.OutputLexicon = string.Empty;
-        ViewModel.LexiconChanges = new();
+        ViewModel.LexiconChanges = [];
+    }
+
+    public async Task<bool> SaveOutputLexicon()
+    {
+        var file = await MainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+        {
+            Title = "Save Results",
+            FileTypeChoices = _lexiconFileTypes,
+            SuggestedStartLocation = _configurationService.Configuration.CurrentDirectory != null
+                ? await MainWindow.StorageProvider.TryGetFolderFromPathAsync(_configurationService.Configuration.CurrentDirectory)
+                : null
+        });
+
+        if (file == null)
+        {
+            _configurationService.Configuration.CurrentDirectory = null;
+            return false;
+        }
+
+        _configurationService.Configuration.CurrentDirectory = Path.GetDirectoryName(file.Path.LocalPath);
+
+        using (var stream = new StreamWriter(file.Path.LocalPath))
+        {
+            await stream.WriteAsync(ViewModel.OutputLexicon);
+        }
+
+        return true;
     }
 
     public void GoToDestination(int ruleNumber)

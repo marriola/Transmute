@@ -78,6 +78,7 @@
 		<KeyBinding Command="{Binding #Window.NewLexicon}" Gesture="Ctrl+Shift+N" />
 		<KeyBinding Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
 		<KeyBinding Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
+		<KeyBinding Command="{Binding #Window.SaveOutputLexicon}" Gesture="Ctrl+Alt+Shift+S" />
 
         <KeyBinding Command="{Binding #Window.GoBack}" Gesture="Alt+Left" />
         <KeyBinding Command="{Binding #Window.GoForward}" Gesture="Alt+Right" />
@@ -108,6 +109,7 @@
 			        <NativeMenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
 			        <NativeMenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
 			        <NativeMenuItem Header="Save _Lexicon As…" Command="{Binding #Window.SaveLexiconAs}" />
+                    <NativeMenuItem Header="Save Results…" Command="{Binding #Window.SaveOutputLexicon}" Gesture="Ctrl+Alt+Shift+S" />
                     <NativeMenuItemSeparator Header="-" />
                     <NativeMenuItem Header="_Quit Transmute" Gesture="Meta+Q" Command="{Binding #Window.Exit}" />
                 </NativeMenu>
@@ -174,6 +176,7 @@
 			    <MenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" InputGesture="Ctrl+Shift+O" />
 			    <MenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" InputGesture="Ctrl+Shift+S" />
 			    <MenuItem Header="Save _Lexicon As…" Command="{Binding #Window.SaveLexiconAs}" />
+                <MenuItem Header="Save Results…" Command="{Binding #Window.SaveOutputLexicon}" InputGesture="Ctrl+Alt+Shift+S" />
                 <Separator />
                 <MenuItem Header="E_xit" InputGesture="Alt+F4" Command="{Binding #Window.Exit}" />
             </MenuItem>
@@ -244,6 +247,7 @@
             <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Lexicon (Ctrl+Shift+O)" />
             <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Lexicon (Ctrl+Shift+S)" />
             <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-diagram-next" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
+            <Button Command="{Binding #Window.SaveOutputLexicon}" i:Attached.Icon="fa-solid fa-file-export" ToolTip.Tip="Save Results (Ctrl+Alt+Shift+S)" />
 
             <Line Classes="separator" />
 
