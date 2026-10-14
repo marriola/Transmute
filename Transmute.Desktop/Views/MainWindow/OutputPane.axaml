@@ -19,10 +19,10 @@
 		<TabStrip DockPanel.Dock="Top">
 			<TabStripItem IsSelected="{Binding ShowOutputLexicon}"
                           Content="Results"
-                          ToolTip.Tip="Shift+Alt+R" />
+                          ToolTip.Tip="{OnPlatform Shift+Alt+R, macOS=⇧⌥R}" />
 			<TabStripItem IsSelected="{Binding ShowLexiconChanges}"
                           Content="Changes"
-                          ToolTip.Tip="Alt+C" />
+                          ToolTip.Tip="{OnPlatform Alt+C, macOS=⌥C}" />
         </TabStrip>
 
         <Panel DockPanel.Dock="Bottom">

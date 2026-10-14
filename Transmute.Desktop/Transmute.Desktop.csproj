@@ -18,13 +18,9 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)' == 'Release'">
+    <Optimize>True</Optimize>
     <PublishAot>True</PublishAot>
     <PublishTrimmed>True</PublishTrimmed>
-  </PropertyGroup>
-
-  <PropertyGroup Label="Avalonia">
-    <AvaloniaXamlIlDebuggerLaunch>False</AvaloniaXamlIlDebuggerLaunch>
-    <AvaloniaXamlCreateSourceInfo>False</AvaloniaXamlCreateSourceInfo>
   </PropertyGroup>
 
   <!-- Recompile help.tar.gz when README.md changes -->
@@ -39,6 +35,55 @@
     <Touch Files="Help.resx" />
   </Target>
 
+  <!-- Package the app for Mac OS -->
+
+  <ItemGroup Condition="$([MSBuild]::IsOSPlatform('MacOS'))">
+    <Binaries Include="$(PublishDir)/Transmute; $(PublishDir)/*.dylib" />
+  </ItemGroup>
+
+  <Target Condition="$([MSBuild]::IsOSPlatform('MacOS'))" Name="PackageApp" AfterTargets="Publish">
+    <Copy SourceFiles="Properties/Info.plist" DestinationFolder="$(PublishDir)/Transmute.app/Contents" />
+    <Copy SourceFiles="Assets/transmute.icns" DestinationFolder="$(PublishDir)/Transmute.app/Contents/Resources" />
+    <Move SourceFiles="@(Binaries)" DestinationFolder="$(PublishDir)/Transmute.app/Contents/MacOS" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" Version="12.1.4" />
+    <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
+    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
+    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.0" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.4" />
+    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.4" />
+    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
+    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22">
+      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
+      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>none</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.4" />
+    <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Optris.Icons.Avalonia.FontAwesome" Version="12.0.7" />
+    <PackageReference Include="System.Reactive" Version="7.0.0" />
+    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
+  </ItemGroup>
+
+  <ItemGroup Condition="!$([MSBuild]::IsOSPlatform('MacOS'))">
+    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Transmute.Engine\Transmute.Engine.fsproj" />
+  </ItemGroup>
+
+  <PropertyGroup Label="Avalonia">
+    <AvaloniaXamlIlDebuggerLaunch>False</AvaloniaXamlIlDebuggerLaunch>
+    <AvaloniaXamlCreateSourceInfo>False</AvaloniaXamlCreateSourceInfo>
+  </PropertyGroup>
+
   <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
@@ -48,35 +93,6 @@
     <Content Include="LICENSE">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </Content>
-  </ItemGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Avalonia" Version="12.1.3" />
-    <PackageReference Include="Avalonia.AvaloniaEdit" Version="12.0.0" />
-    <PackageReference Include="Avalonia.Controls.DataGrid" Version="12.1.2" />
-    <PackageReference Include="Avalonia.Controls.WebView" Version="12.1.0" />
-    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
-    <PackageReference Include="Avalonia.Fonts.Inter" Version="12.1.3" />
-    <!--Condition below is needed to remove Avalonia.Diagnostics package from build output in Release configuration.-->
-    <PackageReference Include="Avalonia.Diagnostics" Version="11.3.22">
-      <IncludeAssets Condition="'$(Configuration)' != 'Debug'">None</IncludeAssets>
-      <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>none</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.3" />
-    <PackageReference Include="AvaloniaEdit.TextMate" Version="12.0.0" />
-    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-    <PackageReference Include="MessageBox.Avalonia" Version="12.0.0" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
-    <PackageReference Include="Optris.Icons.Avalonia.FontAwesome" Version="12.0.7" />
-    <PackageReference Include="PublishAotCompressed" Version="1.0.5" />
-    <PackageReference Include="System.Reactive" Version="7.0.0" />
-    <PackageReference Include="TextMateSharp.Grammars" Version="2.0.4" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="..\Transmute.Engine\Transmute.Engine.fsproj" />
   </ItemGroup>
 
   <ItemGroup>

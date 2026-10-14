@@ -37,11 +37,11 @@
 			<TabStripItem Content="Rules"
                           IsSelected="{Binding ShowRules}"
                           Classes.dirty="{Binding IsRulesDirty}"
-                          ToolTip.Tip="Alt+R" />
+                          ToolTip.Tip="{OnPlatform Alt+R, macOS=⌥R}" />
             <TabStripItem Name="LastTab"
                           Content="Transition Tables"
                           IsSelected="{Binding ShowTransitionTables}"
-                          ToolTip.Tip="Alt+T" />
+                          ToolTip.Tip="{OnPlatform Alt+T, macOS=⌥T}" />
         </TabStrip>
 
         <Panel DockPanel.Dock="Bottom">
@@ -53,7 +53,7 @@
                             Margin="10 10 10 0"
                             SelectionChanged="HighlightedRule_SelectionChanged"
                             ItemsSource="{Binding NavigationList}"
-                            DisplayMemberBinding="{Binding Description}" />
+                          ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
 				
                 <ae:TextEditor Name="Rules"
                                DockPanel.Dock="Bottom"
@@ -75,7 +75,7 @@
                           Margin="10 10 10 0"
                           SelectionChanged="TransitionTable_SelectionChanged"
                           ItemsSource="{Binding TransitionTables}"
-                          DisplayMemberBinding="{Binding Description}" />
+                          ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
 
                 <DataGrid DockPanel.Dock="Bottom"
                           Name="TransitionTableGrid"

@@ -72,19 +72,19 @@
     </Window.Styles>
 
     <Window.KeyBindings>
-		<KeyBinding Command="{Binding #Window.NewRules}" Gesture="Ctrl+N" />
-        <KeyBinding Command="{Binding #Window.OpenRules}" Gesture="Ctrl+O" />
-        <KeyBinding Command="{Binding #Window.SaveRules}" Gesture="Ctrl+S" />
-		<KeyBinding Command="{Binding #Window.NewLexicon}" Gesture="Ctrl+Shift+N" />
-		<KeyBinding Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
-		<KeyBinding Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
-		<KeyBinding Command="{Binding #Window.SaveOutputLexicon}" Gesture="Ctrl+Alt+Shift+S" />
+		<KeyBinding Command="{Binding #Window.NewRules}" Gesture="{OnPlatform Ctrl+N, macOS=Cmd+N}" />
+        <KeyBinding Command="{Binding #Window.OpenRules}" Gesture="{OnPlatform Ctrl+O, macOS=Cmd+O}" />
+        <KeyBinding Command="{Binding #Window.SaveRules}" Gesture="{OnPlatform Ctrl+S, macOS=Cmd+S}" />
+		<KeyBinding Command="{Binding #Window.NewLexicon}" Gesture="{OnPlatform Ctrl+Shift+N, macOS=Cmd+Shift+N}" />
+		<KeyBinding Command="{Binding #Window.OpenLexicon}" Gesture="{OnPlatform Ctrl+Shift+O, macOS=Cmd+Shift+O}" />
+		<KeyBinding Command="{Binding #Window.SaveLexicon}" Gesture="{OnPlatform Ctrl+Shift+S, macOS=Cmd+Shift+S}" />
+		<KeyBinding Command="{Binding #Window.SaveOutputLexicon}" Gesture="{OnPlatform Ctrl+Alt+Shift+S, macOS=Cmd+Alt+Shift+F}" />
 
-        <KeyBinding Command="{Binding #Window.GoBack}" Gesture="Alt+Left" />
-        <KeyBinding Command="{Binding #Window.GoForward}" Gesture="Alt+Right" />
+        <KeyBinding Command="{Binding #Window.GoBack}" Gesture="{OnPlatform Alt+Left, macOS=Cmd+Left}" />
+        <KeyBinding Command="{Binding #Window.GoForward}" Gesture="{OnPlatform Alt+Right, macOS=Cmd+Right}" />
 
-        <KeyBinding Command="{Binding #Window.PromptLine}" Gesture="Ctrl+G" />
-        <KeyBinding Command="{Binding #Window.GoToChanges}" Gesture="F12" />
+        <KeyBinding Command="{Binding #Window.PromptLine}" Gesture="{OnPlatform Ctrl+G, macOS=Cmd+G}" />
+        <KeyBinding Command="{Binding #Window.JumpTo}" Gesture="F12" />
         <KeyBinding Command="{Binding #Window.ApplyRules}" Gesture="F5" />
 
         <KeyBinding Command="{Binding #Window.SelectRuleTab}" CommandParameter="0" Gesture="Alt+R" />
@@ -94,35 +94,37 @@
         <KeyBinding Command="{Binding #Window.SelectOutputTab}" CommandParameter="1" Gesture="Alt+C" />
 
         <KeyBinding Command="{Binding #Window.OpenHelp}" Gesture="F1" />
+
+		<KeyBinding Command="{Binding #RulesPane.FocusNavigationList}" Gesture="{OnPlatform Ctrl+L, macOS=Cmd+L}" />
     </Window.KeyBindings>
 
     <NativeMenu.Menu>
 		<NativeMenu>
             <NativeMenuItem Header="File">
 				<NativeMenu>
-			        <NativeMenuItem Header="New Rules" Command="{Binding #Window.NewRules}" Gesture="Ctrl+N" />
-                    <NativeMenuItem Header="Open _Rules…" Command="{Binding #Window.OpenRules}" CommandParameter="{Binding #Window}" Gesture="Ctrl+O" />
-                    <NativeMenuItem Header="Save _Rules" Command="{Binding #Window.SaveRules}" Gesture="Ctrl+S" />
+			        <NativeMenuItem Header="New Rules" Command="{Binding #Window.NewRules}" Gesture="Cmd+N" />
+                    <NativeMenuItem Header="Open _Rules…" Command="{Binding #Window.OpenRules}" CommandParameter="{Binding #Window}" Gesture="Cmd+O" />
+                    <NativeMenuItem Header="Save _Rules" Command="{Binding #Window.SaveRules}" Gesture="Cmd+S" />
                     <NativeMenuItem Header="Save _Rules As…" Command="{Binding #Window.SaveRulesAs}" />
                     <NativeMenuItemSeparator Header="-" />
-			        <NativeMenuItem Header="New Lexicon" Command="{Binding #Window.NewLexicon}" Gesture="Ctrl+Shift+N" />
-			        <NativeMenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" Gesture="Ctrl+Shift+O" />
-			        <NativeMenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" Gesture="Ctrl+Shift+S" />
+			        <NativeMenuItem Header="New Lexicon" Command="{Binding #Window.NewLexicon}" Gesture="Cmd+Shift+N" />
+			        <NativeMenuItem Header="Open _Lexicon…" Command="{Binding #Window.OpenLexicon}" Gesture="Cmd+Shift+O" />
+			        <NativeMenuItem Header="Save _Lexicon" Command="{Binding #Window.SaveLexicon}" Gesture="Cmd+Shift+S" />
 			        <NativeMenuItem Header="Save _Lexicon As…" Command="{Binding #Window.SaveLexiconAs}" />
-                    <NativeMenuItem Header="Save Results…" Command="{Binding #Window.SaveOutputLexicon}" Gesture="Ctrl+Alt+Shift+S" />
+                    <NativeMenuItem Header="Save Results…" Command="{Binding #Window.SaveOutputLexicon}" Gesture="Cmd+Alt+Shift+S" />
                     <NativeMenuItemSeparator Header="-" />
-                    <NativeMenuItem Header="_Quit Transmute" Gesture="Meta+Q" Command="{Binding #Window.Exit}" />
+                    <NativeMenuItem Header="_Quit Transmute" Gesture="Cmd+Q" Command="{Binding #Window.Exit}" />
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Edit">
                 <NativeMenu>
-				    <NativeMenuItem Header="_Cut" Command="{Binding #Window.Cut}" Gesture="Ctrl+X" />
-				    <NativeMenuItem Header="_Copy" Command="{Binding #Window.Copy}" Gesture="Ctrl+C" />
-				    <NativeMenuItem Header="_Paste" Command="{Binding #Window.Paste}" Gesture="Ctrl+V" />
+				    <NativeMenuItem Header="_Cut" Command="{Binding #Window.Cut}" Gesture="Cmd+X" />
+				    <NativeMenuItem Header="_Copy" Command="{Binding #Window.Copy}" Gesture="Cmd+C" />
+				    <NativeMenuItem Header="_Paste" Command="{Binding #Window.Paste}" Gesture="Cmd+V" />
                     <NativeMenuItemSeparator Header="-" />
                     <NativeMenuItem Header="Apply _Rules" Command="{Binding #Window.ApplyRules}" Gesture="F5" />
                     <NativeMenuItem Header="Go to Chan_ges" Command="{Binding #Window.GoToChanges}" Gesture="F12" />
-				    <NativeMenuItem Header="_Go to Rule Line…" Command="{Binding #Window.PromptLine}" Gesture="Ctrl+G" />
+				    <NativeMenuItem Header="Go to Rule _Line…" Command="{Binding #Window.PromptLine}" Gesture="Cmd+G" />
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Options">
@@ -135,6 +137,11 @@
 					        <NativeMenuItem Header="_Dark" ToggleType="Radio" IsChecked="{Binding MenuViewModel.DarkThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Dark" />
                         </NativeMenu>
                     </NativeMenuItem>
+                    <NativeMenuItemSeparator Header="-" />
+                    <NativeMenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" />
+                    <NativeMenuItem Header="Show Horizontal _Scroll Bar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
+                    <NativeMenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
+                    <NativeMenuItemSeparator Header="-" />
                     <NativeMenuItem Header="_Change Marker">
                         <NativeMenu>
 				            <NativeMenuItem Header="_None" ToggleType="Radio" IsChecked="{Binding MenuViewModel.NoChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.NoChangeMarker}" />
@@ -143,9 +150,6 @@
 				            <NativeMenuItem Header="_Caret" ToggleType="Radio" IsChecked="{Binding MenuViewModel.CaretChangeMarkerSelected}" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
                         </NativeMenu>
                     </NativeMenuItem>
-                    <NativeMenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" />
-                    <NativeMenuItem Header="Show Horizontal _Scroll Bar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
-                    <NativeMenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
                 </NativeMenu>
             </NativeMenuItem>
             <NativeMenuItem Header="_Help">
@@ -196,15 +200,17 @@
 					<MenuItem Name="rdoLightTheme" GroupName="Theme" Header="_Light" ToggleType="Radio" IsChecked="{Binding MenuViewModel.LightThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Light" />
 					<MenuItem Name="rdoDarkTheme" GroupName="Theme" Header="_Dark" ToggleType="Radio" IsChecked="{Binding MenuViewModel.DarkThemeSelected}" Command="{Binding #Window.ToggleTheme}" CommandParameter="Dark" />
                 </MenuItem>
+                <Separator />
+                <MenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" Name="IpaSilFix" />
+                <MenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
+                <Separator />
                 <MenuItem Header="_Change Marker">
 					<MenuItem Header="_None" Name="rdoNoChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.NoChangeMarker}" />
 					<MenuItem Header="_Underline" Name="rdoUnderlineChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.UnderlineChangeMarker}" />
 					<MenuItem Header="_Double Underline" Name="rdoDoubleUnderlineChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.DoubleUnderlineChangeMarker}" />
 					<MenuItem Header="_Caret" Name="rdoCaretChangeMarker" GroupName="ChangeMarker" ToggleType="Radio" Command="{Binding #Window.ToggleChangeMarker}" CommandParameter="{Binding MenuViewModel.CaretChangeMarker}" />
                 </MenuItem>
-                <MenuItem Header="IPA (SIL) keyboard layout _fix" ToggleType="CheckBox" IsChecked="{Binding RulesPaneViewModel.IpaFix}" Command="{Binding #Window.ToggleFix}" Name="IpaSilFix" />
                 <MenuItem Header="Show Horizontal _Scrollbar" ToggleType="CheckBox" IsChecked="{Binding Configuration.ShowHorizontalScrollbar}" Command="{Binding #Window.ToggleHorizontalScrollbar}" />
-                <MenuItem Header="_Word Wrap" ToggleType="CheckBox" IsChecked="{Binding Configuration.WordWrap}" Command="{Binding #Window.ToggleWordWrap}" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Help" Click="Help_Clicked" InputGesture="F1" />
@@ -219,7 +225,7 @@
             <SplitButton Name="BackButton"
                          Command="{Binding #Window.GoBack}"
                          i:Attached.Icon="fa-regular fa-circle-left"
-                         ToolTip.Tip="Navigate Back (Alt+Left)"
+                         ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘←)}"
                          IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
 				<SplitButton.Flyout>
 					<Flyout Placement="Bottom">
@@ -232,22 +238,22 @@
                     </Flyout>
                 </SplitButton.Flyout>
             </SplitButton>
-            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="Navigate Forward (Alt+Right)" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
+            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="{OnPlatform Navigate Forward (Alt+Right), macOS=Navigate Forward (⌘→)}" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
 
             <Line Classes="separator" />
 
-            <Button Command="{Binding #Window.NewRules}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="New Rules (Ctrl+N)" />
-            <Button Command="{Binding #Window.OpenRules}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Rules (Ctrl+O)" />
-            <Button Command="{Binding #Window.SaveRules}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Rules (Ctrl+S)" />
+            <Button Command="{Binding #Window.NewRules}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="{OnPlatform New Rules (Ctrl+N), macOS=New Rules (⌘N)}" />
+            <Button Command="{Binding #Window.OpenRules}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="{OnPlatform Open Rules (Ctrl+O), macOS=Open Rules (⌘O)}" />
+            <Button Command="{Binding #Window.SaveRules}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="{OnPlatform Save Rules (Ctrl+S), macOS=Save Rules (⌘S)}" />
             <ComboBox SelectedItem="{Binding RulesPaneViewModel.InputFormat}" ItemsSource="{Binding InputFormats}" ToolTip.Tip="Rules File Format" Width="90" />
 
             <Line Classes="separator" />
 
-            <Button Command="{Binding #Window.NewLexicon}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="New Lexicon (Ctrl+Shift+N)" />
-            <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="Open Lexicon (Ctrl+Shift+O)" />
-            <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="Save Lexicon (Ctrl+Shift+S)" />
+            <Button Command="{Binding #Window.NewLexicon}" i:Attached.Icon="fa-regular fa-file" ToolTip.Tip="{OnPlatform New Lexicon (Ctrl+Shift+N), macOS=New Lexicon (⇧⌘N)}" />
+            <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="{OnPlatform Open Lexicon (Ctrl+Shift+O), macOS=Open Lexicon (⇧⌘O)}" />
+            <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="{OnPlatform Save Lexicon (Ctrl+Shift+S), macOS=Save Lexicon (⇧⌘S)}" />
             <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-diagram-next" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
-            <Button Command="{Binding #Window.SaveOutputLexicon}" i:Attached.Icon="fa-solid fa-file-export" ToolTip.Tip="Save Results (Ctrl+Alt+Shift+S)" />
+            <Button Command="{Binding #Window.SaveOutputLexicon}" i:Attached.Icon="fa-solid fa-file-export" ToolTip.Tip="{OnPlatform Save Results (Ctrl+Alt+Shift+S), macOS=Save Rules (⇧⌥⌘S)}" />
 
             <Line Classes="separator" />
 

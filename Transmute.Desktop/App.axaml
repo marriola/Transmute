@@ -4,7 +4,8 @@
              xmlns:local="using:Transmute.Desktop"
              xmlns:dialogHostAvalonia="clr-namespace:DialogHostAvalonia;assembly=DialogHost.Avalonia"
              xmlns:ip="https://github.com/MahApps/IconPacks.Avalonia"
-             RequestedThemeVariant="Default">
+             RequestedThemeVariant="Default"
+             Name="Transmute">
              <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
     <Application.DataTemplates>

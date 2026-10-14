@@ -16,7 +16,7 @@
 			<TabStripItem IsSelected="True"
                           Classes.dirty="{Binding IsLexiconDirty}"
                           Content="Lexicon"
-                          ToolTip.Tip="Alt+L" />
+                          ToolTip.Tip="{OnPlatform Alt+L, macOS=⌥L}" />
         </TabStrip>
         <Panel DockPanel.Dock="Bottom">
     		<TextBox Name="InputLexicon"
