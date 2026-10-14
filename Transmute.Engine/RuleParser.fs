@@ -487,6 +487,9 @@ module internal RuleParser =
                     tokens, List.rev out
 
                 | OfType Whitespace ws :: _ when ws.value.Contains "\n" ->
+                    if matchedOr then
+                        invalidSyntax "Expected another syllable definition, got newline" ws.position
+                    else
                     tokens, List.rev out
 
                 | OfType Whitespace _ :: xs ->
