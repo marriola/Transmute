@@ -49,16 +49,13 @@ namespace Transmute.Desktop.ViewModels
         [ObservableProperty]
         public partial bool ShowTransitionTables { get; set; }
 
-        [ObservableProperty]
-        public partial string RulesPath { get; set; }
+        public string RulesPath { get; set; }
 
         [ObservableProperty]
         public partial bool IsCompiling { get; set; }
 
         [ObservableProperty]
         public partial string RulesPosition { get; set; } = "Line 1, column 1";
-
-        public string OriginalRules { get; set; } = "";
 
         [ObservableProperty]
         public partial TextDocument Rules { get; set; } = new();
@@ -229,7 +226,6 @@ namespace Transmute.Desktop.ViewModels
             CanGoBack = false;
             HasHistory = false;
             Rules.Text = string.Empty;
-            OriginalRules = string.Empty;
         }
 
         public async Task<bool> LoadRules(string path, Stream stream)
@@ -240,7 +236,6 @@ namespace Transmute.Desktop.ViewModels
             Reset();
             RulesPath = path;
             InputFormat = RE_X_SAMPA.IsMatch(text) ? InputFormat.X_SAMPA : InputFormat.IPA;
-            OriginalRules = text;
             Rules.Text = text;
 
             TransitionTables.Clear();

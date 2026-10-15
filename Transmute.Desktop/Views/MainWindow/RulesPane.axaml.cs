@@ -131,7 +131,7 @@ public partial class RulesPane : UserControl
             {
                 endIndex--;
                 break;
-    }
+            }
         }
 
         if (startIndex > endIndex)
@@ -333,6 +333,7 @@ public partial class RulesPane : UserControl
             await stream.WriteAsync(Rules.Text);
         }
 
+        Rules.Document.UndoStack.MarkAsOriginalFile();
         ViewModel.IsRulesDirty = false;
         return true;
     }
@@ -469,7 +470,6 @@ public partial class RulesPane : UserControl
         }
         else
         {
-            ViewModel.IsRulesDirty = Rules.IsModified;
             ViewModel.IsRuleSetCompiled = false;
             _navigationListUpdateTimer.Stop();
             _navigationListUpdateTimer.Start();
@@ -478,6 +478,7 @@ public partial class RulesPane : UserControl
 
     private void Rules_KeyUp(object? sender, KeyEventArgs e)
     {
+        ViewModel.IsRulesDirty = !Rules.Document.UndoStack.IsOriginalFile;
         ViewModel.UpdateRulesPosition(Rules.CaretOffset);
         UpdateSelectedRule();
     }
@@ -527,7 +528,7 @@ public partial class RulesPane : UserControl
                 }
             }
             else if (entry.lineNumber is int lineNumber)
-        {
+            {
                 GoToLine(lineNumber);
                 _lastNavigationEntry = entry;
             }
