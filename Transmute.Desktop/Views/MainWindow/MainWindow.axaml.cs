@@ -61,8 +61,6 @@ namespace Transmute.Desktop.Views
 
         public async Task ApplyRules()
         {
-            RulesPane.StopNavigationListUpdate();
-
             if (await ViewModel.ApplyRules())
             {
                 return;

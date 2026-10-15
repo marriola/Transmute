@@ -72,11 +72,6 @@ public partial class RulesPane : UserControl
 
     private MainWindow MainWindow => this.FindAncestorOfType<MainWindow>();
 
-    public void StopNavigationListUpdate()
-    {
-        _navigationListUpdateTimer.Stop();
-    }
-
     public void SetWordWrap(bool wordWrap)
     {
         Rules.WordWrap = wordWrap;
