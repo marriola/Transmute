@@ -24,6 +24,7 @@
                      AcceptsReturn="true"
                      ScrollViewer.HorizontalScrollBarVisibility="{Binding HorizontalScrollBarVisibility}"
                      ClearSelectionOnLostFocus="False"
+                     UndoLimit="1000"
                      TextChanged="Lexicon_TextChanged"
                      Text="{Binding InputLexicon}" />
         </Panel>

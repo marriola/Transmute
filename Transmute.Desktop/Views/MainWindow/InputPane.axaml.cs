@@ -112,6 +112,7 @@ public partial class InputPane : UserControl
             await stream.WriteAsync(ViewModel.InputLexicon);
         }
 
+        ViewModel.OriginalInputLexicon = ViewModel.InputLexicon;
         ViewModel.IsLexiconDirty = false;
         return true;
     }

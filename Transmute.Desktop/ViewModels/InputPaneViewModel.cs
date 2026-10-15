@@ -18,8 +18,7 @@ namespace Transmute.Desktop.ViewModels
 {
     public partial class InputPaneViewModel : ViewModelBase
     {
-        [ObservableProperty]
-        public partial string LexiconPath { get; set; }
+        public string LexiconPath { get; set; }
 
         public string OriginalInputLexicon { get; set; }
 
