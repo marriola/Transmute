@@ -23,6 +23,7 @@ type RulesFile =
 
 and CompileRuleResult =
     { lineNumber: int
+      label: string
       compileTime: float
       node: Node
       compiledRule: RuleCompiler.SoundChangeRule }
@@ -113,6 +114,7 @@ type TransformResult =
 and LexiconChange =
     { isOriginal: bool
       ruleNumber: int
+      ruleLabel: string
       change: string }
 
 module private RulesFile =
@@ -126,7 +128,7 @@ module private RulesFile =
         result, milliseconds
 
     /// Estimates the complexity of a rule by counting the number of times sets or features are matched.
-    let countSets (RuleNode (_, _, input, _, environment)) =
+    let countSets (RuleNode (_, _, _, input, _, environment)) =
         let rec inner nodes cost =
             match nodes with
             | [] ->
@@ -212,6 +214,7 @@ module private RulesFile =
                     advanceProgress()
                 compiledRules.Add
                     { lineNumber = Node.getLine node
+                      label = Node.getName node
                       compileTime = elapsed
                       node = node
                       compiledRule = rule }
@@ -238,7 +241,7 @@ module private RulesFile =
             | None -> parseResult.soundChangeRules
             | Some testRules ->
                 parseResult.soundChangeRules
-                |> List.filter (function RuleNode (lineNumber, _, _, _, _) -> List.contains lineNumber testRules)
+                |> List.filter (function RuleNode (lineNumber, _, _, _, _, _) -> List.contains lineNumber testRules)
 
         let syllableRules, rules, compileTime = compileRules options parseResult.features parseResult.sets parseResult.syllableRules selectedRules
 
@@ -290,7 +293,7 @@ module private RulesFile =
             |> Seq.tryFind Result.isOk
             |> Option.defaultValue errorResult
 
-    let markChangesWithCombining diacritic nonCombiningDiacritic ruleNum (changes: int list) (result: string) =
+    let markChangesWithCombining diacritic nonCombiningDiacritic ruleNum ruleLabel (changes: int list) (result: string) =
         let result = List.ofSeq result
     
         // Insert a combining long underline after each change, but if there's a deletion at the end, put a regular underscore there
@@ -309,9 +312,9 @@ module private RulesFile =
 
         let out = System.String.Join("", outChars)
 
-        [ { isOriginal = false; ruleNumber = ruleNum; change = out } ]
+        [ { isOriginal = false; ruleNumber = ruleNum; ruleLabel =  ruleLabel; change = out } ]
 
-    let markChangesWithAsciiCarets ruleNum (changes: int list) (result: string) = 
+    let markChangesWithAsciiCarets ruleNum ruleLabel (changes: int list) (result: string) = 
         let maxIndex = List.max changes + 1
 
         let changeLine =
@@ -319,11 +322,11 @@ module private RulesFile =
             |> Array.mapi (fun i _ -> if List.contains i changes then "^" else " ")
             |> String.concat ""
 
-        [ { isOriginal = false; ruleNumber = ruleNum; change = result }
-          { isOriginal = false; ruleNumber = -1; change = changeLine } ]
+        [ { isOriginal = false; ruleNumber = ruleNum; ruleLabel =  ruleLabel; change = result }
+          { isOriginal = false; ruleNumber = -1; ruleLabel = ""; change = changeLine } ]
 
-    let don'tMarkChanges ruleNumber _ s =
-        [ { isOriginal = false; ruleNumber = ruleNumber; change = s } ]
+    let nullChangeMarker ruleNumber ruleLabel _ s =
+        [ { isOriginal = false; ruleNumber = ruleNumber; ruleLabel = ruleLabel; change = s } ]
 
     let transformWord (rulesFile: RulesFile) fMarkChanges word =
         let rec inner syllables nextWord changes totalTime errors rules =
@@ -331,7 +334,7 @@ module private RulesFile =
             | [] ->
                 { original = word
                   nextWord = nextWord
-                  changes = [ { isOriginal = true; ruleNumber = -1; change = word } ] @ changes
+                  changes = [ { isOriginal = true; ruleNumber = -1; ruleLabel = ""; change = word } ] @ changes
                   errors = errors
                   totalTime = totalTime }
 
@@ -360,22 +363,36 @@ module private RulesFile =
 
                             segmentedWord, errors, ms
                         | Error message, ms ->
+                            let message =
+                                let name = Node.getName node
+                                if name.Length > 0 then
+                                    $"{name}: {message}"
+                                else
+                                    message
+
                             String.Empty, ((lineNumber, message) :: errors), ms
 
                 let changes =
                     if result = nextWord then
                         changes
                     else
-                        changes @ fMarkChanges lineNumber locations result
+                        changes @ fMarkChanges lineNumber (Node.getName node) locations result
 
                 inner segmentedWord result changes (totalTime + transformTime + syllableBoundaryTime) errors xs
 
-        let initialSyllables =
-            word
-            |> syllabizeWord rulesFile.debug rulesFile.syllableRules rulesFile.rules[0].lineNumber
-            |> Result.defaultValue String.Empty
+        if rulesFile.rules.IsEmpty then
+            { original = word
+              nextWord = word
+              changes = []
+              errors = []
+              totalTime = 0 }
+        else
+            let initialSyllables =
+                word
+                |> syllabizeWord rulesFile.debug rulesFile.syllableRules rulesFile.rules[0].lineNumber
+                |> Result.defaultValue String.Empty
 
-        inner initialSyllables word [] 0.0 [] rulesFile.rules
+            inner initialSyllables word [] 0.0 [] rulesFile.rules
 
 type RulesFile with
     [<CompiledName("Load")>]
@@ -395,7 +412,7 @@ type RulesFile with
             | Some DoubleUnderline -> RulesFile.markChangesWithCombining '\u0333' '_'
             | Some Caret -> RulesFile.markChangesWithCombining '\u032d' '\u02f0'
             | Some Ascii -> RulesFile.markChangesWithAsciiCarets
-            | _ -> RulesFile.don'tMarkChanges
+            | _ -> RulesFile.nullChangeMarker
 
         let inline transformSerial () = lexicon |> Array.map (fun word -> RulesFile.transformWord rulesFile fMarkChanges word)
         let inline transformParallel () = lexicon |> Array.Parallel.map (fun word -> RulesFile.transformWord rulesFile fMarkChanges word)

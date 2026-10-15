@@ -1,9 +1,3 @@
-$Syllable = (
-    $Onset = ((s | $Laryngeal)) ($C) ([C-Laryngeal])
-    $Nucleus = (") ([Overlong] | $V | [Syllabic] | $Laryngeal)
-    $Coda = ($C)($C) ([C-Glide])
-)
-
 ; Based on https://en.wikipedia.org/wiki/Proto-Germanic_language#Phonological_stages_from_Proto-Indo-European_to_end_of_Proto-Germanic.
 ; For the purposes of this example we take the values of h₁, h₂ and h₃ to be ?, ?\ and ?\_w, respectively, on the basis that I think they're neat.
 
@@ -11,28 +5,38 @@ $Syllable = (
 ;;                        Rules                        ;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+$Syllable = (
+    $Onset = ((s | $Laryngeal)) ($C) ([C-Laryngeal])
+    $Nucleus = (") ([Overlong] | $V | [Syllabic] | $Laryngeal)
+    $Coda = ($C)($C) ([C-Glide])
+)
+
 ;;;;;;;;;;;;
 ; Pre-PGmc ;
 ;;;;;;;;;;;;
 
 ; You can omit the environment section for unconditional rules.
 
-[+Palatalized] -> [-Palatalized]
+palatal-merger:
+	[+Palatalized] -> [-Palatalized]
 
 ; Insertion rules transform ∅ into something. You can omit the ∅ symbol if you want.
 
-/ u / (#|[C-Laryngeal])(")_[+Syllabic](#|$C)
-[+Syllabic] -> [-Syllabic]
+syllabic-vocalization: (
+	/ u / _$Syllabic
+	[+Syllabic] -> [-Syllabic]
+)
 
 [-Overlong] -> [+Overlong] / _#
 
-$Laryngeal // #_$C
+laryngeal-loss:
+	$Laryngeal // #_$C
 
-; e-coloring and dropping of laryngeals in onset
-
-e -> o / ?\_w(")_
-e -> a / ?\(")_
-$Laryngeal // _(")$V
+e-coloring: (
+	e -> o / ?\_w(")_
+	e -> a / ?\(")_
+	$Laryngeal // _(")$V
+)
 
 ; Homorganic vowels in hiatus -> long vowel
 
@@ -42,25 +46,25 @@ ii -> i::
 oo -> o::
 uu -> u::
 
-; e-coloring
-
-e -> o / _(w|j)?\_w
-e -> a / _(w|j)?\
-e?\_w -> o:
-e?\ -> A:
+e-coloring: (
+	e -> o / _(w|j)?\_w
+	e -> a / _(w|j)?\
+	e?\_w -> o:
+	e?\ -> A:
+)
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
-[-Long]$Laryngeal -> [+Long] / _
-$Laryngeal // ($V|$Sonorant)_
+laryngeal-loss: (
+	[-Long]$Laryngeal -> [+Long] / _
+	$Laryngeal // ($V|$Sonorant)_
+)
 
-; Cowgill's law
+cowgills-law:
+	?\_w -> g / ($Sonorant)_w
 
-?\_w -> g / ($Sonorant)_w
-
-; Vocalization of remaining laryngeals
-
-$Laryngeal -> @
+laryngeal-vocalization:
+	$Laryngeal -> @
 
 
 ;;;;;;;;;;;;;;
@@ -69,49 +73,49 @@ $Laryngeal -> @
 
 ;[+Glide] -> [-Glide] / $V_$C
 
-; Sievers' law
-
-/ i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
-/ i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+sievers-law: (
+	/ i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
+	/ i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+)
 
 (j|w) // _(e|a|o)#
 (e|a|o) // $C_#
 
-; Grimm's law: voiceless stops become fricatives, except after an obstruent
+; voiceless stops become fricatives, except after an obstruent
 
-[Stop-Voiced] -> [+Fricative] / (#|$V|$Sonorant)_
-;[Stop-Voiced] -> [+Fricative] / !($Obstruent)_
+grimms-law:
+	[Stop-Voiced] -> [+Fricative] / (#|$V|$Sonorant)_
 
-; Undo Grimm's law after s-
+spirant-law: (
+	[Stop+Labial] -> p\ / _(t|s) ;($C|$V)
+	[Stop+Dental] -> ts / _(t|s) ;($C|$V)
+)
 
-[+Fricative-Voiced] -> [-Fricative] / s _
-
-; Germanic spirant law
-
-[Stop+Labial] -> p\ / _(t|s) ;($C|$V)
-[Stop+Dental] -> ts / _(t|s) ;($C|$V)
 tst -> ss
 ;tss -> ss
 ss -> s / _#
 [Stop+Velar] -> x / _(t|s)!#
 
-; Grimm's law: voiced unaspirated stops become voiceless stops
+grimms-law: (
+	; voiced unaspirated stops become voiceless stops
 
-[Stop +Voiced -Aspirated] -> [-Voiced] / _(#|(")$V|$C)
+	[Stop +Voiced -Aspirated] -> [-Voiced] / _(#|(")$V|$C)
 
-; Grimm's law: aspirated stops become unaspirated
+	; aspirated stops become unaspirated
 
-[Stop+Aspirated] -> [-Aspirated]
+	[Stop+Aspirated] -> [-Aspirated]
+)
 
-; Lenition of /g/ and intervocalic voiced stops
+lenition: (
+	g -> G / (#|$Liquid|$Fricative)_
 
-g -> G / (#|$Liquid|$Fricative)_
+	[Stop+Voiced] -> [+Fricative] / ($V|$Stressed|$Glide)_(#|$V|$Stressed|$Glide)
+)
 
-[Stop+Voiced] -> [+Fricative] / ($V|$Stressed|$Glide)_(#|$V|$Stressed|$Glide)
+; Here we match an unstressed syllable by matching on the NucleusStart boundary, and then requiring the very next thing to be an unstressed vowel. If we encounter a stressed vowel instead, it will be forced to retry the rule starting from the next syllable. Additionally, with ![-Voiced] we block the rule when a voiceless consonant appears on either side.
 
-; Verner's law
-
-[+Fricative-Voiced] → [+Voiced] / $NucleusStart [-Stressed] $CodaStart ![-Voiced] ($Sonorant) _ ![-Voiced]
+verners-law:
+	[+Fricative-Voiced] → [+Voiced] / $NucleusStart [-Stressed] $CodaStart ![-Voiced] ($Sonorant) _ ![-Voiced]
 
 ; Voiced fricatives resulting from Verner's law become stops after a nasal
 
@@ -119,7 +123,8 @@ g -> G / (#|$Liquid|$Fricative)_
 
 ; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
 
-[+Stressed] -> [-Stressed]
+initial-stress:
+	[+Stressed] -> [-Stressed]
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
 
@@ -131,13 +136,15 @@ nw -> nn
 ln -> ll
 zm -> mm
 
-e / i / $$_(#|$C)
-e / i / $$_(#|$C)
+unstressed-vowel-reduction: (
+	e / i / $$_(#|$C)
+	e / i / $$_(#|$C)
+)
+
 (ei|ej) -> i:
 iji -> i:
-ij -> i: / _(C|#)
+ij -> i: / _($C|#)
 i:i -> i:
-
 ji -> i / $V($C)($C)_(#|$C)
 
 (o|a) -> A
@@ -147,20 +154,20 @@ ji -> i / $V($C)($C)_(#|$C)
 ;;;;;;;;;;;;;
 
 m -> n / _(#|$Dental)
-[-Nasalized]n -> [+Nasalized] / _#
+
+nasalization:
+	[-Nasalized]n -> [+Nasalized] / _#
 
 e~: -> A~:
 
 ; Stressed schwa becomes /a/
-
-@ -> A / #(s)($C)($C)_
-
 ; Unstressed schwa disappears between consonants
+; Remaining schwas become /a/
 
+@ -> A / # $NucleusStart _
 @ // $C_$C
 @ -> A
 
-;t // $!"$V($C)_#
 t // $[V-Stressed]($C)_#
 gw -> g / n _
 G_w -> w
@@ -169,12 +176,14 @@ A: -> O:
 A~: -> O~:
 
 e -> i / _n$C
+e -> i / _n SyllableEnd
 
 ; Combined double transformation and deletion
 ; 1. Nasalization and compensatory lengthening of a vowel
 ; 2. Deletion of /n/
 
-[-Nasalized]n -> [+Nasalized +Long] / _x
+nasalization:
+	[-Nasalized]n -> [+Nasalized +Long] / _x
 
 ; Not really sure where this should go, so I'll just stick it at the end
 
@@ -238,8 +247,6 @@ $V = (
     A:: -> A~::
     o:: -> o~::
 )
-
-; [Stressed] = "$V
 
 [Stressed] = (
     a -> "a

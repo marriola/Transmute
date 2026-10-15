@@ -9,7 +9,7 @@ lˈegʰjeti       ; lay (past tense of lie)
 ˈojneʕ          ; one, fem.
 ˈojnom          ; one, neut.
 dwˈoj           ; two
-trˈejes         ; three * (broken)
+trˈejes         ; three
 petwˈoːr        ; four
 pˈempe          ; five
 sˈekʲs          ; six
@@ -23,13 +23,13 @@ kʲm̩tˈom         ; hundred
 ʕʷdˈontm̩        ; tooth, acc.sg.
 ʕʷdˈontm̩s       ; tooth, acc.pl.
 ʕʷdn̩tˈes        ; tooth, gen.sg.
-ʕʷdn̩tˈoʔom      ; tooth, gen.pl. *
+ʕʷdn̩tˈoʔom      ; tooth, gen.pl.
 ʕʷdn̩tˈej        ; tooth, dat.sg.
 ʕʷdn̩tm̩ˈos       ; tooth, dat.pl.
 ʕʷdn̩tˈeʔ        ; tooth, inst.sg.
 widonom         ; know, inf.
 wˈojdʕe         ; know, 1sg.
-wˈojdtʕe        ; know, 2sg. *
+wˈojdtʕe        ; know, 2sg.
 wˈojde          ; know, 3sg.
 widtˈos         ; know, pp.
 pl̩ʔnˈos         ; full, masc.
@@ -61,7 +61,7 @@ kʲr̩ʕnˈom        ; horn
 sʕˈuntros       ; south
 ʕˈewsros        ; east
 bʰˈergʲtos      ; bright
-gʰˈostejes      ; guest *
+gʰˈostejes      ; guest
 dʰewsˈom        ; deer
 knˈudes         ; nuts
 sˈeʕgjonom      ; seek, inf.

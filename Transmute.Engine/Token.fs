@@ -7,6 +7,7 @@
 namespace Transmute.Engine
 
 open Transmute.Engine.Position
+open System.Text.RegularExpressions
 
 type TokenType =
     /// A whitespace token.
@@ -72,6 +73,9 @@ type TokenType =
     /// An identifier token.
     | Id
 
+    /// A label token.
+    | Label
+
     /// An utterance token.
     | Utterance
 
@@ -101,6 +105,7 @@ with
         | Not -> "'!'"
         | Equals -> "'='"
         | Id -> "an identifier"
+        | Label -> "a label"
         | Utterance -> "an utterance"
         | Comment -> "a comment"
 
@@ -133,6 +138,14 @@ type TokenType with
         fn { tokenType = this; position = position; value = value }
 
 module Token =
+    let private RE_WHITESPACE = new Regex "\\s+"
+
+    let labelName token =
+        if token.tokenType <> Label then
+            failwith $"Expected a label, got a {token.tokenType}"
+        else
+            RE_WHITESPACE.Replace(token.value, "").Replace(":", "").Trim()
+
     /// Matches a token on its type.
     let (|OfType|_|) tokenType token = 
         match token with

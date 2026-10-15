@@ -55,10 +55,12 @@
                           BorderThickness="1" BorderBrush="Gray"
                           ItemsSource="{Binding CurrentLexiconChange}">
 					<DataGrid.Columns>
-                        <DataGridTemplateColumn Header="Rule #">
+                        <DataGridTextColumn Header="Label" Binding="{Binding ruleName}" IsReadOnly="True" />
+                        <DataGridTemplateColumn Header="Line #">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate DataType="te:LexiconChange">
 									<HyperlinkButton IsVisible="{Binding !isOriginal}"
+                                                     HorizontalAlignment="Right"
                                                      Content="{Binding ruleNumber}"
                                                      Command="{Binding #OutputPanel.GoToDestination}"
                                                      CommandParameter="{Binding ruleNumber}" />

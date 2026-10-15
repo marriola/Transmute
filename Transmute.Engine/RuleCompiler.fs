@@ -472,7 +472,7 @@ module internal RuleCompiler =
     /// </summary>
     let compile showNfa features sets rule : SoundChangeRule =
         match Node.untag rule with
-        | RuleNode (_, _, input, output, environment) ->
+        | RuleNode (_, _, _, input, output, environment) ->
             let input = Node.untagAll input
             let output = Node.untagAll output
             let environment = Node.untagAll environment

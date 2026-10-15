@@ -8,17 +8,15 @@
 ;   Ingvaeonic and Anglo-Frisian   ;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-; Ingvaeonic nasal spirant law
-
-$V.n -> [+Long +Nasalized] / _$Fricative
+nasal-spirant-law:
+	$V.n -> [+Long +Nasalized] / _$Fricative
 
 (A~:|{~:) -> O~:
 
 (Ai|Aj) -> A:
 
-; Anglo-Frisian brightening
-
-A!: -> { / _!(m|n)
+a-brightening:
+	A!: -> { / _!(m|n)
 
 [+/{ A A~/] // _#
 
@@ -26,27 +24,29 @@ A!: -> { / _!(m|n)
 ;   Old English   ;
 ;;;;;;;;;;;;;;;;;;;
 
-; Front vowel breaking
+front-vowel-breaking:
+	/ u / [V+Front-/y/]_((x|h|w)($V|#) | r$C | l$C)
 
-/ u / [V+Front-/y/]_((x|h|w)($V|#) | r$C | l$C)
 teuxun -> texun
 
-; Diphthong height harmonization
+height-harmonization: (
+	[+/Ai Aj/] -> A:
+	[+/{u {w/] -> {A
+	[+/eu ew/] -> eo
+)
 
-[+/Ai Aj/] -> A:
-[+/{u {w/] -> {A
-[+/eu ew/] -> eo
-
-; A-restoration
-
-{ -> A / _[+Geminate]( [C-/j/][V-Front] | # )
+a-restoration:
+	{ -> A / _[+Geminate]( [C-/j/][V-Front] | # )
 
 ; Palatalization of velars
 
 [Palatalized] = (k -> tS, g -> dZ, gg -> dZ)
 
-[-Palatalized] -> [+Palatalized] / _(i(:)|j)
-[-Palatalized] -> [+Palatalized] / i: _ ($C|#)
+palatalization: (
+	[-Palatalized] -> [+Palatalized] / _(i(:)|j)
+	[-Palatalized] -> [+Palatalized] / i: _ ($C|#)
+)
+
 G -> j\ / [V+Front]_
 G -> j\ / _[V+Front]
 sk -> S
@@ -57,49 +57,46 @@ x -> h / #_
 x -> h / _$V
 h_w -> hw
 
-; Umlaut
+umlaut:
+	[-Front] -> [+Front] / _[C-/j/]([C-/j/])([C-/j/])(i|j|j\)
 
-[-Front] -> [+Front] / _[C-/j/]([C-/j/])([C-/j/])(i|j|j\)
-
-; High vowel loss
-
-(i|u) // ([V+Long] | $Diphthong | $C)$C_#
-
-(i)j // ([V+Long] | $Diphthong)$C_$$
-(i)j // ([V-Long] | [Diphthong-Long])$C$C_$$
+high-vowel-loss: (
+	(i|u) // ([V+Long] | $Diphthong | $C)$C_#
+	(i)j // ([V+Long] | $Diphthong)$C_$$
+	(i)j // ([V-Long] | [Diphthong-Long])$C$C_$$
+)
 
 j\ -> j
 j // $C_#
 
-[Fricative-Voiced] -> [+Voiced] / $V_$V
+intervocalic-voicing:
+	[Fricative-Voiced] -> [+Voiced] / $V_$V
 
-; H-loss
+h-loss:
+	V(h|x) -> [+Long] / (r|l)_$V
 
-V(h|x) -> [+Long] / (r|l)_$V
+palatal-umalut:
+	(e|eo) -> i / _(xs|xt)
 
-; Palatal umlaut
+unstressed-vowel-reduction: (
+	O: -> u / _#
+	o: -> A / _$C$C$C#
+	[+Nasalized] -> [-Nasalized]
+	[V+Long] -> [-Long] / _($C$C$C|$C$C$$)
+	u -> o / _$C$#
+	({|i) -> e / _$C$#
+	O -> o
+)
 
-(e|eo) -> i / _(xs|xt)
-
-; Unstressed vowel reductions
-
-O: -> u / _#
-o: -> A / _$C$C$C#
-[+Nasalized] -> [-Nasalized]
-[V+Long] -> [-Long] / _($C$C$C|$C$C$$)
-u -> o / _$C$#
-({|i) -> e / _$C$#
-O -> o
-
-; Loss of short, low vowels in medial syllables
-
-(A|{|e) // $$_$$V
+medial-short-low-vowel-loss:
+	(A|{|e) // $$_$$V
 
 2 -> e
 iu -> eo
 G -> g / #_
 
-[Fricative+Voiced] -> [-Voiced] / _#
+word-final-devoicing:
+	[Fricative+Voiced] -> [-Voiced] / _#
 
 xs -> ks
 h -> x / _#

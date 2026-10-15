@@ -27,8 +27,6 @@ module internal RuleParser =
     let private next (tokenBuffer: System.Collections.Generic.List<Token>) tokens =
         let mutable _position = Offset 0, Line 1, Column 1
 
-        // TODO add proper handling for missing closing paren
-
         /// <summary>
         /// Matches the next token to a specific type and consumes it.
         /// <summary>
@@ -37,7 +35,7 @@ module internal RuleParser =
             match tokens with
             | [] ->
                 invalidArg "tokens" "Must not be empty"
-            | OfType Whitespace ws::xs ->
+            | OfType Whitespace ws::xs when tokenType <> Whitespace ->
                 tokenBuffer.Add ws
                 matchToken xs tokenType
             | { tokenType = t } as x::xs when tokenType = t ->
@@ -52,14 +50,14 @@ module internal RuleParser =
         let rec tryMatchToken tokens tokenType =
             let rec tryMatchToken' next consumed =
                 match next with
-                | OfType Whitespace ws::xs ->
+                | OfType Whitespace ws::xs when tokenType <> Whitespace ->
                     tryMatchToken' xs (ws :: consumed)
                 | { tokenType = t } as x::xs when tokenType = t ->
+                    if tokenType <> Label then
                     consumed |> List.rev |> tokenBuffer.AddRange
                     tokenBuffer.Add x
-                    xs, Some t
+                    xs, Some x
                 | _ ->
-                    tokenBuffer.Clear()
                     tokens, None
 
             tryMatchToken' tokens []
@@ -78,7 +76,7 @@ module internal RuleParser =
                     tryMatchToken xs tokenType
             | { tokenType = t } as x::xs when tokenType = t ->
                 tokenBuffer.Add x
-                xs, Some t
+                xs, Some x
             | _ ->
                 tokens, None
 
@@ -197,7 +195,7 @@ module internal RuleParser =
         /// <see cref="CompoundSetIdentifierNode" />, <see cref="OptionalNode" /> and <see cref="AlternationNode" />.
         /// </summary>
         /// <param name="tokens">The list of tokens.</param>
-        let rec matchRuleSection tokens =
+        let rec matchRuleSection allowNewline tokens =
             /// <summary>
             /// Matches an <see cref="AlternationNode" />.
             /// </summary>
@@ -224,7 +222,7 @@ module internal RuleParser =
                     tokenBuffer.Add pipe
                     matchAlternation xs startToken out
                 | _ ->
-                    let tokens, ruleSection = matchRuleSection tokens
+                    let tokens, ruleSection = matchRuleSection false tokens
                     ruleSection :: out
                     |> matchAlternation tokens startToken
 
@@ -252,7 +250,7 @@ module internal RuleParser =
                         tokenBuffer.Add pipe
                         matchAlternation xs lparen [out]
                     | _ ->
-                        let tokens, ruleSection = matchRuleSection tokens
+                        let tokens, ruleSection = matchRuleSection false tokens
                         matchOptional_AlternationInteral tokens (ruleSection @ out)
                 matchOptional_AlternationInteral tokens []
 
@@ -265,6 +263,9 @@ module internal RuleParser =
                     | OfType Separator t :: xs ->
                         tokenBuffer.Add t
                         matchNext xs
+
+                    | NewlineWhitespace _ :: _ when not allowNewline ->
+                        tokens, None
 
                     | NonNewlineWhitespace ws :: xs ->
                         tokenBuffer.Add ws
@@ -340,7 +341,7 @@ module internal RuleParser =
                 matchUtterance_Transformation xs utterance
             | OfType Arrow arrow::xs ->
                 tokenBuffer.Add arrow
-                let tokens, token = matchToken xs Utterance
+                let tokens, token = matchOneOf xs [ Utterance; Label ]
                 let inputNode = Node.tag (UtteranceNode utterance.value) utterance.position
                 let outputNode = Node.tag (UtteranceNode token.value) token.position
                 tokens, Node.tag (TransformationNode (inputNode, outputNode)) utterance.position
@@ -361,6 +362,7 @@ module internal RuleParser =
                 | OfType Comment x::xs ->
                     tokenBuffer.Add x
                     matchMemberListInternal xs out
+                | OfType Label x::xs
                 | OfType Utterance x::xs ->
                     tokenBuffer.Add x
                     let tokens, utteranceOrTransformation = matchUtterance_Transformation xs x
@@ -389,23 +391,58 @@ module internal RuleParser =
         /// <param name="tokens">The list of tokens.</param>
         let matchRule tokens headPosition =
             let _, Line startLine, _ = headPosition
-            let tokens, input = matchRuleSection tokens
+            let tokens, label = tryMatchToken tokens Label
+            let tokens, whitespaceToken =
+                if Option.isSome label then
+                    tryMatchToken tokens Whitespace
+                else
+                    tokens, None
+            let startLine =
+                match whitespaceToken with
+                | Some (NewlineWhitespace _) -> startLine + 1
+                | _ -> startLine
+            let tokens, input = matchRuleSection false tokens
             let tokens, _ = matchOneOf tokens [ Arrow; Divider ]
-            let tokens, output = matchRuleSection tokens
+            let tokens, output = matchRuleSection true tokens
             let tokens, divider = tryMatchTokenOnSameLine tokens Divider
             let tokens, environment =
                 match divider with
                 | Some _ ->
-                    let tokens, environment = matchRuleSection tokens
-                    tokens, environment
+                    matchRuleSection true tokens
                 | None ->
                     tokens, [PlaceholderNode]
             let text =
                 tokenBuffer
                 |> Seq.map (fun t -> t.value)
                 |> String.concat ""
-            tokens, Node.tag (RuleNode (startLine, text, input, output, environment)) headPosition
+            tokens, [Node.tag (RuleNode (startLine, Option.map Token.labelName label, text.Trim(), input, output, environment)) headPosition]
 
+        let matchLabeledRuleGroup tokens =
+            let tokens, label = matchToken tokens Label
+            let tokens, _ = matchToken tokens LParen
+            let tokens, _ = matchToken tokens Whitespace
+
+            let rec inner out tokens =
+                match tokens with
+                | OfType Comment _ :: rest
+                | NewlineWhitespace _ :: rest ->
+                    inner out rest
+
+                | OfType RParen _ :: _ ->
+                    tokens, List.collect id out
+
+                | t :: _ ->
+                    tokenBuffer.Clear()
+                    let tokens, rule = matchRule tokens t.position
+                    let rule =
+                        match rule with
+                        | [Node.Untag (RuleNode (lineNumber, _, ruleTokens, input, output, environment), position)] ->
+                            [Node.tag (RuleNode (lineNumber, Some (Token.labelName label), ruleTokens, input, output, environment)) position]
+                    inner (rule :: out) tokens
+
+            let tokens, rules = inner [] tokens
+            let tokens, _ = matchToken tokens RParen
+            tokens, rules
 
         /// <summary>
         /// Matches a rule when an identifier has already been matched.
@@ -415,22 +452,23 @@ module internal RuleParser =
         let matchRuleStartingWithIdentifier tokens identifier =
             let tokens, ruleNode = matchRule tokens identifier.position
             match ruleNode with
-            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
-                tokens, Node.tag
+            | [Node.Untag (RuleNode (lineNumber, name, ruleTokens, input, output, environment), _)] ->
+                tokens, [Node.tag
                     (RuleNode (
                         lineNumber,
+                        name,
                         ruleTokens,
                         Node.tag (SetIdentifierNode identifier.value) identifier.position :: input,
                         output,
                         environment))
-                    identifier.position
+                    identifier.position]
             | _ ->
                 invalidSyntax "Expected a rule" _position
 
         let matchAssignment tokens =
             let tokens, identifier = matchToken tokens Id
             let tokens, _ = matchToken tokens Equals
-            let tokens, nodes = matchRuleSection tokens
+            let tokens, nodes = matchRuleSection true tokens
             tokens, identifier.value, nodes
 
         let matchSyllableDefinition tokens =
@@ -439,8 +477,8 @@ module internal RuleParser =
             let rec inner tokens out =
                 match tokens with
                 | []
-                | OfType RParen _ :: _->
-                    tokens, List.rev out
+                | OfType RParen _ :: _ ->
+                    tokens, Map.ofList out
                 | OfType Comment _ :: xs
                 | OfType Whitespace _ :: xs ->
                     inner xs out
@@ -453,21 +491,6 @@ module internal RuleParser =
             let tokens, _ = matchToken tokens LParen
             let tokens, definitions = inner tokens []
             let tokens, _ = matchToken tokens RParen
-
-            let definitions =
-                definitions
-                |> List.groupBy fst
-                |> Map.ofList
-                |> Map.map (fun _ parts ->
-                    match parts with
-                    | [] -> []
-                    | [_, nodes] -> nodes
-                    | _ -> 
-                        let alternationNode =
-                            parts
-                            |> List.map (fun (_, nodes) -> nodes)
-                            |> AlternationNode
-                        [ alternationNode ])
 
             let onset = Map.tryFind "Onset" definitions |> Option.defaultValue []
             let nucleus = Map.tryFind "Nucleus" definitions |> Option.defaultValue []
@@ -518,13 +541,13 @@ module internal RuleParser =
                 tokenBuffer.Add x
                 let _, Line lineNumber, _ = xs.[0].position
                 let xs, syllableDefinitions = matchSyllableDefinitions xs
-                xs, (SyllableDefinitionListNode (lineNumber, syllableDefinitions))
+                xs, [SyllableDefinitionListNode (lineNumber, syllableDefinitions)]
             | OfType Equals _ :: xs ->
                 let xs, openToken = matchOneOf xs [ LParen; LBrace ]
                 let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
                 let tokens, members = matchMemberList closeToken xs
                 let (_, Line lineNumber, _) = identifier.position
-                tokens, Node.tag (SetDefinitionNode (lineNumber, identifier.value, members)) identifier.position
+                tokens, [Node.tag (SetDefinitionNode (lineNumber, identifier.value, members)) identifier.position]
             | OfType Arrow _::xs
             | OfType Divider _::xs ->
                 let tokens, ruleNode = matchRuleStartingWithIdentifier tokens identifier
@@ -545,8 +568,8 @@ module internal RuleParser =
             let tokens, setIdentifier = matchSetIdentifier tokens headPosition
             let tokens, ruleNode = matchRule tokens headPosition
             match ruleNode with
-            | TaggedNode (_, RuleNode (lineNumber, ruleTokens, input, output, environment)) ->
-                tokens, TaggedNode (headPosition, RuleNode (lineNumber, ruleTokens, setIdentifier :: input, output, environment))
+            | [TaggedNode (_, RuleNode (lineNumber, name, ruleTokens, input, output, environment))] ->
+                tokens, [TaggedNode (headPosition, RuleNode (lineNumber, name, ruleTokens, setIdentifier :: input, output, environment))]
             | _ ->
                 invalidSyntax "Expected a rule" _position
 
@@ -557,8 +580,8 @@ module internal RuleParser =
         /// is not a <see cref="RuleNode" />.</exception>
         let prependToRule rule headPosition nodes =
             match rule with
-            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
-                Node.tag (RuleNode (lineNumber, ruleTokens, nodes @ input, output, environment)) headPosition
+            | [Node.Untag (RuleNode (lineNumber, name, ruleTokens, input, output, environment), _)] ->
+                [Node.tag (RuleNode (lineNumber, name, ruleTokens, nodes @ input, output, environment)) headPosition]
             | _ ->
                 invalidArg "rule" "Must be a RuleNode"
 
@@ -569,17 +592,18 @@ module internal RuleParser =
         /// or when the first element of the input section is not a <see cref="CompoundSetIdentifierNode" />.</exception>
         let prependToRuleSetIdentifier rule headPosition nodes =
             match rule with
-            | Node.Untag (RuleNode (lineNumber, ruleTokens, input, output, environment), _) ->
+            | [Node.Untag (RuleNode (lineNumber, name, ruleTokens, input, output, environment), _)] ->
                 match input.Head with
                 | Node.Untag (CompoundSetIdentifierNode identifiers, _) ->
-                    Node.tag
+                    [Node.tag
                         (RuleNode
                             (lineNumber,
+                            name,
                             ruleTokens,
                             Node.tag (CompoundSetIdentifierNode (nodes @ identifiers)) headPosition :: input.Tail,
                             output,
                             environment))
-                        headPosition
+                        headPosition]
                 | _ ->
                     invalidArg "rule" "First element of the input section must be a CompoundSetIdentifierNode"
             | _ ->
@@ -644,10 +668,6 @@ module internal RuleParser =
             | x::_ ->
                 unexpectedToken [ Plus; Minus; Id ] x
 
-        let matchSyllableRule tokens =
-            let tokens, _ = matchToken tokens Equals
-            matchRuleSection tokens
-
         /// <summary>
         /// Determines which rule to match to the available tokens.
         /// </summary>
@@ -662,11 +682,16 @@ module internal RuleParser =
 
                 match tokens with
                 | [] ->
-                    Result.Error (syntaxErrorMessage "End of file" _position)
+                    Ok ([], [])
                 | OfType Whitespace _::xs ->
                     nextInternal xs
                 | OfType Comment x::xs ->
-                    Ok (xs, Node.tag (CommentNode x.value) x.position)
+                    Ok (xs, [Node.tag (CommentNode x.value) x.position])
+                | OfType Label _ :: OfType LParen _ :: _
+                | OfType Label _ :: NonNewlineWhitespace _ :: OfType LParen _ :: _ ->
+                    tokenBuffer.Clear()
+                    Ok (matchLabeledRuleGroup tokens)
+                | OfType Label x::_
                 | OfType Empty x::_
                 | OfType Divider x::_
                 | OfType Utterance x::_
@@ -701,8 +726,8 @@ module internal RuleParser =
                 Ok (List.rev out)
             | _ ->
                 match next tokenBuffer tokens with
-                | Ok (nextTokens, node) ->
-                    inner nextTokens (node :: out)
+                | Ok (nextTokens, nodes) ->
+                    inner nextTokens (nodes @ out)
                 | Result.Error message ->
                     Result.Error message
         inner tokens []

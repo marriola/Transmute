@@ -17,22 +17,26 @@ Syllable = (
 
 ; You can omit the environment section for unconditional rules.
 
-[+Palatalized] → [-Palatalized]
+palatal-merger:
+	Palatalized → [-Palatalized]
 
 ; Insertion rules transform nothing into something. You can omit the ∅ symbol if you want. If you do that, an arrow at the beginning by itself might look odd, so you can use a slash instead.
 
-∅ → u / _Syllabic
-[+Syllabic] → [-Syllabic]
+syllabic-vocalization: (
+	∅ → u / _Syllabic
+	[+Syllabic] → [-Syllabic]
+)
 
 [-Overlong] → [+Overlong] / _#
 
-Laryngeal → ∅ / #_C
+laryngeal-loss:
+	Laryngeal → ∅ / #_C
 
-; e-coloring and dropping of laryngeals in onset
-
-e → o / ʕʷ(ˈ)_
-e → a / ʕ(ˈ)_
-Laryngeal → ∅ / _(ˈ)V
+e-coloring: (
+	e → o / ʕʷ(ˈ)_
+	e → a / ʕ(ˈ)_
+	Laryngeal → ∅ / _(ˈ)V
+)
 
 ; Homorganic vowels in hiatus → long vowel
 
@@ -42,25 +46,25 @@ ii → iːː
 oo → oːː
 uu → uːː
 
-; e-coloring
-
-e → o / _(w|j)ʕʷ
-e → a / _(w|j)ʕ
-eʕʷ → oː
-eʕ → ɑː
+e-coloring: (
+	e → o / _(w|j)ʕʷ
+	e → a / _(w|j)ʕ
+	eʕʷ → oː
+	eʕ → ɑː
+)
 
 ; Compensatory lengthening with loss of laryngeals after sonorants
 
-[-Long]Laryngeal → [+Long] / _
-Laryngeal → ∅ / (V|Sonorant)_
+laryngeal-loss: (
+	[-Long]Laryngeal → [+Long] / _
+	Laryngeal → ∅ / (V|Sonorant)_
+)
 
-; Cowgill's law
+cowgills-law:
+	ʕʷ → g / (Sonorant)_w
 
-ʕʷ → g / (Sonorant)_w
-
-; Vocalization of remaining laryngeals
-
-Laryngeal → ə
+laryngeal-vocalization:
+	Laryngeal → ə
 
 
 ;;;;;;;;;;;;;;
@@ -69,50 +73,48 @@ Laryngeal → ə
 
 ;[+Glide] → [-Glide] / V_C
 
-; Sievers' law
-
-∅ → i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
-∅ → i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+sievers-law: (
+	∅ → i / [V-Long][C-/j/][C-/j/] ([C-/j/])_j
+	∅ → i / [V+Long][C-/j/] ([C-/j/])([C-/j/])_j
+)
 
 (j|w) → ∅ / _(e|a|o)#
 (e|a|o) → ∅ / σσ_#
 
-; Grimm's law: voiceless stops become fricatives, except after an obstruent
+grimms-law: (
+	; voiceless stops become fricatives, except after an obstruent
 
-[Stop-Voiced] → [+Fricative] / (#|V|Sonorant)_	; ![C -Nasal -Liquid -Glide]_
+	[Stop-Voiced] → [+Fricative] / (#|V|Sonorant)_	; ![C -Nasal -Liquid -Glide]_
 
-; Undo Grimm's law after s-
+	; voiced unaspirated stops become voiceless stops
 
-[+Fricative-Voiced] → [-Fricative] / s_
+	[Stop +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
 
-; Germanic spirant law
+	; aspirated stops become unaspirated
 
-[Stop+Labial] → ɸ / _(t|s) ;(C|V)
-[Stop+Dental] → ts / _(t|s) ;(C|V)
+	[Stop+Aspirated] → [-Aspirated]
+)
+
+spirant-law: (
+	[Stop+Labial] → ɸ / _(t|s) ;(C|V)
+	[Stop+Dental] → ts / _(t|s) ;(C|V)
+)
+
 tst → ss
 ;tss → ss
 ss → s / _#
 [Stop+Velar] → x / _(t|s)!#
 
-; Grimm's law: voiced unaspirated stops become voiceless stops
+lenition: (
+	g → ɣ / (#|Liquid|Fricative)_
 
-[Stop +Voiced -Aspirated] → [-Voiced] / _(#|(ˈ)V|C)
-
-; Grimm's law: aspirated stops become unaspirated
-
-[Stop+Aspirated] → [-Aspirated]
-
-; Lenition of /g/ and intervocalic voiced stops
-
-g → ɣ / (#|Liquid|Fricative)_
-
-[Stop+Voiced] → [+Fricative] / (V|Stressed|Glide)_(#|V|Stressed|Glide)
-
-; Verner's law
+	[Stop+Voiced] → [+Fricative] / (V|Stressed|Glide)_(#|V|Stressed|Glide)
+)
 
 ; Here we match an unstressed syllable by matching on the NucleusStart boundary, and then requiring the very next thing to be an unstressed vowel. If we encounter a stressed vowel instead, it will be forced to retry the rule starting from the next syllable. Additionally, with ![-Voiced] we block the rule when a voiceless consonant appears on either side.
 
-[+Fricative-Voiced] → [+Voiced] / NucleusStart [-Stressed] CodaStart ![-Voiced] (Sonorant) _ ![-Voiced]
+verners-law:
+	[+Fricative-Voiced] → [+Voiced] / NucleusStart [-Stressed] CodaStart ![-Voiced] (Sonorant) _ ![-Voiced]
 
 ; Voiced fricatives resulting from Verner's law become stops after a nasal
 
@@ -120,7 +122,8 @@ g → ɣ / (#|Liquid|Fricative)_
 
 ; Stress moves to initial syllable. Let's just stop marking it, and from now on we'll treat the first syllable as the stressed one.
 
-[+Stressed] → [-Stressed]
+initial-stress:
+	[+Stressed] → [-Stressed]
 
 ; Word-final /s/ previously unaffected by Verner's law becomes voiced by analogy with those that were
 
@@ -132,13 +135,15 @@ nw → nn
 ln → ll
 zm → mm
 
-e → i / σσ_(#|C)
-e → i / σσ_(#|C)
+unstressed-vowel-reduction: (
+	e → i / σσ_(#|C)
+	e → i / σσ_(#|C)
+)
+
 (ei|ej) → iː
 iji → iː
 ij → iː / _(C|#)
 iːi → iː
-
 ji → i / V(C)(C)_(#|C)
 
 (o|a) → ɑ
@@ -148,13 +153,15 @@ ji → i / V(C)(C)_(#|C)
 ;;;;;;;;;;;;;
 
 m → n / _(#|Dental)
-[-Nasalized]n → [+Nasalized] / _#
+
+nasalization:
+	[-Nasalized] n → [+Nasalized] / _#
 
 ẽː → ɑ̃ː
 
-; * Stressed schwa becomes /a/
-; * Unstressed schwa disappears between consonants
-; * Remaining schwas become /a/
+; Stressed schwa becomes /a/
+; Unstressed schwa disappears between consonants
+; Remaining schwas become /a/
 
 ə → ɑ / # NucleusStart _
 ə → ∅ / C_C
@@ -174,7 +181,8 @@ e → i / _n SyllableEnd
 ; 1. Nasalization and compensatory lengthening of a vowel
 ; 2. Deletion of /n/
 
-[-Nasalized]n → [+Nasalized +Long] / _x
+nasalization:
+	[-Nasalized]n → [+Nasalized +Long] / _x
 
 ; Not really sure where this should go, so I'll just stick it at the end
 

@@ -7,6 +7,7 @@ namespace Transmute.Engine
 
 open Transmute.Engine.Position
 open Transmute.Engine.StateMachine
+open Transmute.Engine.Token
 
 module internal Lexer =
     type MismatchAction = Restart | Stop
@@ -43,6 +44,7 @@ module internal Lexer =
         |> onError (fun inputSymbol machineState ->
             let { currentValue = value } = machineState
             let { pos = offset, row, col } = value
+
             match value.mismatchAction with
             | MismatchAction.Restart ->
                 ErrorAction.Restart value //{ value with mismatchAction = MismatchAction.Stop }
@@ -54,7 +56,21 @@ module internal Lexer =
             let (_, input, To nextState) = t
             let { currentValue = value; currentState = currentState } = machineState
             let isEpsilonTransition = input = OnEpsilon
-            let isNextFinal = State.isFinal nextState
+
+            // Labels can only appear at the beginning of a line, optionally following some non-newline whitespace.
+
+            let nextState, isNextFinal =
+                if nextState = LexerTables.Q_LabelFinal then
+                    match value.acc with
+                    | []
+                    | NewlineWhitespace _ :: _
+                    | NonNewlineWhitespace _ :: NewlineWhitespace _ :: _ ->
+                        LexerTables.Q_LabelFinal, true
+
+                    | _ ->
+                        LexerTables.Q_Utterance, false
+                else
+                    nextState, State.isFinal nextState
 
             let nextPos =
                 if isEpsilonTransition then
@@ -63,31 +79,40 @@ module internal Lexer =
                     incrRow value.pos
                 else
                     incrCol value.pos
+
             let builder =
                 if not isEpsilonTransition
                     then inputSymbol :: value.builder
                     else value.builder
+
             // Add token to output if on a final state
+
             let nextAcc =
                 match LexerTables.actionFor nextState with
-                | Some fn ->
-                    let v = builder |> accumulate |> fn value.startPos
+                | Some finalizeValue ->
+                    let v = builder |> accumulate |> finalizeValue value.startPos
                     v :: value.acc
                 | None -> value.acc
+
             let nextStartPos =
                 // Reset startPos when finishing a match, and don't set it until the next non-whitespace character
+
                 if isNextFinal
                     || (builder = []
                         && currentState <> LexerTables.Q_Whitespace
-                        && System.Char.IsWhiteSpace(inputSymbol))
+                        && System.Char.IsWhiteSpace inputSymbol)
                     then nextPos
                     else value.startPos
-            { value with
+
+            let nextValue =
+                { value with
                     startPos = nextStartPos
                     pos = nextPos
                     mismatchAction = if isNextFinal then MismatchAction.Restart else MismatchAction.Stop
                     builder = if isNextFinal then [] else builder
-                    acc = nextAcc })
+                    acc = nextAcc }
+
+            nextState, nextValue)
         |> onFinish (fun ({ acc = acc }) ->
             acc |> List.rev |> Ok)
         |> runDFA (content + "\n")

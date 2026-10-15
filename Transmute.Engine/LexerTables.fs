@@ -24,6 +24,8 @@ module private LexerTables =
     /// <param name="token">The comment token.</param>
     let private trimComment token = { token with value = token.value.[1..].Trim() }
 
+    let private trimStart token = { token with value = token.value.TrimStart() }
+
     /// Removes the initial sigil from a token if it has one.
     let private trimSigil sigil token =
         { token with
@@ -65,6 +67,9 @@ module private LexerTables =
     let internal Q_UtteranceFinal = State.make "Q_UtteranceFinal" |> State.makeFinal
     let internal Q_Comment = State.make "Q_Comment"
     let internal Q_CommentFinal = State.make "Q_CommentFinal" |> State.makeFinal
+    let internal Q_Label = State.make "Q_Label"
+    let internal Q_LabelColon = State.make "Q_LabelColon"
+    let internal Q_LabelFinal = State.make "Q_LabelFinal" |> State.makeFinal
 
     // Defines the transition table for the lexer.
     let private createTable inputFormat =
@@ -76,7 +81,7 @@ module private LexerTables =
                 [ seq { '0'..'9' }; seq { 'A'..'Z' }; seq { 'a'..'z' } ]
                 Q_Identifier
 
-        let utteranceTransitions =
+        let utteranceTransitionsTo destination =
             if inputFormat = IPA then
                 onMany
                     [ // IPA symbols
@@ -87,7 +92,7 @@ module private LexerTables =
                       // Combining diacritics
                       seq { '\u0300'..'\u0341' }
                     ]
-                    Q_Utterance
+                    destination
             else
                 onMany
                     [ seq { 'a'..'z' }
@@ -96,7 +101,9 @@ module private LexerTables =
                       "àáâãäèéêëìíîïòóõôöùúûüỳýŷÿ" :> char seq
                       @"?&@{}""%:_\<>`'~=" :> char seq
                     ]
-                    Q_Utterance
+                    destination
+
+        let utteranceTransitions = utteranceTransitionsTo Q_Utterance
 
         let beginUtteranceTransitions =
             if inputFormat = IPA then
@@ -111,11 +118,15 @@ module private LexerTables =
                     ]
                     Q_Utterance
 
-        let whitespaceTransitions = onMany [ " \t\r\n" :> char seq ] Q_Whitespace
+        let alphabeticTransitionsTo destination = onMany [ seq { 'a'..'z'} ] destination
+        
+        let numericTransitionsTo destination = onMany [ seq { '0'..'9'} ] destination
+
+        let whitespaceTransitionsTo destination = onMany [ " \t\r\n" :> char seq ] destination
 
         createTransitionTableFromClasses
-            [ makeTransitions (From START) whitespaceTransitions
-              makeTransitions (From Q_Whitespace) whitespaceTransitions
+            [ makeTransitions (From START) (whitespaceTransitionsTo Q_Whitespace)
+              makeTransitions (From Q_Whitespace) (whitespaceTransitionsTo Q_Whitespace)
               makeTransitions (From Q_Whitespace) [ To Q_WhitespaceFinal, OnEpsilon ]
 
               // Single character symbols
@@ -174,6 +185,26 @@ module private LexerTables =
               makeTransitions (From Q_Utterance) utteranceTransitions
               makeTransitions (From Q_Utterance) [ To Q_UtteranceFinal, OnEpsilon ]
 
+              // Label
+
+              // TODO fix the bug where you have to do a rule grouping to be able to write a labeled rule that begins with an optional or alternation
+              // or I may have to think about being more explicit, i.e.
+
+              // set C = (k, p, t)
+              // feature Voiced = (k -> g, p -> b, t -> d)
+              // rule test-rule: (a|e) -> @
+
+              makeTransitions (From START) (alphabeticTransitionsTo Q_Label)
+              makeTransitions (From Q_Utterance) (alphabeticTransitionsTo Q_Label)
+              makeTransitions (From Q_Label) (alphabeticTransitionsTo Q_Label)
+              makeTransitions (From Q_Label) (numericTransitionsTo Q_Label)
+              makeTransitions (From Q_Label) [ To Q_Label, OnChar '-' ]
+              makeTransitions (From Q_Label) [ To Q_LabelColon, OnChar ':' ]
+              makeTransitions (From Q_Label) [ To Q_Utterance, OnEpsilon ]
+              if inputFormat = X_SAMPA then
+                makeTransitions (From Q_LabelColon) (utteranceTransitionsTo Q_Utterance)
+              makeTransitions (From Q_LabelColon) [ To Q_LabelFinal, OnEpsilon ]
+
               // Comment
 
               makeTransitions (From START) [ To Q_Comment, OnChar ';' ]
@@ -206,6 +237,7 @@ module private LexerTables =
           Q_IdentifierFinal, Id.apply (trimSigil '$')
           Q_UtteranceFinal, Utterance.apply (trimSigil '.')
           Q_CommentFinal, Comment.apply trimComment
+          Q_LabelFinal, Label.apply trimStart
         ]
         |> Map.ofSeq
 

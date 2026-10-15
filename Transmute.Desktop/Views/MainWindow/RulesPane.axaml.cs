@@ -46,6 +46,8 @@ public partial class RulesPane : UserControl
 
     private readonly DispatcherTimer _navigationListUpdateTimer = new() { Interval = TimeSpan.FromMilliseconds(1000) };
 
+    private NavigationEntry _lastNavigationEntry;
+
     public RulesPane()
     {
         InitializeComponent();
@@ -92,6 +94,20 @@ public partial class RulesPane : UserControl
         else if (tabIndex == 1)
         {
             SelectedTransitionTable.Focus();
+        }
+    }
+
+    public void FocusNavigationList()
+    {
+        if (ViewModel.ShowRules)
+        {
+            HighlightedRule.Focus();
+            HighlightedRule.IsDropDownOpen = true;
+        }
+        else if (ViewModel.ShowTransitionTables)
+        {
+            SelectedTransitionTable.Focus();
+            SelectedTransitionTable.IsDropDownOpen = true;
         }
     }
 
@@ -154,6 +170,7 @@ public partial class RulesPane : UserControl
         {
             Rules.ScrollToLine(entry.Line + 1);
             await Rules.HighlightLine(entry.Line, false);
+            Rules.Focus();
             ViewModel.SelectHistory(entry);
             UpdateHighlightedRuleSelection(entry.Line);
         });
@@ -237,14 +254,7 @@ public partial class RulesPane : UserControl
                 return;
             }
 
-            Dispatcher.UIThread.Post(async () =>
-            {
-                HighlightedRule.ScrollViewer?.ScrollToHome();
-                SelectedTransitionTable.ScrollViewer?.ScrollToHome();
-                Rules.ScrollToLine(0);
-                Rules.CaretOffset = 0;
-                UpdateHighlightedRuleSelection(1);
-            });
+            Dispatcher.UIThread.Post(async () => ResetView());
         }
         catch (FileNotFoundException)
         {
@@ -381,9 +391,27 @@ public partial class RulesPane : UserControl
         using Stream s = File.OpenRead(path);
 
         await ViewModel.LoadRules(path, s);
+        ResetView();
+    }
+
+    private void ResetView()
+    {
+        HighlightedRule.ScrollViewer?.ScrollToHome();
+        SelectedTransitionTable.ScrollViewer?.ScrollToHome();
         Rules.Focus();
-        UpdateHighlightedRuleSelection(1);
         Rules.CaretOffset = 0;
+        Rules.Document.UndoStack.MarkAsOriginalFile();
+        ViewModel.IsRulesDirty = false;
+
+        if (UpdateHighlightedRuleSelection(1) is NavigationEntry entry
+            && entry.lineNumber is int lineNumber)
+        {
+            ViewModel.NavigateTo(0, entry.Description);
+        }
+        else
+        {
+            ViewModel.NavigateTo(0, "1");
+        }
     }
 
     private void Rules_Tapped(object? sender, TappedEventArgs e)
@@ -443,9 +471,29 @@ public partial class RulesPane : UserControl
             return;
         }
 
-        if (e?.AddedItems?.Count > 0 && e?.AddedItems?[0] is NavigationEntry entry)
+        if (e?.AddedItems?.Count > 0
+            && e?.AddedItems?[0] is NavigationEntry entry)
         {
-            GoToLine(entry.lineNumber);
+            if (entry.isSeparator)
+            {
+                if (HighlightedRule.SelectedIndex < ViewModel.NavigationList.Count - 1
+                    && ViewModel.NavigationList[HighlightedRule.SelectedIndex + 1] is NavigationEntry next
+                    && !next.isSeparator)
+                {
+                    // Move to the next item if the user selected a separator
+                    HighlightedRule.SelectedIndex++;
+                }
+                else
+                {
+                    _dontUpdateNavigationStack = true;
+                    HighlightedRule.SelectedItem = _lastNavigationEntry;
+                }
+            }
+            else if (entry.lineNumber is int lineNumber)
+        {
+                GoToLine(lineNumber);
+                _lastNavigationEntry = entry;
+            }
         }
     }
 
@@ -468,7 +516,7 @@ public partial class RulesPane : UserControl
         var (currentLineNumber, _) = RulesPaneViewModel.GetLineAndColumn(Rules.Text, Rules.CaretOffset);
         var selectedItem = new int[] { 0, -1, -2, 1, 2 }
             .Select(i => ViewModel.NavigationList.FirstOrDefault(n => n.lineNumber == currentLineNumber + i))
-            .FirstOrDefault();
+            .FirstOrDefault(n => n != null);
 
         if (selectedItem != null && selectedItem != HighlightedRule.SelectedItem)
         {
@@ -477,13 +525,17 @@ public partial class RulesPane : UserControl
         }
     }
 
-    public void UpdateHighlightedRuleSelection(int line)
+    public NavigationEntry? UpdateHighlightedRuleSelection(int line)
     {
         if (ViewModel.NavigationList.FirstOrDefault(n => n.lineNumber == line) is NavigationEntry entry && entry != HighlightedRule.SelectedItem)
         {
             _dontUpdateNavigationStack = true;
             HighlightedRule.SelectedItem = entry;
+
+            return entry;
         }
+
+        return null;
     }
 
     private void Rules_PointerPressed(object? sender, PointerPressedEventArgs e)
@@ -508,6 +560,11 @@ public partial class RulesPane : UserControl
         {
             _dontUpdateNavigationStack = true;
             HighlightedRule.SelectedItem = entry;
+            return entry;
+        }
+        else
+        {
+            return null;
         }
 
         return entry;

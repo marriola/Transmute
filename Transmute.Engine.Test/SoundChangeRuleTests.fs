@@ -206,6 +206,53 @@ let ``Repeat set replacement`` () =
     Tests.testRules IPA rule input expected
 
 [<Fact>]
+let ``Single rule labels work`` () =
+    let ruleText = """
+    test-rule: a -> b
+    """
+    let rulesFile =
+        RulesFileOptions.Default
+        |> RulesFileOptions.fromText ruleText
+        |> RulesFileOptions.withInputFormat IPA
+        |> RulesFile.load
+        |> Async.RunSynchronously
+
+    let ruleNode = rulesFile.rules[0].node
+    let label =
+        match ruleNode with
+        | RuleNode (_, Some label, _, _, _, _) -> label
+        | _ -> ""
+
+    Assert.Equal<string>(label, "test-rule")
+
+[<Fact>]
+let ``Rule label groups work`` () =
+    let ruleText = """
+    test-rule-group: (
+        a -> b
+        c -> d
+        e -> f
+    )
+    """
+    let rulesFile =
+        RulesFileOptions.Default
+        |> RulesFileOptions.fromText ruleText
+        |> RulesFileOptions.withInputFormat IPA
+        |> RulesFile.load
+        |> Async.RunSynchronously
+
+    let ruleNodes = List.map (fun r -> r.node) rulesFile.rules
+
+    let labels =
+        ruleNodes
+        |> List.map (fun n ->
+            match n with
+            | RuleNode (_, Some label, _, _, _, _) -> label
+            | _ -> "")
+
+    Assert.Equal<string list>(labels, [ "test-rule-group"; "test-rule-group"; "test-rule-group" ])
+
+[<Fact>]
 let ``X-SAMPA works`` () =
     let input = ["pater"]
     let expected = ["p\\aTer"]
@@ -237,3 +284,54 @@ let ``X-SAMPA diacritics work`` () =
         [-$Fricative] -> [+$Fricative]
         """
     Tests.testRules X_SAMPA rule input expected
+
+[<Fact>]
+let ``Single rule labels work in X-SAMPA mode`` () =
+    let ruleText = "test-rule: a -> b"
+    let rulesFile =
+        RulesFileOptions.Default
+        |> RulesFileOptions.fromText ruleText
+        |> RulesFileOptions.withInputFormat X_SAMPA
+        |> RulesFile.load
+        |> Async.RunSynchronously
+
+    let ruleNode = rulesFile.rules[0].node
+    let label =
+        match ruleNode with
+        | RuleNode (_, Some label, _, _, _, _) -> label
+        | _ -> ""
+
+    Assert.Equal<string>(label, "test-rule")
+
+[<Fact>]
+let ``Rule label groups work in X-SAMPA mode`` () =
+    let ruleText = """
+    $V = (
+        a
+        a:
+        a::
+    )
+
+    test-rule-group: (
+        a -> b
+        c -> d
+        e -> f
+    )
+    """
+    let rulesFile =
+        RulesFileOptions.Default
+        |> RulesFileOptions.fromText ruleText
+        |> RulesFileOptions.withInputFormat X_SAMPA
+        |> RulesFile.load
+        |> Async.RunSynchronously
+
+    let ruleNodes = List.map (fun r -> r.node) rulesFile.rules
+
+    let labels =
+        ruleNodes
+        |> List.map (fun n ->
+            match n with
+            | RuleNode (_, Some label, _, _, _, _) -> label
+            | _ -> "")
+
+    Assert.Equal<string list>(labels, [ "test-rule-group"; "test-rule-group"; "test-rule-group" ])

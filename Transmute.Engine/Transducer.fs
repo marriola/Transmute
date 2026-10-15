@@ -345,10 +345,13 @@ module internal Transducer =
                 let nextProductionStr = nextProduction |> List.rev |> List.map string |> String.concat " "
                 printfn $"%-34s{transition} | %-20s{nextOutputStr} {nextProductionStr}"
 
-            { value with
-                isPartialMatch = true
-                wasLastFinal = isNextFinal
-                buffer = nextProduction })
+            let nextValue =
+                { value with
+                    isPartialMatch = true
+                    wasLastFinal = isNextFinal
+                    buffer = nextProduction }
+                    
+            nextState, nextValue)
         |> onFinish (fun value ->
             // Flush last production
             let outputBuffer, locations =

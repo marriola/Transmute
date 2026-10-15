@@ -108,7 +108,7 @@ module private StateMachine =
 
     type OnError<'TValue, 'TResult> = char -> MachineState<'TValue> -> ErrorAction<'TValue, 'TResult>
 
-    type OnTransition<'TValue> = char -> Transition -> MachineState<'TValue> -> 'TValue
+    type OnTransition<'TValue> = char -> Transition -> MachineState<'TValue> -> State * 'TValue
 
     type OnFinish<'TValue, 'TResult> = 'TValue -> 'TResult
 
@@ -228,7 +228,8 @@ module private StateMachine =
                 if transition = None then
                     if captureToneDiacritics && Special.ToneDiacritics.Contains nextSymbol then
                         let t = (From currentState, OnChar nextSymbol, To currentState)
-                        inner (fTransition nextSymbol t machineState) currentState position rest
+                        let _, nextValue = fTransition nextSymbol t machineState
+                        inner nextValue currentState position rest
                     else
                         match fError nextSymbol machineState with
                         | Restart value when currentState <> startState ->
@@ -246,7 +247,8 @@ module private StateMachine =
                             result
                 else
                     let transition = Option.get transition
-                    inner (fTransition nextSymbol transition machineState) nextState nextPosition nextInput
+                    let nextState, nextValue = fTransition nextSymbol transition machineState
+                    inner nextValue nextState nextPosition nextInput
 
         input
         |> List.ofSeq

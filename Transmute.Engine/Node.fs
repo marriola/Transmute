@@ -40,7 +40,7 @@ type Node =
     | SyllableBoundaryNode of boundaryType: SyllableBoundaryType
 
     /// Represents a phonological rule.
-    | RuleNode of lineNumber: int * text: string * input:Node list * output:Node list * environment:Node list
+    | RuleNode of lineNumber: int * name: string option * text: string * input:Node list * output:Node list * environment:Node list
 
     /// Defines a set of utterances.
     | SetDefinitionNode of lineNumber: int * name:string * members:Node list
@@ -128,7 +128,7 @@ type Node =
             |> sprintf "( %s )"
         | NegationNode node ->
             sprintf "!%O" node
-        | RuleNode (_, text, _, _, _) ->
+        | RuleNode (_, _, text, _, _, _) ->
             text
 
 and SyllableBoundaryType =
@@ -196,8 +196,8 @@ module Node =
         | x ->
             x
         |> function
-            | RuleNode (lineNumber, tokens, input, output, environment) ->
-                RuleNode (lineNumber, tokens, untagAll input, untagAll output, untagAll environment)
+            | RuleNode (lineNumber, name, tokens, input, output, environment) ->
+                RuleNode (lineNumber, name, tokens, untagAll input, untagAll output, untagAll environment)
             | CompoundSetIdentifierNode xs ->
                 CompoundSetIdentifierNode (untagAll xs)
             | SetDefinitionNode (lineNumber, name, members) ->
@@ -230,7 +230,7 @@ module Node =
         | FeatureDefinitionNode (line, _, _)
         | SyllableDefinitionNode (line, _, _, _)
         | SyllableDefinitionListNode (line, _)
-        | RuleNode (line, _, _, _, _) -> line
+        | RuleNode (line, _, _, _, _, _) -> line
         | _ ->
             failwithf "Expected RuleNode or SyllableDefinitionListNode, got %O" node
 
@@ -253,6 +253,8 @@ module Node =
     /// Gets the name of a feature or set definition.
     let getName node =
         match untag node with
+        | RuleNode (_, name, _, _, _, _) ->
+            Option.defaultValue "" name
         | SetDefinitionNode (lineNumber, name, _) 
         | FeatureDefinitionNode (lineNumber, name, _) ->
             name

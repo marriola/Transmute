@@ -99,7 +99,7 @@ module private SyllableBoundaryDetector =
             segments
             |> List.map string
             |> String.concat ""
-            |> sprintf "warning: failed to syllabize '%s' (syllabizer returned '%s')" word
+            |> sprintf "failed to syllabize '%s' (syllabizer returned '%s')" word
             |> Result.Error
         else
             segments

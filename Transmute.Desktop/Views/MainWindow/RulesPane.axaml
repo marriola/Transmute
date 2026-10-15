@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:local="using:Transmute.Desktop"
              xmlns:models="using:Transmute.Desktop.Models"
              xmlns:views="using:Transmute.Desktop.Views"
              xmlns:vm="using:Transmute.Desktop.ViewModels"
@@ -15,6 +16,41 @@
     <Design.DataContext>
         <vm:RulesPaneViewModel/>
     </Design.DataContext>
+
+    <UserControl.Resources>
+		<local:NavigationListCellWidthConverter x:Key="cellWidthConverter" />
+
+        <DataTemplate x:Key="navigationListTemplate" x:DataType="models:NavigationEntry">
+			<Grid ColumnDefinitions="1*,5*,10*" MinWidth="{Binding Bounds.Width, ElementName=HighlightedRule}">
+                <!-- Navigation entry layout -->
+
+				<TextBlock Grid.Column="0"
+                           IsVisible="{Binding showLineNumber}"
+                           Text="{Binding lineNumber}"
+                           HorizontalAlignment="Right"
+                           Margin="15 0 5 0" />
+                <TextBlock Grid.Column="1"
+                           IsVisible="{Binding !isSeparator}"
+                           Text="{Binding label}" />
+                <TextBlock Grid.Column="2"
+                           IsVisible="{Binding !isSeparator}"
+                           Text="{Binding description}"
+                           MaxWidth="{Binding $parent[Grid].Bounds.Width, Converter={StaticResource cellWidthConverter}}"
+                           TextTrimming="CharacterEllipsis" />
+
+                <!-- Separator entry layout -->
+
+                <TextBlock Grid.Column="0" Grid.ColumnSpan="3"
+                           IsVisible="{Binding isSeparator}"
+                           TextAlignment="Center"
+                           FontWeight="SemiBold"
+                           Classes="separator"
+                           Text="{Binding label}"
+                           MinWidth="{Binding $parent[Grid].Bounds.Width}"
+                           Foreground="Black" Background="LightGray" />
+            </Grid>
+        </DataTemplate>
+    </UserControl.Resources>
 
     <UserControl.Styles>
 		<Style Selector="DataGridRow:selected HyperlinkButton">
@@ -47,13 +83,14 @@
         <Panel DockPanel.Dock="Bottom">
             <DockPanel IsVisible="{Binding ShowRules}">
                 <ComboBox Name="HighlightedRule"
-                            IsTextSearchEnabled="True"
-                            DockPanel.Dock="Top"
-                            HorizontalAlignment="Stretch"
-                            Margin="10 10 10 0"
-                            SelectionChanged="HighlightedRule_SelectionChanged"
-                            ItemsSource="{Binding NavigationList}"
+                          IsTextSearchEnabled="True"
+                          DockPanel.Dock="Top"
+                          HorizontalAlignment="Stretch"
+                          Margin="10 10 10 0"
+                          SelectionChanged="HighlightedRule_SelectionChanged"
+                          ItemsSource="{Binding NavigationList}"
                           ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
+                          ItemTemplate="{StaticResource navigationListTemplate}" />
 				
                 <ae:TextEditor Name="Rules"
                                DockPanel.Dock="Bottom"
@@ -76,6 +113,7 @@
                           SelectionChanged="TransitionTable_SelectionChanged"
                           ItemsSource="{Binding TransitionTables}"
                           ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
+                          ItemTemplate="{StaticResource navigationListTemplate}" />
 
                 <DataGrid DockPanel.Dock="Bottom"
                           Name="TransitionTableGrid"

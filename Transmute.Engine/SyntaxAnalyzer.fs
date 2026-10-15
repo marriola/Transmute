@@ -207,7 +207,7 @@ module internal SyntaxAnalyzer =
                 Ok())
 
     let private validateRuleNode features sets syllableRules node =
-        let (RuleNode (_, _, input, output, environment)) = node
+        let (RuleNode (_, _, _, input, output, environment)) = node
 
         let features =
             features

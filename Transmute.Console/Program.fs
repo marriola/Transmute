@@ -31,6 +31,8 @@ let dumpRules (rules: CompileRuleResult list) =
 
         printfn "\n********************************************************************************"
 
+let indent n = "".PadLeft n
+
 [<EntryPoint>]
 let main argv =
     Console.OutputEncoding <- Text.Encoding.UTF8
@@ -68,6 +70,10 @@ let main argv =
 
     if options.verbosityLevel > Silent then
         Console.Error.WriteLine "\n"
+
+    if not rulesFile.errors.IsEmpty then
+        rulesFile.errors |> List.iter Console.WriteLine
+        exit 0
 
     // List selected rules
 
@@ -124,6 +130,12 @@ let main argv =
         |> Seq.iter (fun (lineNumber, message) -> Console.WriteLine $"{lineNumber}: {message}")
         printfn ""
 
+    let maxWidth =
+        transformedLexicon
+        |> Seq.collect (fun r -> r.changes)
+        |> Seq.map (fun c -> c.ruleLabel.Length + 3 + (string c.ruleNumber).Length)
+        |> Seq.max
+
     for result in transformedLexicon do
         if options.verbosityLevel <= Normal then
             fprintfn outputStream "%s" result.nextWord
@@ -139,13 +151,19 @@ let main argv =
                 fprintfn outputStream ""
 
                 for line in result.changes do
-                    if options.verbosityLevel >= ShowTimes then
-                        fprintf outputStream "       "
+                    let ruleDesc =
+                        if line.ruleLabel.Length > 0 then
+                            $"{line.ruleLabel} @ {line.ruleNumber}"
+                        else
+                            $"{line.ruleNumber,3}"
 
-                    if line.ruleNumber <> -1 then
-                        Console.WriteLine $"%3d{line.ruleNumber}: {line.change}"
+                    if line.ruleNumber = -1 then
+                        Console.WriteLine $"{indent (maxWidth+2)}{line.change}"
+
+                        if not (Seq.exists ((=) '^') line.change) then
+                            Console.WriteLine ""
                     else
-                        Console.WriteLine $"     {line.change}"
+                        Console.WriteLine $"{ruleDesc.PadLeft maxWidth}: {line.change}"
 
             fprintfn outputStream ""
 

@@ -313,10 +313,15 @@ namespace Transmute.Desktop.ViewModels
 
             foreach (var rule in CompiledRules!.rules)
             {
-                TransitionTables.Add(new NavigationEntry(rule.lineNumber, rule.node.ToString()));
+                TransitionTables.Add(new NavigationEntry(rule.lineNumber, rule.label, rule.node.ToString()));
             }
         }
 
+        /// <summary>
+        /// Parse the rules and populate the navigation list.
+        /// </summary>
+        /// <returns></returns>
+        /// <exception cref="NotImplementedException">Thrown when the rules file contains an unsupported node type.</exception>
         public bool PopulateNavigationList()
         {
             NavigationList.Clear();
@@ -331,21 +336,27 @@ namespace Transmute.Desktop.ViewModels
                 return false;
             }
 
+            NavigationList.Add(new NavigationEntry(null, "Rules", isSeparator: true));
+
             var combinedRules = result.soundChangeRules
                 .Concat(result.syllableRules)
                 .OrderBy(NodeModule.getLine);
 
             foreach (var node in combinedRules)
             {
+                var lineNumber = NodeModule.getLine(node);
+
                 var entry = node switch
                 {
-                    RuleNode => new NavigationEntry(NodeModule.getLine(node), node.ToString()),
-                    SyllableDefinitionNode => new NavigationEntry(NodeModule.getLine(node), "Syllable definition"),
+                    RuleNode ruleNode => new NavigationEntry(lineNumber, NodeModule.getName(node), node.ToString()),
+                    SyllableDefinitionNode => new NavigationEntry(lineNumber, "Syllable definition", string.Empty),
                     _ => throw new NotImplementedException($"Invalid rule node type {node.GetType()}")
                 };
 
                 NavigationList.Add(entry);
             }
+
+            NavigationList.Add(new NavigationEntry(null, "Sets and features", isSeparator: true));
 
             var setsAndFeatures = result.sets
                 .Concat(result.features)
@@ -360,7 +371,7 @@ namespace Transmute.Desktop.ViewModels
                     _ => throw new NotImplementedException($"{set.Value.GetType()} is not supported")
                 };
 
-                NavigationList.Add(new NavigationEntry(lineNumber, set.Key, showLineNumber: false));
+                NavigationList.Add(new NavigationEntry(lineNumber, set.Key, string.Empty, showLineNumber: false));
             }
 
             return true;

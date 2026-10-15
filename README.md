@@ -17,6 +17,30 @@ Under the `sample/ipa` and `sample/x-sampa` folders, there are IPA and X-SAMPA v
 
 Try out the last step in the [browser demo](https://marriola.github.io/transmute-demo). Click Examples and select West Germanic to Old English.
 
+## Keyboard shortcuts
+
+| Shortcut          | Function                                                                        |
+|-------------------|---------------------------------------------------------------------------------|
+| F1                | Open help                                                                       |
+| Alt+Left          | Go back                                                                         |
+| Alt+Right         | Go forward                                                                      |
+| Ctrl+L            | Open navigation list                                                            |
+| Ctrl+N            | New rules                                                                       |
+| Ctrl+O            | Open rules                                                                      |
+| Ctrl+S            | Save rules                                                                      |
+| Ctrl+Shift+N      | New lexicon                                                                     |
+| Ctrl+Shift+O      | Open lexicon                                                                    |
+| Ctrl+Shift+S      | Save lexicon                                                                    |
+| Ctrl+Alt+Shift+S  | Save transformation results                                                     |
+| F5                | Apply rules                                                                     |
+| Ctrl+G            | Go to line                                                                      |
+| F12               | Go to the definition in the rules pane, go to the changes in the lexicon panes. |
+| Alt+R             | Select rules tab                                                                |
+| Alt+T             | Select transition tables tab                                                    |
+| Alt+L             | Select lexicon tab                                                              |
+| Alt+Shift+R       | Select results tab                                                              |
+| Alt+C             | Select changes tab                                                              |
+
 ## Performance
 
 Although written in a functional style, Transmute is reasonably fast on good hardware. Using the 67 rules in `protogermanic.sc` in the `samples/ipa` folder on a quad-core Intel Core i5-6500T, rules compile in ~5 ms on average with Native AOT. Using the sample `pie.txt` lexicon, each word takes ~1 millisecond on average to process all the rules with syllable detection.
@@ -75,7 +99,7 @@ A conditional rule has a third section, the **environment** in which the rule ap
 
     Laryngeal → ə / C_C
 
-The rule will first match any consonant `C`, then a `LARYNGEAL`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
+The rule will first match any consonant `C`, then a `Laryngeal`, and then another consonant, and upon matching the second consonant will replace the laryngeal with a schwa.
 
 **Note:** `_` is a valid X-SAMPA character, so make sure your placeholder has spaces around it if you're using X-SAMPA mode.
 
@@ -88,7 +112,6 @@ An insertion rule has an empty input section. You can use the empty set symbol U
 	
 	; Insert /u/ before syllabic sonorants
 	/ u / _Syllabic
-	
 
 ##### Deletion rules
 
@@ -99,6 +122,27 @@ A deletion rule has an empty output section (or `∅`, as with insertion rules).
 
     ; Delete /j/ before /e a o/ at the end of a word
     j//_(e|a|o)#
+	
+
+#### Labeling
+
+Rules can be given a label. It can either go on the same line as the rule, or separately:
+
+	schwa-deletion: ə → ∅
+
+    nasal-spirant-law:
+	    V.n → [+Long +Nasalized] / _Fricative
+
+The rule's label will be reported along with the rule number of each change in the changes tab.
+
+If you want to use the same label for more than one rule, you can group them in parentheses:
+
+    diphthong-harmonization: (
+        (ɑi|ɑj) → ɑː
+        (æu|æw) → æɑ
+        (eu|ew) → eo
+    )
+
 
 #### Matching
 

@@ -32,8 +32,7 @@ with
         | InsertsAfter output -> $"InsertsAfter {output}"
         | Deletes (count, text) -> $"Deletes ({count}, {text})"
 
-module TransitionResult =
-    let inline coalesce result1 result2 =
+    static member coalesce result1 result2 =
         if result1 = OutputDefault then result2 else result1
 
 type State =
@@ -99,5 +98,9 @@ type State =
                 Array.exists State.isFinal states
 
         override this.ToString() =
-            let leftParen, rightParen = if State.isFinal this then "(", ")" else "", ""
-            leftParen + State.name this + rightParen
+            let name = State.name this
+
+            if State.isFinal this then
+                $"({name})"
+            else
+                name
