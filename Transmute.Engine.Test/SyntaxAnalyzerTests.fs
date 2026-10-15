@@ -7,8 +7,8 @@ module Transmute.Engine.Test.SyntaxAnalyzerTests
 
 open Transmute.Engine
 open Transmute.Engine.Position
-open Xunit
 open Transmute.Engine.Utils.Operators
+open Xunit
 
 let resultMessage = function
     | Ok _ -> []
@@ -36,10 +36,40 @@ C = (A)
 """
 
     let nodes = parse rule
-    let features = Node.getFeatureMap nodes
-    let sets = Node.getSetMap nodes
+    let features = nodes |> Node.getFeatureMap
+    let sets = nodes |> Node.getSetMap
+    let setNode = nodes[0]
 
-    let actual = SyntaxAnalyzer.validateCircularReferences features sets nodes[0]
-    let expected = Error ["Syntax error at line 2, column 1 (offset 2): Circular reference in set definition: A → B → C → A, line numbers 2, 3 and 4"]
+    let actual =
+        SyntaxAnalyzer.validateCircularReferences features sets setNode
+        |> resultMessage
+
+    let expected = "Syntax error at line 2, column 1 (offset 2): Circular reference in set definition: A → B → C → A, line numbers 2, 3 and 4"
     
-    Assert.Equal<string list>(resultMessage expected, resultMessage actual)
+    Assert.Equal<string list>([expected], actual)
+
+[<Fact>]
+let ``Nonexistent set references are caught in syllable rules`` () =
+    let rule =
+        """
+Syllable = (
+    Onset = b
+    Nucleus = a
+    Coda = Jimbob
+)
+
+a -> b
+"""
+
+    let nodes = parse rule
+    let features = nodes |> Node.getFeatureMap |> Map.values
+    let sets = nodes |> Node.getFeatureMap |> Map.values
+    let syllableNode = nodes[0]
+
+    let actual =
+        SyntaxAnalyzer.validateSyllableRule features sets syllableNode
+        |> resultMessage
+
+    let expected = "Syntax error at line 5, column 12 (offset 59): Feature or set 'Jimbob' is not defined"
+
+    Assert.Equal<string list>([expected],  actual)
