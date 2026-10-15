@@ -123,7 +123,7 @@
 				    <NativeMenuItem Header="_Paste" Command="{Binding #Window.Paste}" Gesture="Cmd+V" />
                     <NativeMenuItemSeparator Header="-" />
                     <NativeMenuItem Header="Apply _Rules" Command="{Binding #Window.ApplyRules}" Gesture="F5" />
-                    <NativeMenuItem Header="Go to Chan_ges" Command="{Binding #Window.GoToChanges}" Gesture="F12" />
+                    <NativeMenuItem Header="_Go to Definition/Changes" Command="{Binding #Window.JumpTo}" Gesture="F12" />
 				    <NativeMenuItem Header="Go to Rule _Line…" Command="{Binding #Window.PromptLine}" Gesture="Cmd+G" />
                 </NativeMenu>
             </NativeMenuItem>
@@ -190,8 +190,8 @@
 				<MenuItem Header="_Paste" Command="{Binding #Window.Paste}" InputGesture="Ctrl+V" />
                 <Separator />
                 <MenuItem Header="Apply _Rules" Command="{Binding #Window.ApplyRules}" InputGesture="F5" />
-                <MenuItem Header="Go to Chan_ges" Command="{Binding #Window.GoToChanges}" InputGesture="F12" />
-				<MenuItem Header="_Go to Rule Line…" Command="{Binding #Window.PromptLine}" InputGesture="Ctrl+G" />
+                <MenuItem Header="_Go to Definition/Changes" Command="{Binding #Window.JumpTo}" InputGesture="F12" />
+				<MenuItem Header="Go to Rule _Line…" Command="{Binding #Window.PromptLine}" InputGesture="Ctrl+G" />
             </MenuItem>
             <MenuItem Header="_Options">
                 <MenuItem Header="_Fonts…" Command="{Binding #Window.OpenFonts}" />

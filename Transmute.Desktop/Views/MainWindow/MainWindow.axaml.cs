@@ -43,7 +43,7 @@ namespace Transmute.Desktop.Views
 
         private Size _previousSize;
 
-        private TextBox? _focusedEditor = null;
+        private Control? _focusedEditor = null;
 
         public MainWindow()
         {
@@ -118,11 +118,11 @@ namespace Transmute.Desktop.Views
             await RulesPane.PromptLine();
         }
 
-        public void GoToChanges()
+        public void JumpTo()
         {
-            if (RulesPane.Rules.IsFocused)
+            if (_focusedEditor == RulesPane.Rules)
             {
-                return;
+                RulesPane.GoToSymbol();
             }
             else if (_focusedEditor == InputPane.InputLexicon)
             {
@@ -310,9 +310,9 @@ namespace Transmute.Desktop.Views
                 }
             });
 
-            InputPane.InputLexicon.GetObservable(IsFocusedProperty).Subscribe(f => _focusedEditor = InputPane.InputLexicon);
-
-            OutputPane.OutputLexicon.GetObservable(IsFocusedProperty).Subscribe(f => _focusedEditor = OutputPane.OutputLexicon);
+            RulesPane.Rules.GettingFocus += (sender, e) => _focusedEditor = RulesPane.Rules;
+            InputPane.InputLexicon.GettingFocus += (sender, e) => _focusedEditor = InputPane.InputLexicon;
+            OutputPane.OutputLexicon.GettingFocus += (sender, e) => _focusedEditor = OutputPane.OutputLexicon;
 
             if (!_configurationService.IsNew)
             {
@@ -470,7 +470,7 @@ namespace Transmute.Desktop.Views
 
         private void AboutAvalonia_Clicked(object? sender, RoutedEventArgs e)
         {
-            ShowAboutDialogWithURL("Avalonia UI", $"Avalonia UI 12.1.2\n© 2026 AvaloniaUI OÜ", "https://avaloniaui.net/");
+            ShowAboutDialogWithURL("Avalonia UI", $"Avalonia UI 12.1.4\n© 2026 AvaloniaUI OÜ", "https://avaloniaui.net/");
         }
 
         private void AboutAvaloniaNative_Clicked(object? sender, EventArgs e)

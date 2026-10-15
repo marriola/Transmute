@@ -111,6 +111,48 @@ public partial class RulesPane : UserControl
         }
     }
 
+    public void GoToSymbol()
+    {
+        int startIndex = Rules.CaretOffset;
+        int endIndex = Rules.CaretOffset;
+
+        if (!char.IsAsciiLetter(Rules.Text[startIndex]))
+        {
+            startIndex--;
+        }
+
+        for ( ; startIndex >= 0; startIndex--)
+        {
+            if (!char.IsAsciiLetter(Rules.Text[startIndex]))
+            {
+                startIndex++;
+                break;
+            }
+        }
+
+        for ( ; endIndex <= Rules.Text.Length; endIndex++)
+        {
+            if (!char.IsAsciiLetter(Rules.Text[endIndex]))
+            {
+                endIndex--;
+                break;
+    }
+        }
+
+        if (startIndex > endIndex)
+        {
+            return;
+        }
+
+        var word = Rules.Text.Substring(startIndex, endIndex - startIndex + 1);
+
+        if (ViewModel.NavigationList.FirstOrDefault(n => n.label == word) is NavigationEntry entry
+            && entry.lineNumber is int lineNumber)
+        {
+            GoToLine(lineNumber);
+        }
+    }
+
     public void GoToDestination(string destination)
     {
         TransitionTableGrid.SelectedItems.Clear();
@@ -566,8 +608,6 @@ public partial class RulesPane : UserControl
         {
             return null;
         }
-
-        return entry;
     }
 
     private int LineToOffset(int lineNumber)

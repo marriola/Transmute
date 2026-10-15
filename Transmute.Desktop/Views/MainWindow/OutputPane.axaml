@@ -55,7 +55,7 @@
                           BorderThickness="1" BorderBrush="Gray"
                           ItemsSource="{Binding CurrentLexiconChange}">
 					<DataGrid.Columns>
-                        <DataGridTextColumn Header="Label" Binding="{Binding ruleName}" IsReadOnly="True" />
+                        <DataGridTextColumn Header="Label" Binding="{Binding ruleLabel}" IsReadOnly="True" />
                         <DataGridTemplateColumn Header="Line #">
 							<DataGridTemplateColumn.CellTemplate>
 								<DataTemplate DataType="te:LexiconChange">
