@@ -54,8 +54,8 @@ module internal RuleParser =
                     tryMatchToken' xs (ws :: consumed)
                 | { tokenType = t } as x::xs when tokenType = t ->
                     if tokenType <> Label then
-                    consumed |> List.rev |> tokenBuffer.AddRange
-                    tokenBuffer.Add x
+                        consumed |> List.rev |> tokenBuffer.AddRange
+                        tokenBuffer.Add x
                     xs, Some x
                 | _ ->
                     tokens, None
@@ -482,11 +482,14 @@ module internal RuleParser =
                 | OfType Comment _ :: xs
                 | OfType Whitespace _ :: xs ->
                     inner xs out
-                | OfType Id _ :: _ ->
-                    let xs, name, nodes = matchAssignment tokens
-                    inner xs ((name, nodes) :: out)
+                | OfType Id { value = id } as token :: _ ->
+                    if id <> "Onset" && id <> "Nucleus" && id <> "Coda" then
+                        invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda', got '{id}'" token.position
+                    else
+                        let xs, name, nodes = matchAssignment tokens
+                        inner xs ((name, nodes) :: out)
                 | token::_ ->
-                    invalidSyntax $"Expected 'Onset', 'Nucleus' or 'Coda', got {token}" token.position
+                    invalidSyntax $"Expected a syllable segment definition, ')' or a comment, got {token}" token.position
 
             let tokens, _ = matchToken tokens LParen
             let tokens, definitions = inner tokens []
@@ -513,7 +516,7 @@ module internal RuleParser =
                     if matchedOr then
                         invalidSyntax "Expected another syllable definition, got newline" ws.position
                     else
-                    tokens, List.rev out
+                        tokens, List.rev out
 
                 | OfType Whitespace _ :: xs ->
                     inner matchedOr out xs
@@ -619,7 +622,7 @@ module internal RuleParser =
             let closeToken = if openToken.tokenType = LBrace then RBrace else RParen
             let tokens, memberList = matchMemberList closeToken tokens
             let (_, Line lineNumber, _) = headPosition
-            tokens, Node.tag (FeatureDefinitionNode (lineNumber, identifier.value, memberList)) headPosition
+            tokens, [Node.tag (FeatureDefinitionNode (lineNumber, identifier.value, memberList)) headPosition]
 
 
         /// <summary>
