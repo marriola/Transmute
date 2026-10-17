@@ -155,9 +155,6 @@
             <NativeMenuItem Header="_Help">
                 <NativeMenu>
                     <NativeMenuItem Header="_Help" Gesture="F1" />
-                    <NativeMenuItemSeparator Header="-" />
-				    <NativeMenuItem Header="About _Transmute" Click="AboutTransmuteNative_Clicked" />
-				    <NativeMenuItem Header="About _Avalonia UI" Click="AboutAvaloniaNative_Clicked" />
                 </NativeMenu>
             </NativeMenuItem>
         </NativeMenu>
@@ -216,7 +213,7 @@
                 <MenuItem Header="_Help" Click="Help_Clicked" InputGesture="F1" />
                 <Separator />
 				<MenuItem Header="About _Transmute" Click="AboutTransmute_Clicked" />
-				<MenuItem Header="About _Avalonia UI" Click="AboutAvalonia_Clicked" />
+				<MenuItem Header="About _Avalonia" Click="AboutAvalonia_Clicked" />
             </MenuItem>
         </Menu>
 

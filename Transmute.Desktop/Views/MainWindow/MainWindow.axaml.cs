@@ -458,37 +458,12 @@ namespace Transmute.Desktop.Views
 
         private void AboutTransmute_Clicked(object? sender, RoutedEventArgs e)
         {
-            ShowAboutDialogWithURL("Transmute", $"Transmute v0.2\n{Help.License}", "https://github.com/marriola/Transmute");
-        }
-
-        private void AboutTransmuteNative_Clicked(object? sender, EventArgs e)
-        {
-            AboutTransmute_Clicked(this, null);
+            App.AboutTransmute();
         }
 
         private void AboutAvalonia_Clicked(object? sender, RoutedEventArgs e)
         {
-            ShowAboutDialogWithURL("Avalonia UI", $"Avalonia UI 12.1.4\n© 2026 AvaloniaUI OÜ", "https://avaloniaui.net/");
-        }
-
-        private void AboutAvaloniaNative_Clicked(object? sender, EventArgs e)
-        {
-            AboutAvalonia_Clicked(this, null);
-        }
-
-        private void ShowAboutDialogWithURL(string name, string message, string url)
-        {
-            MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
-            {
-                ButtonDefinitions = [new ButtonDefinition { Name = "OK" }],
-                ContentTitle = $"About {name}",
-                ContentMessage = message,
-                HyperLinkParams = new HyperLinkParams
-                {
-                    Text = url,
-                    Action = () => Utilities.OpenWebPage(url)
-                }
-            }).ShowWindowDialogAsync(this);
+            App.AboutAvalonia();
         }
     }
 }

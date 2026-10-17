@@ -8,6 +8,10 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.DependencyInjection;
+using MsBox.Avalonia;
+using MsBox.Avalonia.Base;
+using MsBox.Avalonia.Dto;
+using MsBox.Avalonia.Models;
 using System;
 using Transmute.Desktop.Extensions;
 using Transmute.Desktop.Services;
@@ -76,6 +80,55 @@ namespace Transmute.Desktop
                 IsShuttingDown = true;
                 desktop.Shutdown();
             }
+        }
+
+        public void AboutTransmute_Clicked(object? sender, EventArgs e)
+        {
+            AboutTransmute();
+        }
+
+        public void AboutAvalonia_Clicked(object? sender, EventArgs e)
+        {
+            AboutAvalonia();
+        }
+
+        internal static void AboutTransmute()
+        {
+            if (App.Current.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                return;
+            }
+
+            App.GetDialogWithURL("Transmute", $"Transmute v0.2\n{Help.License}", "https://github.com/marriola/Transmute").ShowWindowDialogAsync(desktop.MainWindow);
+        }
+
+        internal static void AboutAvalonia()
+        {
+            if (App.Current.ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                return;
+            }
+
+            new Avalonia.Dialogs.AboutAvaloniaDialog().ShowDialog(desktop.MainWindow);
+        }
+
+        internal static IMsBox<string> GetDialogWithURL(string name, string message, string url)
+        {
+            return MessageBoxManager.GetMessageBoxCustom(new MessageBoxCustomParams
+            {
+                ButtonDefinitions = [new ButtonDefinition { Name = "OK" }],
+                ContentTitle = $"About {name}",
+                ContentMessage = message,
+                HyperLinkParams = new HyperLinkParams
+                {
+                    Text = url,
+                    Action = () => Utilities.OpenWebPage(url)
+                }
+            });
+        }
+
+        private void NativeMenuItem_Click(object? sender, EventArgs e)
+        {
         }
 
         //private void DisableAvaloniaDataAnnotationValidation()

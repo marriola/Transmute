@@ -51,4 +51,11 @@
         <StyleInclude Source="avares://AvaloniaEdit/Themes/Simple/AvaloniaEdit.xaml" />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Simple.xaml" />
     </Application.Styles>
+
+    <NativeMenu.Menu>
+		<NativeMenu>
+            <NativeMenuItem Header="About _Transmute" Click="AboutTransmute_Clicked" />
+            <NativeMenuItem Header="About _Avalonia" Click="AboutAvalonia_Clicked" />
+        </NativeMenu>
+    </NativeMenu.Menu>
 </Application>
