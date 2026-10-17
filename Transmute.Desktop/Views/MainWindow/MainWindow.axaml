@@ -154,7 +154,7 @@
             </NativeMenuItem>
             <NativeMenuItem Header="_Help">
                 <NativeMenu>
-                    <NativeMenuItem Header="_Help" Gesture="F1" />
+                    <NativeMenuItem Header="_Help" Click="Help_Clicked_Native" Gesture="F1" />
                 </NativeMenu>
             </NativeMenuItem>
         </NativeMenu>

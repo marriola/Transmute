@@ -456,6 +456,11 @@ namespace Transmute.Desktop.Views
             OpenHelp();
         }
 
+        private void Help_Clicked_Native(object? sender, EventArgs e)
+        {
+            OpenHelp();
+        }
+
         private void AboutTransmute_Clicked(object? sender, RoutedEventArgs e)
         {
             App.AboutTransmute();
