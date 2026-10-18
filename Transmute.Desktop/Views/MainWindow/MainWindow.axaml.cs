@@ -11,9 +11,6 @@ using Avalonia.Media;
 using Avalonia.Styling;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
-using MsBox.Avalonia;
-using MsBox.Avalonia.Dto;
-using MsBox.Avalonia.Models;
 using System;
 using System.Diagnostics;
 using System.Linq;
@@ -52,6 +49,21 @@ namespace Transmute.Desktop.Views
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 IpaSilFix.IsVisible = false;
+            }
+            
+            if (_configurationService.Configuration.RulesPaneWidth is double rulesPaneWidth)
+            {
+                LayoutGrid.ColumnDefinitions[0].Width = new GridLength(rulesPaneWidth);
+            }
+
+            if (_configurationService.Configuration.InputPaneWidth is double inputPaneWidth)
+            {
+                LayoutGrid.ColumnDefinitions[2].Width = new GridLength(inputPaneWidth);
+            }
+
+            if (_configurationService.Configuration.OutputPaneWidth is double outputPaneWidth)
+            {
+                LayoutGrid.ColumnDefinitions[4].Width = new GridLength(outputPaneWidth);
             }
         }
 
@@ -424,6 +436,9 @@ namespace Transmute.Desktop.Views
             _configurationService.Configuration.IsMaximized = WindowState == WindowState.Maximized;
             _configurationService.Configuration.WindowX = Position.X;
             _configurationService.Configuration.WindowY = Position.Y;
+            _configurationService.Configuration.RulesPaneWidth = LayoutGrid.ColumnDefinitions[0].Width.Value;
+            _configurationService.Configuration.InputPaneWidth = LayoutGrid.ColumnDefinitions[2].Width.Value;
+            _configurationService.Configuration.OutputPaneWidth = LayoutGrid.ColumnDefinitions[4].Width.Value;
             _configurationService.Save();
 
             if (!ViewModel.RulesPaneViewModel.IsRulesDirty && !ViewModel.InputPaneViewModel.IsLexiconDirty)

@@ -258,7 +258,7 @@
         </StackPanel>
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*" RowDefinitions="*,auto,auto">
-            <Grid ColumnDefinitions="4*,0,2*,0,2*" RowDefinitions="*" Grid.Row="0" Grid.Column="0">
+            <Grid Name="LayoutGrid" ColumnDefinitions="4*,0,2*,0,2*" RowDefinitions="*" Grid.Row="0" Grid.Column="0">
                 <uc:RulesPane Grid.Column="0" Name="RulesPane" DataContext="{Binding RulesPaneViewModel}" />
                 <GridSplitter Grid.Column="1" />
                 <uc:InputPane Grid.Column="2" Name="InputPane" DataContext="{Binding InputPaneViewModel}" />

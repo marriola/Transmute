@@ -78,6 +78,12 @@ namespace Transmute.Desktop.Models
         public int WindowY { get; set; } = 0;
 
         public bool IsMaximized { get; set; } = true;
+
+        public double? RulesPaneWidth { get; set; }
+
+        public double? InputPaneWidth { get; set; }
+
+        public double? OutputPaneWidth { get; set; }
     }
 
     public enum ChangeMarker
