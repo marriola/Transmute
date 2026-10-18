@@ -1,7 +1,7 @@
 #!/bin/bash
 project=project.json
-sourcedir=$(realpath source)
-outdir=$(realpath out)
+sourcedir=$(realpath $(dirname source))/$(basename source)
+outdir=$(realpath $(dirname out))/$(basename out)
 
 if [ -n "$1" ]; then
 	project=$1
@@ -10,13 +10,14 @@ fi
 
 echo Transmute.Help: compiling $project...
 
-mkdir "%outdir%"
+mkdir "$outdir"
 python3 compile.py $project
 if [ $? -ne 0 ]; then
 	exit 1
 fi
 
-destination=$(realpath $(jq -r .destination $project))
+dest=$(jq -r .destination $project)
+destination=$(realpath $(dirname $dest))/$(basename $dest)
 
 echo
 echo Archiving $destination...

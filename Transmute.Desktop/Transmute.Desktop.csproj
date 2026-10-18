@@ -31,7 +31,7 @@
   </ItemGroup>
 
   <Target Name="CompileHelp" BeforeTargets="BeforeBuild" Inputs="@(HelpInput)" Outputs="@(HelpOutput)">
-    <Exec Command="compile" WorkingDirectory="../Transmute.Help" />
+    <Exec Command="./compile" WorkingDirectory="../Transmute.Help" />
     <Touch Files="Help.resx" />
   </Target>
 
