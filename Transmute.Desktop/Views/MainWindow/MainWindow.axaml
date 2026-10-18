@@ -80,8 +80,8 @@
 		<KeyBinding Command="{Binding #Window.SaveLexicon}" Gesture="{OnPlatform Ctrl+Shift+S, macOS=Cmd+Shift+S}" />
 		<KeyBinding Command="{Binding #Window.SaveOutputLexicon}" Gesture="{OnPlatform Ctrl+Alt+Shift+S, macOS=Cmd+Alt+Shift+F}" />
 
-        <KeyBinding Command="{Binding #Window.GoBack}" Gesture="{OnPlatform Alt+Left, macOS=Cmd+Left}" />
-        <KeyBinding Command="{Binding #Window.GoForward}" Gesture="{OnPlatform Alt+Right, macOS=Cmd+Right}" />
+        <KeyBinding Command="{Binding #Window.GoBack}" Gesture="{OnPlatform Alt+Left, macOS=Cmd+OemOpenBrackets}" />
+        <KeyBinding Command="{Binding #Window.GoForward}" Gesture="{OnPlatform Alt+Right, macOS=Cmd+OemCloseBrackets}" />
 
         <KeyBinding Command="{Binding #Window.PromptLine}" Gesture="{OnPlatform Ctrl+G, macOS=Cmd+G}" />
         <KeyBinding Command="{Binding #Window.JumpTo}" Gesture="F12" />
@@ -222,7 +222,7 @@
             <SplitButton Name="BackButton"
                          Command="{Binding #Window.GoBack}"
                          i:Attached.Icon="fa-regular fa-circle-left"
-                         ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘←)}"
+                        ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘[)}"
                          IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
 				<SplitButton.Flyout>
 					<Flyout Placement="Bottom">
@@ -235,7 +235,7 @@
                     </Flyout>
                 </SplitButton.Flyout>
             </SplitButton>
-            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="{OnPlatform Navigate Forward (Alt+Right), macOS=Navigate Forward (⌘→)}" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
+            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="{OnPlatform Navigate Forward (Alt+Right), macOS=Navigate Forward (⌘])}" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
 
             <Line Classes="separator" />
 
