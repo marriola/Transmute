@@ -222,7 +222,7 @@
             <SplitButton Name="BackButton"
                         Command="{Binding #Window.GoBack}"
                         i:Attached.Icon="fa-regular fa-circle-left"
-                        ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘[)}"
+                        ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘\[)}"
                         IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
                 <SplitButton.Flyout>
                     <Flyout Placement="Bottom">
@@ -235,7 +235,7 @@
                     </Flyout>
                 </SplitButton.Flyout>
             </SplitButton>
-            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="{OnPlatform Navigate Forward (Alt+Right), macOS=Navigate Forward (⌘])}" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
+            <Button Command="{Binding #Window.GoForward}" i:Attached.Icon="fa-regular fa-circle-right" ToolTip.Tip="{OnPlatform Navigate Forward (Alt+Right), macOS=Navigate Forward (⌘\])}" IsEnabled="{Binding RulesPaneViewModel.CanGoForward}" />
 
             <Line Classes="separator" />
 
