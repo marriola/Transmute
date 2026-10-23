@@ -16,7 +16,7 @@
 		    <TabStripItem Name="ErrorsTab" Tapped="ErrorsTab_Tapped" IsSelected="{Binding ShowErrors, Mode=OneWay}" Content="{Binding ErrorsTitle}" />
 		    <TabStripItem Name="WarningsTab" Tapped="WarningsTab_Tapped" IsSelected="{Binding ShowWarnings, Mode=OneWay}" Content="{Binding WarningsTitle}" />
         </TabStrip>
-        <Panel DockPanel.Dock="Bottom" Classes="errorsPanel">
+        <Panel DockPanel.Dock="Bottom" Classes="errorsPanel" Margin="10 0 10 10">
             <TextBox Name="Errors"
                      IsVisible="{Binding ShowErrors}"
                      Classes="multiline"

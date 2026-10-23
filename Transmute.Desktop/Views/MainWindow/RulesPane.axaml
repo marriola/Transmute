@@ -93,6 +93,7 @@
 				
                 <ae:TextEditor Name="Rules"
                                DockPanel.Dock="Bottom"
+                               Margin="{OnPlatform Windows=0 0 0 1}"
                                Focusable="True"
                                BorderThickness="1"
                                WordWrap="True"
