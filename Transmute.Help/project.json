@@ -21,17 +21,22 @@
 			"heading": "Rule types"
 		},
 		{
-			"output": "4_Matching.md",
+			"output": "4_Labels.md",
+			"title": "Rule labels",
+			"heading": "Labeling"
+		},
+		{
+			"output": "5_Matching.md",
 			"title": "Matching",
 			"heading": "Matching"
 		},
 		{
-			"output": "5_DefiningSets.md",
+			"output": "6_DefiningSets.md",
 			"title": "Defining sets and features",
 			"heading": "Defining sets and features"
 		},
 		{
-			"output": "6_SyllableRules.md",
+			"output": "7_SyllableRules.md",
 			"title": "Syllable rules",
 			"heading": "Defining syllable rules"
 		}
