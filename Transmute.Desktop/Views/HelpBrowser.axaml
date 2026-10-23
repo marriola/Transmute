@@ -10,6 +10,11 @@
         Width="800" WindowState="Maximized"
         Opened="HelpBrowser_Opened"
         Title="Help">
+
+    <Window.KeyBindings>
+        <KeyBinding Command="{Binding #Window.Close}" Gesture="{OnPlatform Alt+W, macOS=Cmd+W}" />
+    </Window.KeyBindings>
+
   <Grid ColumnDefinitions="400,2,*" RowDefinitions="*">
       <TreeView Name="SelectedSection"
                 Grid.Row="0" Grid.Column="0"
