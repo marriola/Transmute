@@ -79,6 +79,8 @@ namespace Transmute.Desktop.Models
 
         public bool IsMaximized { get; set; } = true;
 
+        public bool IsFullScreen { get; set; }
+
         public double? RulesPaneWidth { get; set; }
 
         public double? InputPaneWidth { get; set; }

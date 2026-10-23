@@ -298,6 +298,37 @@ namespace Transmute.Desktop.Views
         {
             _configurationService.Configuration.SilIpaFix = ViewModel.RulesPaneViewModel.IpaFix = !ViewModel.RulesPaneViewModel.IpaFix;
         }
+
+        public void ToggleHorizontalScrollbar()
+        {
+            _configurationService.Configuration.ShowHorizontalScrollbar = !_configurationService.Configuration.ShowHorizontalScrollbar;
+            SetHorizontalScrollBarVisibility();
+        }
+
+        public void ToggleWordWrap()
+        {
+            _configurationService.Configuration.WordWrap = !_configurationService.Configuration.WordWrap;
+            RulesPane.SetWordWrap(_configurationService.Configuration.WordWrap);
+        }
+
+        public void Minimize()
+        {
+            WindowState = WindowState.Minimized;
+        }
+
+        public void FullScreen()
+        {
+            if (WindowState == WindowState.FullScreen)
+            {
+                WindowState = _oldWindowState;
+            }
+            else
+            {
+                _oldWindowState = WindowState;
+                WindowState = WindowState.FullScreen;
+            }
+        }
+
         protected override void OnLoaded(RoutedEventArgs e)
         {
             base.OnLoaded(e);

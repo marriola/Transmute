@@ -96,6 +96,8 @@
         <KeyBinding Command="{Binding #Window.OpenHelp}" Gesture="F1" />
 
 		<KeyBinding Command="{Binding #RulesPane.FocusNavigationList}" Gesture="{OnPlatform Ctrl+L, macOS=Cmd+L}" />
+        <KeyBinding Command="{Binding #Window.Minimize}" Gesture="{OnPlatform macOS=Cmd+M}" />
+        <KeyBinding Command="{Binding #Window.FullScreen}" Gesture="{OnPlatform macOS=Cmd+Shift+F}" />
     </Window.KeyBindings>
 
     <NativeMenu.Menu>
@@ -250,7 +252,7 @@
             <Button Command="{Binding #Window.OpenLexicon}" i:Attached.Icon="fa-regular fa-folder-open" ToolTip.Tip="{OnPlatform Open Lexicon (Ctrl+Shift+O), macOS=Open Lexicon (⇧⌘O)}" />
             <Button Command="{Binding #Window.SaveLexicon}" i:Attached.Icon="fa-regular fa-floppy-disk" ToolTip.Tip="{OnPlatform Save Lexicon (Ctrl+Shift+S), macOS=Save Lexicon (⇧⌘S)}" />
             <Button Command="{Binding #Window.ApplyRules}" i:Attached.Icon="fa-diagram-next" ToolTip.Tip="Apply Rules (F5)" IsEnabled="{Binding !RulesPaneViewModel.IsCompiling}" />
-            <Button Command="{Binding #Window.SaveOutputLexicon}" i:Attached.Icon="fa-solid fa-file-export" ToolTip.Tip="{OnPlatform Save Results (Ctrl+Alt+Shift+S), macOS=Save Rules (⇧⌥⌘S)}" />
+            <Button Command="{Binding #Window.SaveOutputLexicon}" i:Attached.Icon="fa-solid fa-file-export" ToolTip.Tip="{OnPlatform Save Results (Ctrl+Alt+Shift+S), macOS=Save Results (⇧⌥⌘S)}" />
 
             <Line Classes="separator" />
 

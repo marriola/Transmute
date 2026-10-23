@@ -65,10 +65,26 @@ namespace Transmute.Desktop
             {
                 DataContext = new MainWindowViewModel(),
                 Width = _configurationService.Configuration.WindowWidth,
-                Height = _configurationService.Configuration.WindowHeight,
-                WindowState = _configurationService.Configuration.IsMaximized ? WindowState.Maximized : WindowState.Normal,
-                Position = new PixelPoint(_configurationService.Configuration.WindowX, _configurationService.Configuration.WindowY)
+                Height = _configurationService.Configuration.WindowHeight
             };
+
+            if (_configurationService.Configuration.IsFullScreen)
+            {
+                desktop.MainWindow.WindowState = WindowState.FullScreen;
+            }
+            else if (_configurationService.Configuration.IsMaximized)
+            {
+                desktop.MainWindow.WindowState = WindowState.Maximized;
+            }
+
+            if (_configurationService.IsNew)
+            {
+                desktop.MainWindow.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+            else
+            {
+                desktop.MainWindow.Position = new PixelPoint(_configurationService.Configuration.WindowX, _configurationService.Configuration.WindowY);
+            }
 
             base.OnFrameworkInitializationCompleted();
         }
