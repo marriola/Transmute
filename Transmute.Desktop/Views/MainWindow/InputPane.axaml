@@ -12,7 +12,7 @@
     </Design.DataContext>
 
     <DockPanel Margin="10 0 10 0">
-		<TabStrip DockPanel.Dock="Top">
+		<TabStrip Name="TabStrip" DockPanel.Dock="Top">
 			<TabStripItem IsSelected="True"
                           Classes.dirty="{Binding IsLexiconDirty}"
                           Content="Lexicon"

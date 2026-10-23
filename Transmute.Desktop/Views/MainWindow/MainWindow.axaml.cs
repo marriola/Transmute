@@ -6,13 +6,14 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Styling;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Microsoft.Extensions.DependencyInjection;
 using System;
-using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -31,17 +32,37 @@ namespace Transmute.Desktop.Views
         /// HACK: The menu's GettingFocus event fires three times. When the user uses one of the Alt hotkeys to jump to one of the sections,
         /// each event needs to be cancelled to keep the focus from jumping to the menu.
         /// </summary>
-        private int didSelectTab = 0;
+        private int _didSelectTab = 0;
 
-        private ScrollViewer inputScroll = null;
-        private ScrollViewer outputScroll = null;
+        private ScrollViewer _inputScroll = null;
+        private ScrollViewer _outputScroll = null;
 
-        private HelpBrowser? helpBrowser = null;
+        private HelpBrowser? _helpBrowser = null;
 
-        private Size _previousSize;
+        private Size? _previousSize;
+
+        private PixelPoint? _previousPosition;
 
         private Control? _focusedEditor = null;
 
+        private bool _isRulesPaneResizing = false;
+
+        private WindowState _oldWindowState;
+
+        private (double rulesPane, double inputPane, double outputPane) _paneWidthPercentages = (0, 0, 0);
+
+        internal bool ShowNativeMenu => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+
+        private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
+
+        private ColumnDefinition RulesPaneColumn => LayoutGrid.ColumnDefinitions[0];
+
+        private ColumnDefinition InputPaneColumn => LayoutGrid.ColumnDefinitions[2];
+
+        private ColumnDefinition OutputPaneColumn => LayoutGrid.ColumnDefinitions[4];
+
+        private readonly DispatcherTimer _resizeTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+    
         public MainWindow()
         {
             InitializeComponent();
@@ -53,23 +74,31 @@ namespace Transmute.Desktop.Views
             
             if (_configurationService.Configuration.RulesPaneWidth is double rulesPaneWidth)
             {
-                LayoutGrid.ColumnDefinitions[0].Width = new GridLength(rulesPaneWidth);
+                RulesPaneColumn.Width = new GridLength(rulesPaneWidth, GridUnitType.Star);
             }
 
             if (_configurationService.Configuration.InputPaneWidth is double inputPaneWidth)
             {
-                LayoutGrid.ColumnDefinitions[2].Width = new GridLength(inputPaneWidth);
+                InputPaneColumn.Width = new GridLength(inputPaneWidth, GridUnitType.Star);
             }
 
             if (_configurationService.Configuration.OutputPaneWidth is double outputPaneWidth)
             {
-                LayoutGrid.ColumnDefinitions[4].Width = new GridLength(outputPaneWidth);
+                OutputPaneColumn.Width = new GridLength(outputPaneWidth, GridUnitType.Star);
             }
         }
 
-        internal bool ShowNativeMenu => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+        protected override void OnOpened(EventArgs e)
+        {
+            base.OnOpened(e);
 
-        private MainWindowViewModel ViewModel => DataContext as MainWindowViewModel;
+            RulesPaneColumn.MinWidth = RulesPane.TabStrip.Items.OfType<TabStripItem>().Max(t => t.DesiredSize.Width);
+            InputPaneColumn.MinWidth = InputPane.TabStrip.Items.OfType<TabStripItem>().Max(t => t.DesiredSize.Width);
+            OutputPaneColumn.MinWidth = OutputPane.TabStrip.Items.OfType<TabStripItem>().Max(t => t.DesiredSize.Width);
+
+            MinWidth = RulesPaneColumn.MinWidth + InputPaneColumn.MinWidth + OutputPaneColumn.MinWidth;
+            SizeChanged += Window_SizeChanged;
+        }
 
         public async Task ApplyRules()
         {
@@ -94,32 +123,32 @@ namespace Transmute.Desktop.Views
 
         public void OpenHelp()
         {
-            if (helpBrowser != null)
+            if (_helpBrowser != null)
             {
-                helpBrowser.Activate();
+                _helpBrowser.Activate();
                 return;
             }
 
-            helpBrowser = new();
-            helpBrowser.Show();
-            helpBrowser.Closed += (_, _) => helpBrowser = null;
+            _helpBrowser = new();
+            _helpBrowser.Show();
+            _helpBrowser.Closed += (_, _) => _helpBrowser = null;
         }
 
         public void SelectRuleTab(string tabIndexString)
         {
-            didSelectTab = 2;
+            _didSelectTab = 2;
             RulesPane.SelectRuleTab(tabIndexString);
         }
 
         public void SelectInputLexicon()
         {
-            didSelectTab = 2;
+            _didSelectTab = 2;
             InputPane.InputLexicon.Focus();
         }
 
         public void SelectOutputTab(string tabIndexString)
         {
-            didSelectTab = 2;
+            _didSelectTab = 2;
             OutputPane.SelectOutputTab(tabIndexString);
         }
 
@@ -340,14 +369,34 @@ namespace Transmute.Desktop.Views
 
             ViewModel.RulesPaneViewModel.IpaFix = _configurationService.Configuration.SilIpaFix;
 
+            _resizeTimer.Tick += (sender, e) =>
+            {
+                _resizeTimer.Stop();
+
+                if (WindowState == WindowState.Maximized || WindowState == WindowState.FullScreen)
+                {
+                    return;
+                }
+
+                _previousSize = new Size(_configurationService.Configuration.WindowWidth, _configurationService.Configuration.WindowHeight);
+                _previousPosition = new PixelPoint(_configurationService.Configuration.WindowX, _configurationService.Configuration.WindowY);
+
+                _configurationService.Configuration.WindowWidth = (int)Width;
+                _configurationService.Configuration.WindowHeight = (int)Height;
+                _configurationService.Configuration.WindowX = Position.X;
+                _configurationService.Configuration.WindowY = Position.Y;
+            };
+
             this.GetObservable(WindowStateProperty).Subscribe(ws =>
             {
-                // SizeChanged fires before WindowState changes and wipes out the saved window size in the config when maximizing, so restore it here
+                _configurationService.Configuration.IsFullScreen = ws == WindowState.FullScreen;
 
-                if (ws == WindowState.Maximized)
+                if (ws == WindowState.FullScreen && _previousSize is not null && _previousPosition is not null)
                 {
-                    _configurationService.Configuration.WindowWidth = (int)_previousSize.Width;
-                    _configurationService.Configuration.WindowHeight = (int)_previousSize.Height;
+                    _configurationService.Configuration.WindowWidth = (int)_previousSize.Value.Width;
+                    _configurationService.Configuration.WindowHeight = (int)_previousSize.Value.Height;
+                    _configurationService.Configuration.WindowX = _previousPosition.Value.X;
+                    _configurationService.Configuration.WindowY = _previousPosition.Value.Y;
                 }
             });
 
@@ -380,24 +429,24 @@ namespace Transmute.Desktop.Views
                 }
             }
 
-            if ((inputScroll = InputPane?.InputLexicon?.GetVisualDescendants()?.OfType<ScrollViewer>()?.FirstOrDefault()!) is null)
+            if ((_inputScroll = InputPane?.InputLexicon?.GetVisualDescendants()?.OfType<ScrollViewer>()?.FirstOrDefault()!) is null)
             {
                 return;
             }
 
-            inputScroll.ScrollChanged += (sender, e) =>
+            _inputScroll.ScrollChanged += (sender, e) =>
             {
-                outputScroll.Offset = inputScroll.Offset;
+                _outputScroll.Offset = _inputScroll.Offset;
             };
 
-            if ((outputScroll = OutputPane?.OutputLexicon.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault()!) is null)
+            if ((_outputScroll = OutputPane?.OutputLexicon.GetVisualDescendants().OfType<ScrollViewer>().FirstOrDefault()!) is null)
             {
                 return;
             }
 
-            outputScroll.ScrollChanged += (sender, e) =>
+            _outputScroll.ScrollChanged += (sender, e) =>
             {
-                inputScroll.Offset = outputScroll.Offset;
+                _inputScroll.Offset = _outputScroll.Offset;
             };
 
             RulesPane.Rules.Focus();
@@ -422,37 +471,45 @@ namespace Transmute.Desktop.Views
 
         private void TheMenu_Opened(object? sender, RoutedEventArgs e)
         {
-            if (didSelectTab > 0)
+            if (_didSelectTab > 0)
             {
-                didSelectTab--;
+                _didSelectTab--;
                 TheMenu.Close();
             }
         }
 
         private void TheMenu_GettingFocus(object? sender, Avalonia.Input.FocusChangingEventArgs e)
         {
-            if (didSelectTab > 0)
+            if (_didSelectTab > 0)
             {
                 e.TryCancel();
                 TheMenu.Close();
             }
         }
 
-        public void ToggleHorizontalScrollbar()
-        {
-            _configurationService.Configuration.ShowHorizontalScrollbar = !_configurationService.Configuration.ShowHorizontalScrollbar;
-            SetHorizontalScrollBarVisibility();
-        }
-
-        public void ToggleWordWrap()
-        {
-            _configurationService.Configuration.WordWrap = !_configurationService.Configuration.WordWrap;
-            RulesPane.SetWordWrap(_configurationService.Configuration.WordWrap);
-        }
-
         private void SetHorizontalScrollBarVisibility()
         {
             ViewModel.HorizontalScrollBarVisibility = _configurationService.Configuration.ShowHorizontalScrollbar ? ScrollBarVisibility.Visible : ScrollBarVisibility.Hidden;
+        }
+
+        private void Help_Clicked(object? sender, RoutedEventArgs e)
+        {
+            OpenHelp();
+        }
+
+        private void Help_Clicked_Native(object? sender, EventArgs e)
+        {
+            OpenHelp();
+        }
+
+        private void AboutTransmute_Clicked(object? sender, RoutedEventArgs e)
+        {
+            App.AboutTransmute();
+        }
+
+        private void AboutAvalonia_Clicked(object? sender, RoutedEventArgs e)
+        {
+            App.AboutAvalonia();
         }
 
         private async void Window_Closing(object? sender, WindowClosingEventArgs e)
@@ -462,14 +519,12 @@ namespace Transmute.Desktop.Views
                 return;
             }
 
-            helpBrowser?.Close();
+            _helpBrowser?.Close();
 
             _configurationService.Configuration.IsMaximized = WindowState == WindowState.Maximized;
-            _configurationService.Configuration.WindowX = Position.X;
-            _configurationService.Configuration.WindowY = Position.Y;
-            _configurationService.Configuration.RulesPaneWidth = LayoutGrid.ColumnDefinitions[0].Width.Value;
-            _configurationService.Configuration.InputPaneWidth = LayoutGrid.ColumnDefinitions[2].Width.Value;
-            _configurationService.Configuration.OutputPaneWidth = LayoutGrid.ColumnDefinitions[4].Width.Value;
+            _configurationService.Configuration.RulesPaneWidth = RulesPaneColumn.Width.Value;
+            _configurationService.Configuration.InputPaneWidth = InputPaneColumn.Width.Value;
+            _configurationService.Configuration.OutputPaneWidth = OutputPaneColumn.Width.Value;
             _configurationService.Save();
 
             if (!ViewModel.RulesPaneViewModel.IsRulesDirty && !ViewModel.InputPaneViewModel.IsLexiconDirty)
@@ -491,30 +546,24 @@ namespace Transmute.Desktop.Views
 
         private void Window_SizeChanged(object? sender, SizeChangedEventArgs e)
         {
-            _previousSize = e.PreviousSize;
-            _configurationService.Configuration.WindowWidth = (int)Width;
-            _configurationService.Configuration.WindowHeight = (int)Height;
-            Debug.WriteLine($"size changed: {e.NewSize}");
+            _resizeTimer.Stop();
+            _resizeTimer.Start();
         }
 
-        private void Help_Clicked(object? sender, RoutedEventArgs e)
+        private void Window_PositionChanged(object? sender, PixelPointEventArgs e)
         {
-            OpenHelp();
+            _configurationService.Configuration.WindowX = Position.X;
+            _configurationService.Configuration.WindowY = Position.Y;
         }
 
-        private void Help_Clicked_Native(object? sender, EventArgs e)
+        private void RulesPaneSplitter_DragStarted(object? sender, VectorEventArgs e)
         {
-            OpenHelp();
+            _isRulesPaneResizing = true;
         }
 
-        private void AboutTransmute_Clicked(object? sender, RoutedEventArgs e)
+        private void RulesPaneSplitter_DragCompleted(object? sender, VectorEventArgs e)
         {
-            App.AboutTransmute();
-        }
-
-        private void AboutAvalonia_Clicked(object? sender, RoutedEventArgs e)
-        {
-            App.AboutAvalonia();
+            _isRulesPaneResizing = false;
         }
     }
 }

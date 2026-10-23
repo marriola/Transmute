@@ -69,7 +69,7 @@
     </UserControl.Styles>
 
     <DockPanel Margin="0 0 10 0">
-        <TabStrip DockPanel.Dock="Top">
+        <TabStrip Name="TabStrip" DockPanel.Dock="Top">
 			<TabStripItem Content="Rules"
                           IsSelected="{Binding ShowRules}"
                           Classes.dirty="{Binding IsRulesDirty}"

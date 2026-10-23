@@ -13,9 +13,9 @@
         x:Name="Window"
         Icon="/Assets/transmute.ico"
         Title="Transmute"
-        Width="800" Height="600" WindowState="Maximized"
+        Width="800" Height="600"
         Closing="Window_Closing"
-        SizeChanged="Window_SizeChanged">
+        PositionChanged="Window_PositionChanged">
     
     <Design.DataContext>
         <vm:MainWindowViewModel/>
@@ -220,18 +220,18 @@
         <!-- Toolbar -->
         <StackPanel Classes="toolbar" DockPanel.Dock="Top" Orientation="Horizontal" Margin="5" Spacing="5">
             <SplitButton Name="BackButton"
-                         Command="{Binding #Window.GoBack}"
-                         i:Attached.Icon="fa-regular fa-circle-left"
+                        Command="{Binding #Window.GoBack}"
+                        i:Attached.Icon="fa-regular fa-circle-left"
                         ToolTip.Tip="{OnPlatform Navigate Back (Alt+Left), macOS=Navigate Back (⌘[)}"
-                         IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
-				<SplitButton.Flyout>
-					<Flyout Placement="Bottom">
-						<ListBox Name="NavigationHistory"
-                                 BorderThickness="0" Padding="0" Margin="0"
-                                 ItemsSource="{Binding RulesPaneViewModel.NavigationHistory}"
-                                 SelectedItem="{Binding RulesPaneViewModel.CurrentPosition, Mode=OneWay}"
-                                 DisplayMemberBinding="{Binding Description}"
-                                 SelectionChanged="History_SelectionChanged" />
+                        IsEnabled="{Binding RulesPaneViewModel.HasHistory}">
+                <SplitButton.Flyout>
+                    <Flyout Placement="Bottom">
+                        <ListBox Name="NavigationHistory"
+                                BorderThickness="0" Padding="0" Margin="0"
+                                ItemsSource="{Binding RulesPaneViewModel.NavigationHistory}"
+                                SelectedItem="{Binding RulesPaneViewModel.CurrentPosition, Mode=OneWay}"
+                                DisplayMemberBinding="{Binding Description}"
+                                SelectionChanged="History_SelectionChanged" />
                     </Flyout>
                 </SplitButton.Flyout>
             </SplitButton>
@@ -260,7 +260,7 @@
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*" RowDefinitions="*,auto,auto">
             <Grid Name="LayoutGrid" ColumnDefinitions="4*,0,2*,0,2*" Grid.Row="0" Grid.Column="0" Margin="10 0 10 0">
                 <uc:RulesPane Grid.Column="0" Name="RulesPane" DataContext="{Binding RulesPaneViewModel}" />
-                <GridSplitter Grid.Column="1" />
+                <GridSplitter Grid.Column="1" DragStarted="RulesPaneSplitter_DragStarted" DragCompleted="RulesPaneSplitter_DragCompleted"/>
                 <uc:InputPane Grid.Column="2" Name="InputPane" DataContext="{Binding InputPaneViewModel}" />
                 <GridSplitter Grid.Column="3" />
                 <uc:OutputPane Grid.Column="4" Name="OutputPane" DataContext="{Binding OutputPaneViewModel}" />
