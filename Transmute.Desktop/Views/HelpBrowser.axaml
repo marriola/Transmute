@@ -12,7 +12,7 @@
         Title="Help">
 
     <Window.KeyBindings>
-        <KeyBinding Command="{Binding #Window.Close}" Gesture="{OnPlatform Alt+W, macOS=Cmd+W}" />
+        <KeyBinding Command="{Binding #Window.Close}" Gesture="{OnPlatform Ctrl+W, macOS=Cmd+W}" />
     </Window.KeyBindings>
 
   <Grid ColumnDefinitions="400,2,*" RowDefinitions="*">
