@@ -26,7 +26,7 @@
   <!-- Recompile help.tar.gz when README.md changes -->
 
   <ItemGroup>
-    <HelpInput Include="../README.md" />
+    <HelpInput Include="../README.md; ../Transmute.Help/project.json" />
     <HelpOutput Include="help.tar.gz" />
   </ItemGroup>
 
