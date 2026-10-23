@@ -42,11 +42,6 @@
         <Style Selector="HyperlinkButton">
             <Setter Property="Foreground" Value="{DynamicResource HighlightBrush}" />
         </Style>
-        <Style Selector="GridSplitter">
-			    <Setter Property="Background" Value="SlateGray" />
-			    <Setter Property="MinWidth" Value="3" />
-			    <Setter Property="MaxWidth" Value="3" />
-        </Style>
         <SimpleTheme />
         <StyleInclude Source="avares://AvaloniaEdit/Themes/Simple/AvaloniaEdit.xaml" />
         <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Simple.xaml" />

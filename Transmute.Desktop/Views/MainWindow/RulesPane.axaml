@@ -68,7 +68,7 @@
         </Style>
     </UserControl.Styles>
 
-    <DockPanel>
+    <DockPanel Margin="0 0 10 0">
         <TabStrip DockPanel.Dock="Top">
 			<TabStripItem Content="Rules"
                           IsSelected="{Binding ShowRules}"
@@ -81,12 +81,11 @@
         </TabStrip>
 
         <Panel DockPanel.Dock="Bottom">
-            <DockPanel IsVisible="{Binding ShowRules}">
+            <DockPanel IsVisible="{Binding ShowRules}" VerticalSpacing="10">
                 <ComboBox Name="HighlightedRule"
                           IsTextSearchEnabled="True"
                           DockPanel.Dock="Top"
                           HorizontalAlignment="Stretch"
-                          Margin="10 10 10 0"
                           SelectionChanged="HighlightedRule_SelectionChanged"
                           ItemsSource="{Binding NavigationList}"
                           ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
@@ -104,12 +103,11 @@
                                Document="{Binding Rules}" />
             </DockPanel>
 
-            <DockPanel IsVisible="{Binding ShowTransitionTables}">
+            <DockPanel IsVisible="{Binding ShowTransitionTables}" VerticalSpacing="10">
                 <ComboBox Name="SelectedTransitionTable"
                           IsTextSearchEnabled="True"
                           DockPanel.Dock="Top"
                           HorizontalAlignment="Stretch"
-                          Margin="10 10 10 0"
                           SelectionChanged="TransitionTable_SelectionChanged"
                           ItemsSource="{Binding TransitionTables}"
                           ToolTip.Tip="{OnPlatform Ctrl+L, macOS=⌘L}"
@@ -118,7 +116,6 @@
                 <DataGrid DockPanel.Dock="Bottom"
                           Name="TransitionTableGrid"
                           RowBackground="Transparent"
-                          Margin="10"
                           IsReadOnly="True"
                           CanUserReorderColumns="True"
                           CanUserResizeColumns="True"

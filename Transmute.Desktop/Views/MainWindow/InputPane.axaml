@@ -11,7 +11,7 @@
         <vm:MainWindowViewModel/>
     </Design.DataContext>
 
-    <DockPanel>
+    <DockPanel Margin="10 0 10 0">
 		<TabStrip DockPanel.Dock="Top">
 			<TabStripItem IsSelected="True"
                           Classes.dirty="{Binding IsLexiconDirty}"
