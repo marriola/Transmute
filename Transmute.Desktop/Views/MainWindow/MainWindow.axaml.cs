@@ -67,6 +67,11 @@ namespace Transmute.Desktop.Views
         {
             InitializeComponent();
 
+            if (Design.IsDesignMode)
+            {
+                return;
+            }
+
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 IpaSilFix.IsVisible = false;
